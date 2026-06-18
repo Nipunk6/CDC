@@ -77,9 +77,10 @@ const getStatusIcon = (status: string) => {
 
 function JnfQueueContent() {
   const searchParams = useSearchParams();
-  const initialStatus = searchParams.get("status") || "pending";
+  const initialStatus = searchParams.get("status") || "all";
   const [jnfs, setJnfs] = useState<JnfItem[]>([]);
   const [status, setStatus] = useState<string>(initialStatus);
+  const [selectedYear, setSelectedYear] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,7 +89,7 @@ function JnfQueueContent() {
       setLoading(true);
       setError(null);
 
-      const query = status === "pending" ? "" : `?status=${encodeURIComponent(status)}`;
+      const query = status === "all" ? "?status=all" : (status === "pending" ? "" : `?status=${encodeURIComponent(status)}`);
 
       try {
         const response = await adminApi<{ jnfs: JnfItem[] }>(`/admin/jnfs${query}`);
@@ -107,7 +108,17 @@ function JnfQueueContent() {
     setStatus(event.target.value);
   };
 
-  const groupedJnfs = jnfs.reduce((acc, jnf) => {
+  const currentYear = new Date().getFullYear();
+  const staticYears = Array.from({ length: 4 }, (_, i) => String(currentYear + i));
+  const existingYears = jnfs.map((jnf) => jnf.graduating_batch).filter((b): b is string => !!b && b !== "Unknown Batch");
+  const availableYears = Array.from(new Set([...staticYears, ...existingYears])).sort((a, b) => b.localeCompare(a));
+
+  const filteredJnfs = jnfs.filter(jnf => {
+    if (selectedYear === "all") return true;
+    return (jnf.graduating_batch || "Unknown Batch") === selectedYear;
+  });
+
+  const groupedJnfs = filteredJnfs.reduce((acc, jnf) => {
     const batch = jnf.graduating_batch || "Unknown Batch";
     if (!acc[batch]) {
       acc[batch] = [];
@@ -160,13 +171,28 @@ function JnfQueueContent() {
 
       {/* Filter */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} flexWrap="wrap" useFlexGap>
           <Stack direction="row" spacing={1} alignItems="center">
+            <FilterListIcon color="primary" />
+            <Typography variant="subtitle2">Filter by Year:</Typography>
+          </Stack>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <Select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} displayEmpty>
+              <MenuItem value="all">All Years</MenuItem>
+              <MenuItem value="Unknown Batch">Unknown Batch</MenuItem>
+              {availableYears.map((year) => (
+                <MenuItem key={year} value={year}>{`Batch of ${year}`}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: { sm: 2 } }}>
             <FilterListIcon color="primary" />
             <Typography variant="subtitle2">Filter by Status:</Typography>
           </Stack>
           <FormControl size="small" sx={{ minWidth: 250 }}>
             <Select value={status} onChange={handleStatusChange} displayEmpty>
+              <MenuItem value="all">All Statuses</MenuItem>
               <MenuItem value="pending">📋 Pending Queue (submitted + under_review)</MenuItem>
               <MenuItem value="submitted">⏳ Submitted</MenuItem>
               <MenuItem value="under_review">🔍 Under Review</MenuItem>
@@ -175,7 +201,7 @@ function JnfQueueContent() {
               <MenuItem value="draft">📝 Draft</MenuItem>
             </Select>
           </FormControl>
-          <Chip label={`${jnfs.length} results`} color="primary" variant="outlined" />
+          <Chip label={`${filteredJnfs.length} results`} color="primary" variant="outlined" sx={{ ml: 'auto !important' }} />
         </Stack>
       </Paper>
 

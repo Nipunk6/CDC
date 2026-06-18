@@ -25,12 +25,12 @@ class AdminFormReviewController extends Controller
     public function jnfQueue(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'status' => ['nullable', 'in:submitted,under_review,accepted,rejected,draft'],
+            'status' => ['nullable', 'in:submitted,under_review,accepted,rejected,draft,all'],
         ]);
 
         $query = Jnf::with('company:id,name,hr_name,hr_email,logo_path')->latest();
 
-        if (! empty($validated['status'])) {
+        if (! empty($validated['status']) && $validated['status'] !== 'all') {
             if ($validated['status'] === 'draft') {
                 $query->where(function ($nested): void {
                     $nested
@@ -52,8 +52,16 @@ class AdminFormReviewController extends Controller
             } else {
                 $query->where('status', $validated['status']);
             }
-        } else {
+        } elseif (empty($validated['status'])) {
             $query->whereIn('status', ['submitted', 'under_review']);
+        } elseif ($validated['status'] === 'all') {
+            $query->with([
+                'statusHistories' => function ($history): void {
+                    $history
+                        ->select(['id', 'form_id', 'form_type', 'new_status', 'created_at'])
+                        ->latest();
+                },
+            ]);
         }
 
         $jnfs = $query->get()->map(function (Jnf $jnf) use ($validated) {
@@ -63,7 +71,7 @@ class AdminFormReviewController extends Controller
                 $batch = $formData['eligibility'][0]['graduatingBatches'][0];
             }
 
-            if (($validated['status'] ?? null) === 'draft') {
+            if (in_array(($validated['status'] ?? null), ['draft', 'all'], true)) {
                 $isDraftReviewMarked = $this->isDraftReviewMarked($jnf->statusHistories, (string) $jnf->status);
 
                 if ($isDraftReviewMarked) {
@@ -92,12 +100,12 @@ class AdminFormReviewController extends Controller
     public function infQueue(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'status' => ['nullable', 'in:submitted,under_review,accepted,rejected,draft'],
+            'status' => ['nullable', 'in:submitted,under_review,accepted,rejected,draft,all'],
         ]);
 
         $query = Inf::with('company:id,name,hr_name,hr_email,logo_path')->latest();
 
-        if (! empty($validated['status'])) {
+        if (! empty($validated['status']) && $validated['status'] !== 'all') {
             if ($validated['status'] === 'draft') {
                 $query->where(function ($nested): void {
                     $nested
@@ -119,8 +127,16 @@ class AdminFormReviewController extends Controller
             } else {
                 $query->where('status', $validated['status']);
             }
-        } else {
+        } elseif (empty($validated['status'])) {
             $query->whereIn('status', ['submitted', 'under_review']);
+        } elseif ($validated['status'] === 'all') {
+            $query->with([
+                'statusHistories' => function ($history): void {
+                    $history
+                        ->select(['id', 'form_id', 'form_type', 'new_status', 'created_at'])
+                        ->latest();
+                },
+            ]);
         }
 
         $infs = $query->get()->map(function (Inf $inf) use ($validated) {
@@ -130,7 +146,7 @@ class AdminFormReviewController extends Controller
                 $batch = $formData['eligibility'][0]['graduatingBatches'][0];
             }
 
-            if (($validated['status'] ?? null) === 'draft') {
+            if (in_array(($validated['status'] ?? null), ['draft', 'all'], true)) {
                 $isDraftReviewMarked = $this->isDraftReviewMarked($inf->statusHistories, (string) $inf->status);
 
                 if ($isDraftReviewMarked) {
