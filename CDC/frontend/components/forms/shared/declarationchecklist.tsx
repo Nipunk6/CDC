@@ -18,6 +18,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import DownloadIcon from "@mui/icons-material/Download";
 import { useState, useEffect } from "react";
 import { companyApi } from "@/lib/companyapi";
 import dynamic from "next/dynamic";
@@ -108,8 +109,6 @@ export default function DeclarationChecklist({
   const handleReachBottom = () => {
     if (pdfUrl) {
       setReadDocs((prev) => ({ ...prev, [pdfUrl.docId]: true }));
-      // Automatically close modal after reading
-      setTimeout(() => setPdfUrl(null), 500);
     }
   };
 
@@ -282,9 +281,31 @@ export default function DeclarationChecklist({
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {pdfUrl?.title || "Document"}
-          <IconButton onClick={() => setPdfUrl(null)} size="small">
-            <CloseIcon />
-          </IconButton>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <IconButton
+              onClick={() => {
+                if (pdfUrl) {
+                  const downloadUrl = pdfUrl.url.startsWith("http")
+                    ? `/api/proxy-pdf?url=${encodeURIComponent(pdfUrl.url)}`
+                    : pdfUrl.url;
+                  const link = document.createElement('a');
+                  link.href = downloadUrl;
+                  link.download = `${pdfUrl.title || 'document'}.pdf`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }
+              }}
+              size="small"
+              title="Download PDF"
+              sx={{ color: 'primary.main' }}
+            >
+              <DownloadIcon />
+            </IconButton>
+            <IconButton onClick={() => setPdfUrl(null)} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0, bgcolor: "#f5f5f5" }}>
           {pdfUrl && (
