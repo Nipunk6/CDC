@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\PolicyDocument;
+use App\Models\User;
 use App\Services\FileUploadService;
+use App\Services\PortalNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PolicyDocumentController extends Controller
 {
-    public function __construct(private readonly FileUploadService $fileUploadService)
-    {
+    public function __construct(
+        private readonly FileUploadService $fileUploadService,
+        private readonly PortalNotificationService $notificationService
+    ) {
     }
 
     /**
@@ -51,6 +55,8 @@ class PolicyDocumentController extends Controller
             'is_visible_inf' => filter_var($request->input('is_visible_inf', true), FILTER_VALIDATE_BOOLEAN),
         ]);
 
+        $this->notifyAdmins($request, 'created', $document->title);
+
         return response()->json([
             'message' => 'Policy document created successfully.',
             'document' => $document,
@@ -88,6 +94,8 @@ class PolicyDocumentController extends Controller
             'is_visible_inf' => filter_var($request->input('is_visible_inf', true), FILTER_VALIDATE_BOOLEAN),
         ]);
 
+        $this->notifyAdmins($request, 'updated', $policyDocument->title);
+
         return response()->json([
             'message' => 'Policy document updated successfully.',
             'document' => $policyDocument,
@@ -99,7 +107,10 @@ class PolicyDocumentController extends Controller
      */
     public function destroy(PolicyDocument $policyDocument): JsonResponse
     {
+        $docTitle = $policyDocument->title;
         $policyDocument->delete();
+
+        $this->notifyAdmins(request(), 'deleted', $docTitle);
 
         return response()->json([
             'message' => 'Policy document deleted successfully.',
@@ -126,5 +137,29 @@ class PolicyDocumentController extends Controller
         $documents = $query->orderBy('id', 'asc')->get(['id', 'title', 'type', 'url']);
 
         return response()->json($documents);
+    }
+
+    /**
+     * Notify all admin users of actions performed on policy documents.
+     */
+    private function notifyAdmins(Request $request, string $actionText, string $docTitle): void
+    {
+        $actorEmail = $request->user()?->email ?? 'unknown-admin';
+        $admins = User::query()->where('role', 'admin')->get();
+
+        foreach ($admins as $admin) {
+            $this->notificationService->createInAppNotification(
+                user: $admin,
+                title: 'Policy Document Update',
+                message: sprintf(
+                    'Admin %s: Policy document "%s" was %s by %s.',
+                    $admin->email,
+                    $docTitle,
+                    $actionText,
+                    $actorEmail
+                ),
+                type: 'info'
+            );
+        }
     }
 }

@@ -203,55 +203,64 @@ export default function PdfViewer({ url, onReachBottom }: PdfViewerProps) {
           ))}
         </Document>
 
-        {/* Agreement button — appears after scrolling to end */}
-        {hasReachedEnd && (
-          <Box
-            sx={{
-              width: "100%",
-              maxWidth: 800,
-              mt: 3,
-              mb: 2,
-              p: 3,
-              bgcolor: agreed ? "rgba(46, 125, 50, 0.08)" : "white",
-              borderRadius: 2,
-              boxShadow: agreed ? 0 : 3,
-              border: "2px solid",
-              borderColor: agreed ? "success.main" : "primary.main",
-              textAlign: "center",
-              transition: "all 0.3s ease",
-            }}
-          >
-            {agreed ? (
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
-                <CheckCircleOutlineIcon color="success" />
-                <Typography variant="body1" fontWeight={600} color="success.main">
-                  You have agreed to this guideline
-                </Typography>
-              </Box>
-            ) : (
-              <>
-                <Typography variant="body2" color="text.secondary" mb={2}>
-                  You have finished reading this document. Please confirm below.
-                </Typography>
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={handleAgree}
-                  sx={{
-                    px: 5,
-                    py: 1.5,
-                    borderRadius: 2,
-                    fontWeight: 600,
-                    fontSize: "0.95rem",
-                    textTransform: "none",
-                    boxShadow: 2,
-                    "&:hover": { boxShadow: 4 },
-                  }}
-                >
-                  ✅ I have read this guideline and I agree
-                </Button>
-              </>
-            )}
+      </Box>
+
+      {/* Agreement button — STATIC/FIXED at the bottom */}
+      <Box
+        sx={{
+          width: "100%",
+          p: 2.5,
+          bgcolor: agreed ? "rgba(46, 125, 50, 0.05)" : "white",
+          borderTop: "1px solid",
+          borderColor: agreed ? "success.light" : "divider",
+          textAlign: "center",
+          boxShadow: "0 -4px 12px rgba(0,0,0,0.05)",
+          zIndex: 10,
+          flexShrink: 0,
+        }}
+      >
+        {agreed ? (
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
+            <CheckCircleOutlineIcon color="success" />
+            <Typography variant="body1" fontWeight={700} color="success.main">
+              You have agreed to this guideline
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+            <Typography variant="body2" color="text.secondary" fontWeight={500}>
+              {!hasReachedEnd
+                ? "Please read the document till the end before proceeding further."
+                : "You have finished reading this document. Please confirm below."}
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              disabled={!hasReachedEnd}
+              onClick={handleAgree}
+              startIcon={<CheckCircleOutlineIcon />}
+              sx={{
+                px: 5,
+                py: 1.25,
+                borderRadius: 2,
+                fontWeight: 700,
+                fontSize: "0.95rem",
+                textTransform: "none",
+                bgcolor: "#7B1113",
+                color: "white",
+                boxShadow: 2,
+                "&:hover": {
+                  bgcolor: "#5A0C0E",
+                  boxShadow: 4,
+                },
+                "&.Mui-disabled": {
+                  bgcolor: "rgba(0, 0, 0, 0.08)",
+                  color: "rgba(0, 0, 0, 0.26)",
+                }
+              }}
+            >
+              I have read this guideline and I agree
+            </Button>
           </Box>
         )}
       </Box>

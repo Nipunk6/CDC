@@ -19,6 +19,8 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DownloadIcon from "@mui/icons-material/Download";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import LinkIcon from "@mui/icons-material/Link";
 import { useState, useEffect } from "react";
 import { companyApi } from "@/lib/companyapi";
 import dynamic from "next/dynamic";
@@ -109,6 +111,7 @@ export default function DeclarationChecklist({
   const handleReachBottom = () => {
     if (pdfUrl) {
       setReadDocs((prev) => ({ ...prev, [pdfUrl.docId]: true }));
+      setPdfUrl(null);
     }
   };
 
@@ -126,43 +129,65 @@ export default function DeclarationChecklist({
         {/* Policy Links Moved to Top */}
         <Box sx={{ bgcolor: alpha("#ff9800", 0.1), p: 2, borderRadius: 1, mb: 3, border: '1px solid', borderColor: 'warning.light' }}>
           <Typography variant="body2" color="text.primary" fontWeight={500} mb={1}>
-            ⚠️ You must read and scroll/click all guidelines below to unlock the declaration checkboxes.
+            ⚠️ You must read all guidelines below to proceed further.
           </Typography>
           {loading ? (
             <CircularProgress size={20} sx={{ mt: 1 }} />
           ) : documents.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No guidelines required for this form.</Typography>
           ) : (
-            <Stack direction="row" spacing={3} flexWrap="wrap" useFlexGap gap={2}>
+            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap gap={2} sx={{ mt: 1.5 }}>
               {documents.map((doc) => {
                 const isRead = Boolean(readDocs[doc.id]);
-                if (doc.type === "link") {
-                  return (
-                    <Link
-                      key={doc.id}
-                      href={doc.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => handleLinkClick(doc)}
-                      variant="body2"
-                      sx={{ cursor: "pointer", display: 'flex', alignItems: 'center', gap: 0.5, color: isRead ? 'success.main' : 'primary.main', textDecoration: 'none' }}
-                    >
-                      📄 {doc.title} {isRead && "✓"}
-                    </Link>
-                  );
-                } else {
-                  return (
-                    <Link
-                      key={doc.id}
-                      href="#"
-                      onClick={(e) => handleOpenPdf(e, doc)}
-                      variant="body2"
-                      sx={{ cursor: "pointer", display: 'flex', alignItems: 'center', gap: 0.5, color: isRead ? 'success.main' : 'primary.main', textDecoration: 'none' }}
-                    >
-                      📄 {doc.title} {isRead && "✓"}
-                    </Link>
-                  );
-                }
+                return (
+                  <Box
+                    key={doc.id}
+                    component="a"
+                    href={doc.type === "link" ? doc.url : "#"}
+                    target={doc.type === "link" ? "_blank" : undefined}
+                    rel={doc.type === "link" ? "noopener noreferrer" : undefined}
+                    onClick={
+                      doc.type === "link"
+                        ? () => handleLinkClick(doc)
+                        : (e) => handleOpenPdf(e, doc)
+                    }
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                      px: 2.5,
+                      py: 1.5,
+                      borderRadius: 2,
+                      border: "1.5px solid",
+                      borderColor: isRead ? "success.light" : "primary.main",
+                      bgcolor: isRead ? "rgba(46, 125, 50, 0.03)" : "rgba(123, 17, 19, 0.02)",
+                      color: isRead ? "success.main" : "primary.main",
+                      textDecoration: "none",
+                      cursor: "pointer",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
+                      transition: "all 0.2s ease-in-out",
+                      "&:hover": {
+                        transform: "translateY(-1px)",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                        bgcolor: isRead ? "rgba(46, 125, 50, 0.08)" : "rgba(123, 17, 19, 0.06)",
+                      },
+                    }}
+                  >
+                    {doc.type === "pdf" ? (
+                      <PictureAsPdfIcon sx={{ fontSize: 20 }} />
+                    ) : (
+                      <LinkIcon sx={{ fontSize: 20 }} />
+                    )}
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                      <Typography variant="body2" fontWeight={600} color={isRead ? "success.dark" : "primary.dark"} sx={{ textAlign: 'left' }}>
+                        {doc.title}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem", fontWeight: 500, textAlign: 'left' }}>
+                        {isRead ? "✓ Read & Agreed" : "⚠ Action Required (Click to read)"}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
               })}
             </Stack>
           )}

@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CompanyRegistrationNotificationTest extends TestCase
@@ -18,15 +20,33 @@ class CompanyRegistrationNotificationTest extends TestCase
             'company_id' => null,
         ]);
 
+        // Verify the recruiter email in the database
+        DB::table('recruiter_email_verifications')->insert([
+            'email' => 'jane.hr@gmail.com',
+            'token_hash' => hash('sha256', 'dummy-token'),
+            'verified_at' => now(),
+            'expires_at' => now()->addHour(),
+        ]);
+
         $payload = [
             'company_name' => 'Acme Corp',
-            'industry' => 'Technology',
             'website' => 'https://acme.example',
-            'hr_name' => 'Jane HR',
+            'sector' => 'Technology',
+            'company_logo' => UploadedFile::fake()->create('logo.png', 100, 'image/png'),
+            'recruiter_name' => 'Jane HR',
+            'recruiter_designation' => 'HR Manager',
             'hr_email' => 'jane.hr@gmail.com',
             'hr_phone' => '9876543210',
-            'password' => 'Secret123',
-            'password_confirmation' => 'Secret123',
+            'head_name' => 'Head Recruiter',
+            'head_designation' => 'VP HR',
+            'head_email' => 'head@acme.example',
+            'head_mobile' => '9876543211',
+            'poc1_name' => 'POC One',
+            'poc1_designation' => 'Coordinator',
+            'poc1_email' => 'poc1@acme.example',
+            'poc1_mobile' => '9876543212',
+            'password' => 'Secret123!',
+            'password_confirmation' => 'Secret123!',
         ];
 
         $response = $this->postJson('/api/auth/company/register', $payload);

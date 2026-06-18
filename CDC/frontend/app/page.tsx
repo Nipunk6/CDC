@@ -135,7 +135,9 @@ export default function Home() {
             >
               <Box
                 component={Link}
-                href="/"
+                href="https://www.iitism.ac.in/"
+                target="_blank"
+                rel="noopener noreferrer"
                 sx={{
                   display: "flex",
                   alignItems: "center",
@@ -154,6 +156,10 @@ export default function Home() {
                 />
               </Box>
               <Box
+                component={Link}
+                href="https://www.iitism.ac.in/"
+                target="_blank"
+                rel="noopener noreferrer"
                 sx={{
                   width: { xs: 40, sm: 50, md: 65 },
                   height: { xs: 40, sm: 50, md: 65 },
@@ -162,6 +168,7 @@ export default function Home() {
                   justifyContent: "center",
                   flexShrink: 0,
                   ml: 1,
+                  textDecoration: "none",
                 }}
               >
                 <Image
