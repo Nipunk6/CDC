@@ -21,7 +21,9 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import CloseIcon from "@mui/icons-material/Close";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { createPortal } from "react-dom";
 
 export interface SelectionRound {
   id: string;
@@ -66,13 +68,13 @@ const modeOptions = [
 ];
 
 const defaultRounds: SelectionRound[] = [
-  { id: "1", type: "ppt", mode: "offline", enabled: false },
-  { id: "2", type: "resume", mode: "online", enabled: false },
-  { id: "3", type: "aptitude_test", mode: "online", enabled: false },
-  { id: "4", type: "technical_test", mode: "online", enabled: false },
-  { id: "5", type: "group_discussion", mode: "offline", enabled: false },
-  { id: "6", type: "technical_interview", mode: "offline", enabled: false },
-  { id: "7", type: "hr_interview", mode: "offline", enabled: false },
+  { id: "1", type: "ppt", mode: "offline", enabled: false, showDate: true, showDuration: true, showDetails: true, showInfra: true },
+  { id: "2", type: "resume", mode: "not_applicable", enabled: false, showDate: true, showDuration: true, showDetails: true, showInfra: false },
+  { id: "3", type: "aptitude_test", mode: "online", enabled: false, showDate: true, showDuration: true, showDetails: true, showInfra: true },
+  { id: "4", type: "technical_test", mode: "online", enabled: false, showDate: true, showDuration: true, showDetails: true, showInfra: true },
+  { id: "5", type: "group_discussion", mode: "offline", enabled: false, showDate: true, showDuration: true, showDetails: true, showInfra: true },
+  { id: "6", type: "technical_interview", mode: "offline", enabled: false, showDate: true, showDuration: true, showDetails: true, showInfra: true },
+  { id: "7", type: "hr_interview", mode: "offline", enabled: false, showDate: true, showDuration: true, showDetails: true, showInfra: true },
 ];
 
 export { defaultRounds };
@@ -88,7 +90,13 @@ export default function SelectionProcessBuilder({
     setIsMounted(true);
   }, []);
 
-  const rounds = value.length > 0 ? value : defaultRounds;
+  const rounds = (value.length > 0 ? value : defaultRounds).map((r) => ({
+    ...r,
+    showDate: r.showDate ?? true,
+    showDuration: r.showDuration ?? true,
+    showDetails: r.showDetails ?? true,
+    showInfra: r.showInfra ?? true,
+  }));
 
   const toggleRound = (id: string) => {
     const updated = rounds.map((r) =>
@@ -116,6 +124,10 @@ export default function SelectionProcessBuilder({
       duration: 30,
       description: "Others",
       enabled: true,
+      showDate: true,
+      showDuration: true,
+      showDetails: true,
+      showInfra: true,
     };
     onChange([...rounds, newRound]);
   };
@@ -207,230 +219,227 @@ export default function SelectionProcessBuilder({
 
                   return (
                     <Draggable key={round.id} draggableId={round.id} index={index}>
-                      {(provided, snapshot) => (
-                        <Box
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          style={{
-                            ...provided.draggableProps.style,
-                            paddingBottom: "16px",
-                          }}
-                        >
-                          <Paper
-                            sx={{
-                              p: 2,
-                              border: "1px solid",
-                              borderColor: "divider",
-                              "&:hover": { borderColor: "primary.light" },
-                              bgcolor: "background.paper",
-                              ...(snapshot.isDragging && {
-                                boxShadow: 3,
-                                borderColor: "primary.main",
-                              }),
+                      {(provided, snapshot) => {
+                        const child = (
+                          <Box
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            style={{
+                              ...provided.draggableProps.style,
+                              paddingBottom: "16px",
                             }}
                           >
-                          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }}>
-                            <Stack direction="row" alignItems="center" spacing={1} sx={{ width: { md: "280px" }, flexShrink: 0 }}>
-                              <Box {...provided.dragHandleProps} sx={{ display: 'flex', alignItems: 'center' }}>
-                                <DragIndicatorIcon sx={{ color: "text.disabled", cursor: "grab" }} />
-                              </Box>
-                    <Chip
-                      label={`Round ${index + 1}`}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                    />
-                    {round.type === "other" ? (
-                      <TextField
-                        size="small"
-                        placeholder="Round Name"
-                        value={round.description ?? ""}
-                        onChange={(e) => updateRound(round.id, "description", e.target.value)}
-                        variant="standard"
-                        sx={{ width: 150 }}
-                      />
-                    ) : (
-                      <Typography fontWeight={500}>
-                        {typeInfo?.icon} {typeInfo?.label}
-                      </Typography>
-                    )}
-                  </Stack>
-
-                  <FormControl size="small" sx={{ minWidth: 160 }}>
-                    <InputLabel>Mode</InputLabel>
-                    <Select
-                      value={round.mode}
-                      label="Mode"
-                      onChange={(e) => updateRound(round.id, "mode", e.target.value)}
-                    >
-                      {modeOptions.map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-
-                  {/* Options to add fields */}
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
-                    {!round.showDate && (
+                            <Paper
+                              sx={{
+                                p: 2,
+                                border: "1px solid",
+                                borderColor: "divider",
+                                "&:hover": { borderColor: "primary.light" },
+                                bgcolor: "background.paper",
+                                ...(snapshot.isDragging && {
+                                  boxShadow: 3,
+                                  borderColor: "primary.main",
+                                }),
+                              }}
+                            >
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }}>
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ width: { md: "280px" }, flexShrink: 0 }}>
+                                <Box {...provided.dragHandleProps} sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <DragIndicatorIcon sx={{ color: "text.disabled", cursor: "grab" }} />
+                                </Box>
                       <Chip
-                        icon={<AddIcon fontSize="small" />}
-                        label="Date"
-                        onClick={() => updateRound(round.id, "showDate", true)}
+                        label={`Round ${index + 1}`}
                         size="small"
+                        color="primary"
                         variant="outlined"
-                        sx={{ cursor: "pointer", bgcolor: "background.paper" }}
                       />
-                    )}
-                    {!round.showDuration && round.type !== "ppt" && round.type !== "resume" && (
-                      <Chip
-                        icon={<AddIcon fontSize="small" />}
-                        label="Duration"
-                        onClick={() => updateRound(round.id, "showDuration", true)}
-                        size="small"
-                        variant="outlined"
-                        sx={{ cursor: "pointer", bgcolor: "background.paper" }}
-                      />
-                    )}
-                    {!round.showDetails && (
-                      <Chip
-                        icon={<AddIcon fontSize="small" />}
-                        label="Description"
-                        onClick={() => updateRound(round.id, "showDetails", true)}
-                        size="small"
-                        variant="outlined"
-                        sx={{ cursor: "pointer", bgcolor: "background.paper" }}
-                      />
-                    )}
-                    {!round.showInfra && (round.mode === "offline" || round.mode === "hybrid") && (
-                      <Chip
-                        icon={<AddIcon fontSize="small" />}
-                        label="Infra"
-                        onClick={() => updateRound(round.id, "showInfra", true)}
-                        size="small"
-                        variant="outlined"
-                        sx={{ cursor: "pointer", bgcolor: "background.paper" }}
-                      />
-                    )}
-                  </Stack>
+                      {round.type === "other" ? (
+                        <TextField
+                          size="small"
+                          placeholder="Round Name"
+                          value={round.description ?? ""}
+                          onChange={(e) => updateRound(round.id, "description", e.target.value)}
+                          variant="standard"
+                          sx={{ width: 150 }}
+                        />
+                      ) : (
+                        <Typography fontWeight={500}>
+                          {typeInfo?.icon} {typeInfo?.label}
+                        </Typography>
+                      )}
+                    </Stack>
 
-                  <Box flexGrow={1} />
-
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => removeRound(round.id)}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
-
-                <Stack direction="column" spacing={2} mt={2} pl={{ md: "260px" }}>
-                  {/* Render enabled fields */}
-                  {round.showDate && (
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <IconButton
-                        size="small"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateRound(round.id, { showDate: false, date: "" });
-                        }}
-                        sx={{ width: 28, height: 28, p: 0.5 }}
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel>Mode</InputLabel>
+                      <Select
+                        value={round.mode}
+                        label="Mode"
+                        onChange={(e) => updateRound(round.id, "mode", e.target.value)}
                       >
-                        <CloseIcon fontSize="small" color="error" />
-                      </IconButton>
+                        {modeOptions.map((opt) => (
+                          <MenuItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    {round.showDate && (
                       <TextField
                         size="small"
                         type="date"
                         label="Tentative Date"
                         InputLabelProps={{ shrink: true }}
+                        inputProps={{ min: new Date().toLocaleDateString('en-CA') }}
                         value={round.date ?? ""}
                         onChange={(e) => updateRound(round.id, "date", e.target.value)}
-                        sx={{ maxWidth: 300 }}
+                        sx={{ minWidth: 180, maxWidth: 220 }}
+                        required
                       />
-                    </Stack>
-                  )}
+                    )}
 
-                  {round.showDuration && round.type !== "ppt" && round.type !== "resume" && (
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <IconButton
-                        size="small"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateRound(round.id, { showDuration: false, duration: undefined });
-                        }}
-                        sx={{ width: 28, height: 28, p: 0.5 }}
-                      >
-                        <CloseIcon fontSize="small" color="error" />
-                      </IconButton>
-                      <TextField
-                        size="small"
-                        type="number"
-                        label="Duration (mins)"
-                        value={round.duration ?? ""}
-                        onChange={(e) =>
-                          updateRound(round.id, "duration", e.target.value ? parseInt(e.target.value) : undefined)
-                        }
-                        sx={{ maxWidth: 300 }}
-                      />
+                    {/* Options to add fields */}
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      {!round.showDate && (
+                        <Chip
+                          icon={<AddIcon fontSize="small" />}
+                          label="Date"
+                          onClick={() => updateRound(round.id, "showDate", true)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ cursor: "pointer", bgcolor: "background.paper" }}
+                        />
+                      )}
+                      {!round.showDuration && round.type !== "ppt" && round.type !== "resume" && (
+                        <Chip
+                          icon={<AddIcon fontSize="small" />}
+                          label="Duration"
+                          onClick={() => updateRound(round.id, "showDuration", true)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ cursor: "pointer", bgcolor: "background.paper" }}
+                        />
+                      )}
+                      {!round.showDetails && (
+                        <Chip
+                          icon={<AddIcon fontSize="small" />}
+                          label="Description"
+                          onClick={() => updateRound(round.id, "showDetails", true)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ cursor: "pointer", bgcolor: "background.paper" }}
+                        />
+                      )}
+                      {!round.showInfra && round.type !== "resume" && (
+                        <Chip
+                          icon={<AddIcon fontSize="small" />}
+                          label="Infra"
+                          onClick={() => updateRound(round.id, "showInfra", true)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ cursor: "pointer", bgcolor: "background.paper" }}
+                        />
+                      )}
                     </Stack>
-                  )}
 
-                  {round.showDetails && (
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <IconButton
-                        size="small"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateRound(round.id, { showDetails: false, details: "" });
-                        }}
-                        sx={{ width: 28, height: 28, p: 0.5 }}
-                      >
-                        <CloseIcon fontSize="small" color="error" />
-                      </IconButton>
-                      <TextField
-                        size="small"
-                        label="Description"
-                        value={round.details ?? ""}
-                        onChange={(e) => updateRound(round.id, "details", e.target.value)}
-                        sx={{ width: "100%", maxWidth: 600 }}
-                      />
-                    </Stack>
-                  )}
+                    <Box flexGrow={1} />
 
-                  {round.showInfra && (round.mode === "offline" || round.mode === "hybrid") && (
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                      <IconButton
-                        size="small"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateRound(round.id, {
-                            showInfra: false,
-                            infraRequirement: "",
-                          });
-                        }}
-                        sx={{ width: 28, height: 28, p: 0.5 }}
-                      >
-                        <CloseIcon fontSize="small" color="error" />
-                      </IconButton>
-                      <TextField
-                        size="small"
-                        label="Infrastructure Requirement (e.g. Computer labs, lecture halls, interview cabins)"
-                        value={round.infraRequirement ?? ""}
-                        onChange={(e) => updateRound(round.id, "infraRequirement", e.target.value)}
-                        sx={{ width: "100%", maxWidth: 600 }}
-                      />
-                    </Stack>
-                  )}
-                </Stack>
-              </Paper>
-            </Box>
-          )}
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => removeRound(round.id)}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+
+                  <Stack direction="column" spacing={2} mt={2} pl={{ md: "260px" }}>
+                    {/* Render enabled fields */}
+
+                    {round.showDuration && round.type !== "ppt" && round.type !== "resume" && (
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <IconButton
+                          size="small"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateRound(round.id, { showDuration: false, duration: undefined });
+                          }}
+                          sx={{ width: 28, height: 28, p: 0.5 }}
+                        >
+                          <CloseIcon fontSize="small" color="error" />
+                        </IconButton>
+                        <TextField
+                          size="small"
+                          type="number"
+                          label="Duration (mins)"
+                          value={round.duration ?? ""}
+                          onChange={(e) =>
+                            updateRound(round.id, "duration", e.target.value ? parseInt(e.target.value) : undefined)
+                          }
+                          sx={{ maxWidth: 300 }}
+                        />
+                      </Stack>
+                    )}
+
+                    {round.showDetails && (
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <IconButton
+                          size="small"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateRound(round.id, { showDetails: false, details: "" });
+                          }}
+                          sx={{ width: 28, height: 28, p: 0.5 }}
+                        >
+                          <CloseIcon fontSize="small" color="error" />
+                        </IconButton>
+                        <TextField
+                          size="small"
+                          label="Description"
+                          value={round.details ?? ""}
+                          onChange={(e) => updateRound(round.id, "details", e.target.value)}
+                          sx={{ width: "100%", maxWidth: 600 }}
+                        />
+                      </Stack>
+                    )}
+
+                    {round.showInfra && round.type !== "resume" && (
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <IconButton
+                          size="small"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateRound(round.id, {
+                              showInfra: false,
+                              infraRequirement: "",
+                            });
+                          }}
+                          sx={{ width: 28, height: 28, p: 0.5 }}
+                        >
+                          <CloseIcon fontSize="small" color="error" />
+                        </IconButton>
+                        <TextField
+                          size="small"
+                          label="Infrastructure Requirement (e.g. Computer labs, lecture halls, interview cabins)"
+                          value={round.infraRequirement ?? ""}
+                          onChange={(e) => updateRound(round.id, "infraRequirement", e.target.value)}
+                          sx={{ width: "100%", maxWidth: 600 }}
+                        />
+                      </Stack>
+                    )}
+                  </Stack>
+                </Paper>
+              </Box>
+            );
+
+            if (snapshot.isDragging) {
+              return createPortal(child, document.body);
+            }
+            return child;
+          }}
         </Draggable>
                 );
               })}

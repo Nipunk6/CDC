@@ -464,8 +464,13 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
         );
       case 3:
         return formData.programmeSalaries.some((s) => s.ctcAnnual);
-      case 4:
-        return formData.selectionRounds.some((r) => r.enabled);
+      case 4: {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        return (
+          formData.selectionRounds.some((r) => r.enabled) &&
+          formData.selectionRounds.filter((r) => r.enabled).every((r) => !!r.date && r.date >= todayStr)
+        );
+      }
       case 5:
         return Object.values(formData.declarations).every(Boolean) && !!formData.signatory.name;
       default:
