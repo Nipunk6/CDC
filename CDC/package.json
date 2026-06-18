@@ -1,0 +1,13 @@
+{
+  "name": "cdc-monorepo",
+  "private": true,
+  "scripts": {
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:lint": "npm --prefix frontend run lint",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:test:e2e": "npm --prefix frontend run test:e2e:smoke",
+    "frontend:test:perf": "npm --prefix frontend run test:perf -- --project=chromium",
+    "backend:test": "cd backend && php artisan test",
+    "backend:serve": "cd backend && php artisan serve"
+  }
+}
