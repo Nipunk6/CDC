@@ -77,9 +77,10 @@ const getStatusIcon = (status: string) => {
 
 function InfQueueContent() {
   const searchParams = useSearchParams();
-  const initialStatus = searchParams.get("status") || "pending";
+  const initialStatus = searchParams.get("status") || "all";
   const [infs, setInfs] = useState<InfItem[]>([]);
   const [status, setStatus] = useState<string>(initialStatus);
+  const [selectedYear, setSelectedYear] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,7 +89,7 @@ function InfQueueContent() {
       setLoading(true);
       setError(null);
 
-      const query = status === "pending" ? "" : `?status=${encodeURIComponent(status)}`;
+      const query = status === "all" ? "?status=all" : (status === "pending" ? "" : `?status=${encodeURIComponent(status)}`);
 
       try {
         const response = await adminApi<{ infs: InfItem[] }>(`/admin/infs${query}`);
@@ -107,7 +108,17 @@ function InfQueueContent() {
     setStatus(event.target.value);
   };
 
-  const groupedInfs = infs.reduce((acc, inf) => {
+  const currentYear = new Date().getFullYear();
+  const staticYears = Array.from({ length: 4 }, (_, i) => String(currentYear + i));
+  const existingYears = infs.map((inf) => inf.graduating_batch).filter((b): b is string => !!b && b !== "Unknown Batch");
+  const availableYears = Array.from(new Set([...staticYears, ...existingYears])).sort((a, b) => b.localeCompare(a));
+
+  const filteredInfs = infs.filter(inf => {
+    if (selectedYear === "all") return true;
+    return (inf.graduating_batch || "Unknown Batch") === selectedYear;
+  });
+
+  const groupedInfs = filteredInfs.reduce((acc, inf) => {
     const batch = inf.graduating_batch || "Unknown Batch";
     if (!acc[batch]) {
       acc[batch] = [];
@@ -160,13 +171,28 @@ function InfQueueContent() {
 
       {/* Filter */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} flexWrap="wrap" useFlexGap>
           <Stack direction="row" spacing={1} alignItems="center">
+            <FilterListIcon color="secondary" />
+            <Typography variant="subtitle2">Filter by Year:</Typography>
+          </Stack>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <Select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} displayEmpty>
+              <MenuItem value="all">All Years</MenuItem>
+              <MenuItem value="Unknown Batch">Unknown Batch</MenuItem>
+              {availableYears.map((year) => (
+                <MenuItem key={year} value={year}>{`Batch of ${year}`}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: { sm: 2 } }}>
             <FilterListIcon color="secondary" />
             <Typography variant="subtitle2">Filter by Status:</Typography>
           </Stack>
           <FormControl size="small" sx={{ minWidth: 250 }}>
             <Select value={status} onChange={handleStatusChange} displayEmpty>
+              <MenuItem value="all">All Statuses</MenuItem>
               <MenuItem value="pending">📋 Pending Queue (submitted + under_review)</MenuItem>
               <MenuItem value="submitted">⏳ Submitted</MenuItem>
               <MenuItem value="under_review">🔍 Under Review</MenuItem>
@@ -175,7 +201,7 @@ function InfQueueContent() {
               <MenuItem value="draft">📝 Draft</MenuItem>
             </Select>
           </FormControl>
-          <Chip label={`${infs.length} results`} color="secondary" variant="outlined" />
+          <Chip label={`${filteredInfs.length} results`} color="secondary" variant="outlined" sx={{ ml: 'auto !important' }} />
         </Stack>
       </Paper>
 
