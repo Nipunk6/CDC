@@ -15,8 +15,8 @@ class PolicyDocumentSeeder extends Seeder
         PolicyDocument::updateOrCreate(
             ['title' => 'IIT (ISM) CDC Policy'],
             [
-                'type' => 'link',
-                'url' => 'https://www.iitism.ac.in/placement-cell',
+                'type' => 'pdf',
+                'url' => '/IIT_ISM_CDC_Policy.pdf',
                 'is_visible_jnf' => true,
                 'is_visible_inf' => true,
             ]

@@ -29,6 +29,7 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import DescriptionIcon from "@mui/icons-material/Description";
 import { companyApi } from "@/lib/companyapi";
+import { JnfPreview } from "@/components/forms/shared/formpreview";
 
 type FormData = {
   companyProfile?: {
@@ -347,204 +348,81 @@ export default function ViewJnfPage({ params }: { params: Promise<{ id: string }
         )}
       </Stack>
 
-      {/* Company Profile */}
-      {companyProfile && (
-        <SectionCard title="Company Profile" icon={<BusinessIcon color="primary" />}>
-          <Grid2 container spacing={2}>
-            <DataRow label="Company Name" value={companyProfile.name} />
-            <DataRow label="Sector" value={companyProfile.sector} />
-            <DataRow label="Website" value={companyProfile.website} />
-            <DataRow label="Number of Employees" value={companyProfile.employeeCount} />
-            <DataRow label="Category / Organization Type" value={companyProfile.categoryOrgType} />
-            <DataRow label="Date of Establishment" value={companyProfile.dateOfEstablishment} />
-            <DataRow label="Annual Turnover" value={companyProfile.annualTurnover} />
-            <DataRow label="LinkedIn URL" value={companyProfile.linkedinUrl} />
-            <DataRow label="Nature of Business" value={companyProfile.natureOfBusiness} />
-            {companyProfile.companyDescription && (
-              <Grid2 size={12}>
-                <Typography variant="caption" color="text.secondary" display="block">Company Description</Typography>
-                <Typography variant="body2" mt={0.5} component="div" dangerouslySetInnerHTML={{ __html: companyProfile.companyDescription }} />
-              </Grid2>
-            )}
-          </Grid2>
-        </SectionCard>
-      )}
-
-      {/* Job Details */}
-      <SectionCard title="Job Details" icon={<WorkIcon color="primary" />}>
-        <Grid2 container spacing={2}>
-          <DataRow label="Job Title" value={formData.jobTitle || jnf?.job_title} />
-          <DataRow label="Designation" value={formData.jobDesignation} />
-          <DataRow label="Location" value={formData.jobLocation || jnf?.job_location} />
-          <DataRow label="Work Mode" value={formData.workMode} />
-          <DataRow label="Expected Hires" value={formData.expectedHires || jnf?.vacancies} />
-          <DataRow label="Minimum Hires" value={formData.minimumHires} />
-          <DataRow label="Joining Month" value={formData.joiningMonth} />
-          <DataRow
-            label="Registration Link"
-            value={formData.registrationLink ? (
-              <a href={formData.registrationLink} target="_blank" rel="noopener noreferrer">
-                {formData.registrationLink}
-              </a>
-            ) : null}
-          />
-          <Grid2 size={12}>
-            <Typography variant="caption" color="text.secondary" display="block">Skills Required</Typography>
-            <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.5}>
-              {(formData.skills ?? []).length > 0 ? (
-                formData.skills?.map((skill) => (
-                  <Chip key={skill} label={skill} size="small" variant="outlined" />
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary">Not specified</Typography>
-              )}
-            </Stack>
-          </Grid2>
-          <Grid2 size={12}>
-            <Typography variant="caption" color="text.secondary" display="block">Job Description</Typography>
-            <Paper variant="outlined" sx={{ p: 2, mt: 0.5, bgcolor: "grey.50" }}>
-              <Typography variant="body2" component="div" dangerouslySetInnerHTML={{ __html: formData.jobDescription || jnf?.job_description || "Not provided" }} />
-            </Paper>
-          </Grid2>
-          {formData.additionalInfo && (
-            <Grid2 size={12}>
-              <Typography variant="caption" color="text.secondary" display="block">Additional Information</Typography>
-              <Typography variant="body2" mt={0.5}>{formData.additionalInfo}</Typography>
-            </Grid2>
-          )}
-        </Grid2>
-      </SectionCard>
-
-      {/* Eligibility */}
-      <SectionCard title="Eligibility Criteria" icon={<SchoolIcon color="primary" />}>
-        <Grid2 container spacing={2}>
-          <DataRow label="Graduating Batch" value={formData.graduatingBatch || (formData.eligibility && formData.eligibility[0] ? formData.eligibility[0].batch : "-")} />
-          <DataRow label="Minimum CGPA" value={formData.globalCgpa} />
-          <DataRow label="Backlogs Allowed" value={formData.globalBacklogs ? "Yes" : "No"} />
-          <DataRow label="Gender Preference" value={formData.genderFilter?.toUpperCase()} />
-          <DataRow label="SLP Requirement" value={formData.slpRequirement} />
-          <Grid2 size={12}>
-            <Typography variant="caption" color="text.secondary" display="block">
-              Eligible Branches ({selectedBranches.length} selected)
-            </Typography>
-            <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.5}>
-              {selectedBranches.length > 0 ? (
-                selectedBranches.map((branch) => (
-                  <Chip key={branch} label={branch} size="small" color="primary" variant="outlined" />
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary">No branches selected</Typography>
-              )}
-            </Stack>
-          </Grid2>
-        </Grid2>
-      </SectionCard>
-
-      {/* Compensation */}
-      <SectionCard title="Compensation Details" icon={<PaidIcon color="primary" />}>
-        <Grid2 container spacing={2}>
-          <DataRow label="Currency" value={formData.currency || "INR"} />
-          <Grid2 size={12}>
-            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-              Programme-wise Salary
-            </Typography>
-            {enabledSalaries.length > 0 ? (
-              <List dense disablePadding>
-                {enabledSalaries.map((s) => (
-                  <ListItem key={s.programme} disablePadding sx={{ py: 0.5 }}>
-                    <ListItemText
-                      primary={s.programme}
-                      secondary={`CTC: ${symbol}${s.ctcAnnual ? parseInt(s.ctcAnnual).toLocaleString() : "-"} | Base: ${symbol}${s.baseSalary ? parseInt(s.baseSalary).toLocaleString() : "-"} | Take Home: ${symbol}${s.takeHome ? parseInt(s.takeHome).toLocaleString() : "-"}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Typography variant="body2" color="text.secondary">No salary details provided</Typography>
-            )}
-          </Grid2>
-          {formData.salaryComponents && (
-            <>
-              <DataRow label="Joining Bonus" value={formData.salaryComponents.joiningBonus ? `${symbol}${parseInt(formData.salaryComponents.joiningBonus).toLocaleString()}` : null} />
-              <DataRow label="Relocation Bonus" value={formData.salaryComponents.relocationBonus ? `${symbol}${parseInt(formData.salaryComponents.relocationBonus).toLocaleString()}` : null} />
-              <DataRow label="Retention Bonus" value={formData.salaryComponents.retentionBonus ? `${symbol}${parseInt(formData.salaryComponents.retentionBonus).toLocaleString()}` : null} />
-              <DataRow label="ESOPs" value={formData.salaryComponents.esops} />
-              <DataRow label="Bond Years" value={formData.salaryComponents.bondYears ? `${formData.salaryComponents.bondYears} years` : null} />
-            </>
-          )}
-        </Grid2>
-      </SectionCard>
-
-      {/* Selection Process */}
-      <SectionCard title="Selection Process" icon={<AssignmentIcon color="primary" />}>
-        <Grid2 container spacing={2}>
-          <DataRow label="Team Members Required" value={formData.teamMembers} />
-          <DataRow label="Rooms Required" value={formData.roomsRequired} />
-          <Grid2 size={12}>
-            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-              Selection Rounds ({enabledRounds.length})
-            </Typography>
-            {enabledRounds.length > 0 ? (
-              <Stack spacing={1}>
-                {enabledRounds.map((round, idx) => (
-                  <Paper key={round.id} variant="outlined" sx={{ p: 1.5 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip label={`Round ${idx + 1}`} size="small" color="primary" />
-                        <Typography variant="body2" fontWeight={500} textTransform="capitalize">
-                          {round.type === "other" ? round.description || "Custom Round" : round.type.replace("_", " ")}
-                        </Typography>
-                      </Stack>
-                      <Stack direction="row" spacing={1}>
-                        <Chip label={`Mode: ${round.mode.replace("_", " ")}`} size="small" variant="outlined" />
-                        {round.duration && <Chip label={`Duration: ${round.duration} mins`} size="small" variant="outlined" />}
-                      </Stack>
-                    </Stack>
-                    {(round.date || round.infraRequirement || round.details) && (
-                      <Stack spacing={0.5} mt={1}>
-                        {round.date && (
-                          <Typography variant="body2" color="text.secondary">
-                            <strong>Date:</strong> {round.date}
-                          </Typography>
-                        )}
-                        {round.infraRequirement && (
-                          <Typography variant="body2" color="text.secondary">
-                            <strong>Infra:</strong> {round.infraRequirement}
-                          </Typography>
-                        )}
-                        {round.details && (
-                          <Typography variant="body2" color="text.secondary">
-                            <strong>Description:</strong> {round.details}
-                          </Typography>
-                        )}
-                      </Stack>
-                    )}
-                  </Paper>
-                ))}
-              </Stack>
-            ) : (
-              <Typography variant="body2" color="text.secondary">No selection rounds specified</Typography>
-            )}
-          </Grid2>
-        </Grid2>
-      </SectionCard>
-
-      {/* Declaration */}
-      {formData.signatory && (
-        <SectionCard title="Declaration & Signatory" icon={<DescriptionIcon color="primary" />}>
-          <Grid2 container spacing={2}>
-            <DataRow label="Signatory Name" value={formData.signatory.name} />
-            <DataRow label="Designation" value={formData.signatory.designation} />
-            <DataRow label="Date" value={formData.signatory.date} />
-            <Grid2 size={12}>
-              <Typography variant="caption" color="text.secondary" display="block">Declarations</Typography>
-              <Typography variant="body2" color="success.main" mt={0.5}>
-                ✅ All declarations accepted
-              </Typography>
-            </Grid2>
-          </Grid2>
-        </SectionCard>
-      )}
+      {/* Standardized Preview Layout */}
+      <JnfPreview
+        readOnly={true}
+        companyLogoUrl={jnf?.company?.logo_url || formData.companyProfile?.logoUrl || null}
+        companyProfile={{
+          name: formData.companyProfile?.name || jnf?.company?.name || "",
+          website: formData.companyProfile?.website || "",
+          about: formData.companyProfile?.about || "",
+          industry: formData.companyProfile?.industry || "",
+          sector: formData.companyProfile?.sector || "",
+          employeeCount: formData.companyProfile?.employeeCount || "",
+          postalAddress: formData.companyProfile?.postalAddress || "",
+          categoryOrgType: formData.companyProfile?.categoryOrgType || "",
+          dateOfEstablishment: formData.companyProfile?.dateOfEstablishment || "",
+          annualTurnover: formData.companyProfile?.annualTurnover || "",
+          linkedinUrl: formData.companyProfile?.linkedinUrl || "",
+          industrySectorTags: formData.companyProfile?.industrySectorTags || "",
+          mncHqCountryCity: formData.companyProfile?.mncHqCountryCity || "",
+          natureOfBusiness: formData.companyProfile?.natureOfBusiness || "",
+          companyDescription: formData.companyProfile?.companyDescription || "",
+        }}
+        jobDetails={{
+          title: formData.jobTitle || jnf?.job_title || "",
+          designation: formData.jobDesignation || "",
+          location: formData.jobLocation || jnf?.job_location || "",
+          workMode: formData.workMode || "onsite",
+          expectedHires: formData.expectedHires || jnf?.vacancies?.toString() || "",
+          minimumHires: formData.minimumHires || "",
+          joiningMonth: formData.joiningMonth || "",
+          skills: formData.skills || [],
+          description: formData.jobDescription || jnf?.job_description || "",
+          registrationLink: formData.registrationLink || "",
+          additionalInfo: formData.additionalInfo || "",
+        }}
+        eligibility={formData.eligibility || []}
+        globalCgpa={formData.globalCgpa || "7.0"}
+        globalBacklogs={formData.globalBacklogs ?? false}
+        genderFilter={formData.genderFilter || "all"}
+        slpRequirement={formData.slpRequirement || ""}
+        graduatingBatch={formData.graduatingBatch || jnf?.graduating_batch || ""}
+        salary={{
+          currency: (formData.currency as any) || "INR",
+          programmeSalaries: formData.programmeSalaries || [],
+          components: {
+            joiningBonus: formData.salaryComponents?.joiningBonus || "",
+            retentionBonus: formData.salaryComponents?.retentionBonus || "",
+            performanceBonus: formData.salaryComponents?.performanceBonus || "",
+            esops: formData.salaryComponents?.esops || "",
+            vestPeriod: formData.salaryComponents?.vestPeriod || "",
+            relocationAllowance: formData.salaryComponents?.relocationAllowance || "",
+            medicalAllowance: formData.salaryComponents?.medicalAllowance || "",
+            deductions: formData.salaryComponents?.deductions || "",
+            bondAmount: formData.salaryComponents?.bondAmount || "",
+            bondDuration: formData.salaryComponents?.bondDuration || "",
+            stocks: formData.salaryComponents?.stocks || "",
+            ctcBreakup: formData.salaryComponents?.ctcBreakup || "",
+          },
+        }}
+        selectionProcess={{
+          rounds: formData.selectionRounds || [],
+        }}
+        declarations={formData.declarations || {
+          aipc: false,
+          shortlistCriteria: false,
+          infoVerified: false,
+          consentLogo: false,
+          confirmAccuracy: false,
+          resultsViaCdc: false,
+        }}
+        signatory={formData.signatory || {
+          name: "",
+          designation: "",
+          date: "",
+        }}
+      />
     </Box>
   );
 }

@@ -114,6 +114,7 @@ export default function EditInfPage({ params }: { params: Promise<{ id: string }
         <InfFormPro
           initialData={initialData}
           onSaved={(savedId) => router.push(`/company/inf/${savedId}`)}
+          onCancel={() => router.push("/company")}
         />
       )}
     </Box>

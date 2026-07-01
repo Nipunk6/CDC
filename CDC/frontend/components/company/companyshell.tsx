@@ -139,12 +139,10 @@ export default function CompanyShell({
                     justifyContent: "center",
                   }}
                 >
-                  <Image
+                  <img
                     src="/images/centenary-badge.png"
                     alt="Centenary Badge"
-                    width={32}
-                    height={32}
-                    style={{ objectFit: "contain" }}
+                    style={{ objectFit: "contain", width: 32, height: 32 }}
                   />
                 </Box>
                 <Typography
@@ -158,7 +156,12 @@ export default function CompanyShell({
                     fontSize: { xs: "1rem", sm: "1.25rem" }
                   }}
                 >
-                  IIT ISM CDC - Company Portal
+                  <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                    IIT ISM CDC - Company Portal
+                  </Box>
+                  <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                    CDC Recruiter
+                  </Box>
                 </Typography>
               </Stack>
               <Stack

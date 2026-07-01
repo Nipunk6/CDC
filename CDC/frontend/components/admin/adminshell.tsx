@@ -183,12 +183,10 @@ export default function AdminShell({
                   justifyContent: "center",
                 }}
               >
-                <Image
+                <img
                   src="/images/centenary-badge.png"
                   alt="Centenary Badge"
-                  width={32}
-                  height={32}
-                  style={{ objectFit: "contain" }}
+                  style={{ objectFit: "contain", width: 32, height: 32 }}
                 />
               </Box>
               <Typography
@@ -202,7 +200,12 @@ export default function AdminShell({
                   fontSize: { xs: "1rem", sm: "1.25rem" }
                 }}
               >
-                IIT ISM CDC - Admin Portal
+                <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                  IIT ISM CDC - Admin Portal
+                </Box>
+                <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                  CDC Admin
+                </Box>
               </Typography>
             </Stack>
 

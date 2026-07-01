@@ -533,7 +533,7 @@ export default function EligibilityGrid({
 
               {/* Branches Table */}
               <Collapse in={prog.expanded}>
-                <TableContainer>
+                <TableContainer sx={{ overflowX: "auto" }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ bgcolor: "grey.100" }}>

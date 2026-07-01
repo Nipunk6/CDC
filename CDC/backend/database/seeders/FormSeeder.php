@@ -42,6 +42,11 @@ class FormSeeder extends Seeder
                     'application_deadline' => now()->addWeeks(3)->toDateString(),
                     'status' => 'submitted',
                     'admin_remarks' => null,
+                    'form_data' => [
+                        'graduatingBatch' => '2026',
+                        'jobTitle' => 'Graduate Engineer Trainee',
+                        'jobDescription' => 'Core engineering role for final year students.',
+                    ]
                 ]
             );
 
@@ -59,6 +64,11 @@ class FormSeeder extends Seeder
                     'application_deadline' => now()->addWeeks(2)->toDateString(),
                     'status' => 'submitted',
                     'admin_remarks' => null,
+                    'form_data' => [
+                        'graduatingBatch' => '2027',
+                        'internshipTitle' => 'Summer Internship Program',
+                        'internshipDescription' => '8-week internship program for pre-final year students.',
+                    ]
                 ]
             );
 
@@ -107,4 +117,5 @@ class FormSeeder extends Seeder
             ]);
         }
     }
+    
 }

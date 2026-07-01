@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   Box,
@@ -21,6 +22,12 @@ import {
   alpha,
   Radio,
   RadioGroup,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Chip,
 } from "@mui/material";
 import WorkIcon from "@mui/icons-material/Work";
 import BusinessIcon from "@mui/icons-material/Business";
@@ -31,6 +38,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import SaveIcon from "@mui/icons-material/Save";
 import SendIcon from "@mui/icons-material/Send";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 import {
   FormSection,
@@ -201,17 +209,34 @@ const toSafeString = (value: unknown): string => {
   return "";
 };
 
+const hasContent = (html: string | undefined | null): boolean => {
+  if (!html) return false;
+  return html.replace(/<[^>]*>/g, '').trim().length > 0;
+};
+
 type JnfFormProProps = {
   initialData?: Partial<JnfFormData> & { id?: number };
   onSaved?: (id: number) => void;
+  onCancel?: () => void;
 };
 
-export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
+export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormProProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
-  const [formData, setFormData] = useState<JnfFormData>(() => ({
-    ...initialFormData,
-    ...initialData,
-  }));
+  const [formData, setFormData] = useState<JnfFormData>(() => {
+    const data = {
+      ...initialFormData,
+      ...initialData,
+    };
+    if (data.jobTitle === "Untitled JNF Draft") {
+      data.jobTitle = "";
+    }
+    if (data.jobDescription === "Draft in progress." || !hasContent(data.jobDescription)) {
+      data.jobDescription = "";
+    }
+    data.signatory.date = new Date().toLocaleDateString('en-CA');
+    return data;
+  });
   const [draftId, setDraftId] = useState<number | undefined>(initialData?.id);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -222,22 +247,65 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
     message: "",
     severity: "info",
   });
-  const [showBatchDialog, setShowBatchDialog] = useState(true);
+  const [showBatchDialog, setShowBatchDialog] = useState(() => !initialData?.graduatingBatch);
+  const [showLockWarning, setShowLockWarning] = useState(() => !!initialData?.graduatingBatch);
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      router.push("/company");
+    }
+  };
+
+  const saveDraftInstantly = async (updatedFormData: JnfFormData) => {
+    setSaving(true);
+    try {
+      const normalizedTitle = updatedFormData.jobTitle.trim();
+      const normalizedDescription = hasContent(updatedFormData.jobDescription) ? updatedFormData.jobDescription.trim() : "";
+
+      const payload = {
+        id: draftId,
+        job_title: normalizedTitle || "Untitled JNF Draft",
+        job_description: normalizedDescription || "Draft in progress.",
+        job_location: toSafeString(updatedFormData.jobLocation),
+        form_data: JSON.stringify(updatedFormData),
+        status: "draft",
+      };
+
+      const response = await companyApi<{ jnf: { id: number } }>(
+        "/company/jnfs/autosave",
+        { method: "POST", body: JSON.stringify(payload) }
+      );
+      setDraftId(response.jnf.id);
+      setSnackbar({ open: true, message: "Draft saved", severity: "info" });
+    } catch (e) {
+      console.error("Auto-save failed:", e);
+      const message = e instanceof Error ? e.message : "Unable to save draft.";
+      if (message.includes("cannot be edited in its current status")) {
+        return;
+      }
+      setError(message);
+      setSnackbar({ open: true, message, severity: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleBatchConfirm = (batch: string) => {
-    setFormData((prev) => {
-      const updatedEligibility = prev.eligibility.map((prog) => ({
-        ...prog,
-        graduatingBatch: batch,
-        graduatingBatches: [batch],
-      }));
-      return {
-        ...prev,
-        graduatingBatch: batch,
-        eligibility: updatedEligibility,
-      };
-    });
+    const updatedEligibility = formData.eligibility.map((prog) => ({
+      ...prog,
+      graduatingBatch: batch,
+      graduatingBatches: [batch],
+    }));
+    const newFormData = {
+      ...formData,
+      graduatingBatch: batch,
+      eligibility: updatedEligibility,
+    };
+    setFormData(newFormData);
     setShowBatchDialog(false);
+    void saveDraftInstantly(newFormData);
   };
   useEffect(() => {
     const fetchCompanyProfile = async () => {
@@ -294,9 +362,9 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
               logoUrl: prev.companyProfile.logoUrl || response.company.logo_url || null,
             },
             signatory: {
-              name: prev.signatory.name || response.company.hr_name || "",
-              designation: prev.signatory.designation || response.company.hr_designation || "",
-              date: prev.signatory.date || new Date().toISOString().split("T")[0],
+              name: prev.signatory.name || "",
+              designation: prev.signatory.designation || "",
+              date: prev.signatory.date || new Date().toLocaleDateString('en-CA'),
             },
           };
         });
@@ -310,14 +378,14 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
 
   // Auto-save debounce
   const autoSave = useCallback(async () => {
-    if (submitting || submitted) {
+    if (submitting || submitted || !formData.graduatingBatch) {
       return;
     }
 
     setSaving(true);
     try {
       const normalizedTitle = formData.jobTitle.trim();
-      const normalizedDescription = formData.jobDescription.trim();
+      const normalizedDescription = hasContent(formData.jobDescription) ? formData.jobDescription.trim() : "";
 
       const payload = {
         id: draftId,
@@ -337,6 +405,9 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
     } catch (e) {
       console.error("Auto-save failed:", e);
       const message = e instanceof Error ? e.message : "Unable to save draft.";
+      if (message.includes("cannot be edited in its current status")) {
+        return;
+      }
       setError(message);
       setSnackbar({ open: true, message, severity: "error" });
     } finally {
@@ -346,7 +417,7 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
 
   // Debounced auto-save
   useEffect(() => {
-    if (submitting || submitted) {
+    if (submitting || submitted || !formData.graduatingBatch) {
       return;
     }
 
@@ -456,7 +527,7 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
       case 0:
         return true;
       case 1:
-        return !!formData.jobTitle && !!formData.jobDescription;
+        return !!formData.jobTitle && hasContent(formData.jobDescription);
       case 2:
         return (
           formData.eligibility.some((p) => p.branches.some((b) => b.selected)) &&
@@ -468,11 +539,11 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
         const todayStr = new Date().toLocaleDateString('en-CA');
         return (
           formData.selectionRounds.some((r) => r.enabled) &&
-          formData.selectionRounds.filter((r) => r.enabled).every((r) => !!r.date && r.date >= todayStr)
+          formData.selectionRounds.filter((r) => r.enabled).every((r) => !r.date || r.date >= todayStr)
         );
       }
       case 5:
-        return Object.values(formData.declarations).every(Boolean) && !!formData.signatory.name;
+        return Object.values(formData.declarations).every(Boolean);
       default:
         return true;
     }
@@ -482,11 +553,36 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
     <Box>
       {/* Graduating Batch Selection Dialog */}
       <GraduatingBatchDialog
-        open={showBatchDialog}
+        open={showBatchDialog && !formData.graduatingBatch}
         onConfirm={handleBatchConfirm}
+        onBack={handleCancel}
         initialBatch={formData.graduatingBatch || initialData?.graduatingBatch || ""}
         formType="JNF"
       />
+
+      {/* Lock warning dialog for existing JNF */}
+      <Dialog
+        open={showLockWarning}
+        onClose={() => setShowLockWarning(false)}
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'warning.light', color: 'warning.contrastText', py: 1.5 }}>
+          <WarningAmberIcon /> Lock Notice
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <DialogContentText>
+            You have selected graduating batch <strong>{formData.graduatingBatch}</strong>.
+            <br /><br />
+            The graduating batch for this JNF is locked and cannot be modified. If you need to hire for a different batch, you will need to create a new JNF.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setShowLockWarning(false)} variant="contained" color="warning" autoFocus>
+            I Understand
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Header */}
       <Paper
         sx={{
@@ -499,6 +595,11 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box>
+            {formData.jobTitle && (
+              <Typography variant="h6" fontWeight={700} sx={{ color: "rgba(255, 255, 255, 0.95)", textTransform: "uppercase", fontSize: "1.1rem", mb: 0.5 }}>
+                💼 {formData.jobTitle}
+              </Typography>
+            )}
             <Typography variant="h5" fontWeight={600}>
               Job Notification Form (JNF)
             </Typography>
@@ -506,21 +607,54 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
               IIT (ISM) Dhanbad — Career Development Centre
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            {saving && (
-              <Stack direction="row" spacing={1} alignItems="center">
-                <CircularProgress size={16} sx={{ color: "white" }} />
-                <Typography variant="caption">Saving...</Typography>
-              </Stack>
+          <Stack direction="row" spacing={2} alignItems="center">
+            {formData.graduatingBatch && (
+              <Chip
+                icon={<SchoolIcon style={{ color: "white" }} />}
+                label={`Graduating Batch of ${formData.graduatingBatch}`}
+                sx={{
+                  bgcolor: "rgba(255, 255, 255, 0.2)",
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                  px: 1.5,
+                  py: 2,
+                  border: "1px solid rgba(255, 255, 255, 0.4)",
+                }}
+              />
             )}
-            {draftId && (
-              <Typography variant="caption" sx={{ bgcolor: alpha("#fff", 0.2), px: 1, py: 0.5, borderRadius: 1 }}>
-                Draft #{draftId}
-              </Typography>
-            )}
+            <Stack direction="row" spacing={1} alignItems="center">
+              {saving && (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CircularProgress size={16} sx={{ color: "white" }} />
+                  <Typography variant="caption">Saving...</Typography>
+                </Stack>
+              )}
+              {draftId && (
+                <Typography variant="caption" sx={{ bgcolor: alpha("#fff", 0.2), px: 1, py: 0.5, borderRadius: 1 }}>
+                  Draft #{draftId}
+                </Typography>
+              )}
+            </Stack>
           </Stack>
         </Stack>
       </Paper>
+
+      {formData.graduatingBatch && (
+        <Alert
+          severity="info"
+          icon={<SchoolIcon />}
+          sx={{
+            mb: 3,
+            fontWeight: 500,
+            bgcolor: (theme) => alpha(theme.palette.info.main, 0.08),
+            border: "1px solid",
+            borderColor: "info.light",
+          }}
+        >
+          You are currently Hiring for Graduating Batch <strong>{formData.graduatingBatch}</strong>. This choice is locked for this JNF. If you need to hire for a different batch, you will need to create a new JNF.
+        </Alert>
+      )}
 
       {/* Tab Navigation */}
       <Paper sx={{ mb: 3 }}>
@@ -917,10 +1051,9 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
           >
             <DeclarationChecklist
               formType="jnf"
+              draftId={draftId}
               declarations={formData.declarations}
               onDeclarationsChange={(v) => updateFormData("declarations", v)}
-              signatory={formData.signatory}
-              onSignatoryChange={(v) => updateFormData("signatory", v)}
             />
           </FormSection>
         )}
@@ -928,6 +1061,7 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
         {/* Tab 6: Preview & Submit */}
         {activeTab === 6 && (
           <JnfPreview
+            companyProfile={formData.companyProfile}
             jobDetails={{
               title: formData.jobTitle,
               designation: formData.jobDesignation,
@@ -939,8 +1073,14 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
               skills: formData.skills,
               description: formData.jobDescription,
               registrationLink: formData.registrationLink,
+              additionalInfo: formData.additionalInfo,
             }}
             eligibility={formData.eligibility}
+            globalCgpa={formData.globalCgpa}
+            globalBacklogs={formData.globalBacklogs}
+            genderFilter={formData.genderFilter}
+            slpRequirement={formData.slpRequirement}
+            graduatingBatch={formData.graduatingBatch}
             salary={{
               currency: formData.currency,
               programmeSalaries: formData.programmeSalaries,
@@ -951,6 +1091,7 @@ export default function JnfFormPro({ initialData, onSaved }: JnfFormProProps) {
             }}
             declarations={formData.declarations}
             signatory={formData.signatory}
+            onSignatoryChange={(v) => updateFormData("signatory", v)}
             companyLogoUrl={formData.companyProfile.logoUrl}
             onNavigateToTab={setActiveTab}
           />

@@ -9,7 +9,10 @@ export default function NewJnfPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto" }}>
-      <JnfFormPro onSaved={() => router.push("/company")} />
+      <JnfFormPro
+        onSaved={() => router.push("/company")}
+        onCancel={() => router.push("/company")}
+      />
     </Box>
   );
 }

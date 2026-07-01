@@ -20,7 +20,7 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', "regex:/^[\\pL\\s'.-]+$/u"],
-            'email' => ['required', 'string', 'email:rfc,dns', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'confirmed', PasswordRule::min(8)->letters()->mixedCase()->numbers()],
         ]);
 
@@ -43,7 +43,7 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'email:rfc,dns'],
+            'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
 
@@ -83,7 +83,7 @@ class AuthController extends Controller
     public function forgotPassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'email:rfc,dns'],
+            'email' => ['required', 'email'],
         ]);
 
         try {
@@ -131,7 +131,7 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'token' => ['required', 'string'],
-            'email' => ['required', 'email:rfc,dns'],
+            'email' => ['required', 'email'],
             'password' => ['required', 'string', 'confirmed', PasswordRule::min(8)->letters()->mixedCase()->numbers()],
         ]);
 

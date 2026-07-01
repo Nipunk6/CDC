@@ -293,16 +293,53 @@ class CompanyJnfController extends Controller
         }
 
         // Create a copy with "Copy of" prefix
+        $formData = $jnf->form_data;
+        if ($formData) {
+            if (is_string($formData)) {
+                $formData = json_decode($formData, true);
+            }
+            if (is_array($formData)) {
+                // Update title in form_data
+                $formData['jobTitle'] = $formData['jobTitle'] ?? $jnf->job_title;
+                
+                // Clear graduating batch
+                $formData['graduatingBatch'] = '';
+                if (isset($formData['eligibility']) && is_array($formData['eligibility'])) {
+                    foreach ($formData['eligibility'] as $k => $prog) {
+                        $formData['eligibility'][$k]['graduatingBatch'] = '';
+                        $formData['eligibility'][$k]['graduatingBatches'] = [];
+                    }
+                }
+
+                // Reset declarations to false
+                $formData['declarations'] = [
+                    'aipc' => false,
+                    'shortlistCriteria' => false,
+                    'infoVerified' => false,
+                    'consentLogo' => false,
+                    'confirmAccuracy' => false,
+                    'resultsViaCdc' => false,
+                ];
+
+                // Reset signatory to empty
+                $formData['signatory'] = [
+                    'name' => '',
+                    'designation' => '',
+                    'date' => '',
+                ];
+            }
+        }
+
         $newJnf = Jnf::create([
             'company_id' => $company->id,
-            'job_title' => 'Copy of ' . $jnf->job_title,
+            'job_title' => $jnf->job_title,
             'job_description' => $jnf->job_description,
             'job_location' => $jnf->job_location,
             'ctc_min' => $jnf->ctc_min,
             'ctc_max' => $jnf->ctc_max,
             'vacancies' => $jnf->vacancies,
             'application_deadline' => $jnf->application_deadline,
-            'form_data' => $jnf->form_data,
+            'form_data' => $formData,
             'status' => 'draft',
         ]);
 

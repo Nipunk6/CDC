@@ -61,7 +61,7 @@ type DashboardData = {
       job_title: string;
       status: string;
       updated_at: string;
-      company?: { name: string };
+      company?: { name: string; logo_url?: string | null };
       edit_access_requested_at?: string | null;
       graduating_batch?: string;
     }>;
@@ -70,7 +70,7 @@ type DashboardData = {
       internship_title: string;
       status: string;
       updated_at: string;
-      company?: { name: string };
+      company?: { name: string; logo_url?: string | null };
       edit_access_requested_at?: string | null;
       graduating_batch?: string;
     }>;
@@ -314,7 +314,7 @@ export default function AdminPage() {
               </Stack>
 
               {data?.recent_submissions.jnfs && data.recent_submissions.jnfs.length > 0 ? (
-                <TableContainer>
+                <TableContainer sx={{ overflowX: "auto" }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -336,9 +336,18 @@ export default function AdminPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 100 }}>
-                              {jnf.company?.name ?? "-"}
-                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Avatar
+                                src={jnf.company?.logo_url || undefined}
+                                alt={jnf.company?.name || "Logo"}
+                                sx={{ width: 24, height: 24, bgcolor: "grey.200", fontSize: "0.75rem" }}
+                              >
+                                {jnf.company?.name ? jnf.company.name.charAt(0).toUpperCase() : "-"}
+                              </Avatar>
+                              <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 100 }}>
+                                {jnf.company?.name ?? "-"}
+                              </Typography>
+                            </Stack>
                           </TableCell>
                           <TableCell>
                           <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="nowrap">
@@ -392,7 +401,7 @@ export default function AdminPage() {
               </Stack>
 
               {data?.recent_submissions.infs && data.recent_submissions.infs.length > 0 ? (
-                <TableContainer>
+                <TableContainer sx={{ overflowX: "auto" }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -414,9 +423,18 @@ export default function AdminPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 100 }}>
-                              {inf.company?.name ?? "-"}
-                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Avatar
+                                src={inf.company?.logo_url || undefined}
+                                alt={inf.company?.name || "Logo"}
+                                sx={{ width: 24, height: 24, bgcolor: "grey.200", fontSize: "0.75rem" }}
+                              >
+                                {inf.company?.name ? inf.company.name.charAt(0).toUpperCase() : "-"}
+                              </Avatar>
+                              <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 100 }}>
+                                {inf.company?.name ?? "-"}
+                              </Typography>
+                            </Stack>
                           </TableCell>
                           <TableCell>
                           <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="nowrap">

@@ -37,6 +37,8 @@ import WorkIcon from "@mui/icons-material/Work";
 import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
 import { adminApi, adminDownload } from "@/lib/adminapi";
+import { InfPreview, stripHtml } from "@/components/forms/shared/formpreview";
+import SelectionProcessBuilder from "@/components/forms/shared/selectionprocessbuilder";
 
 type FormData = {
   companyProfile?: {
@@ -416,7 +418,14 @@ export default function AdminInfDetailPage() {
   const reviewNotes = statusHistory.filter((entry) => entry.remarks && !entry.remarks.startsWith("NOTE:"));
 
   const startEditing = () => {
-    setEditFormData(JSON.parse(JSON.stringify(formData)));
+    const data = JSON.parse(JSON.stringify(formData));
+    if (data.internshipDescription) {
+      data.internshipDescription = stripHtml(data.internshipDescription);
+    }
+    if (data.companyProfile?.companyDescription) {
+      data.companyProfile.companyDescription = stripHtml(data.companyProfile.companyDescription);
+    }
+    setEditFormData(data);
     setEditMode(true);
   };
 
@@ -563,333 +572,268 @@ export default function AdminInfDetailPage() {
             pr: { md: 1 },
           }}
         >
-          {/* Company Info */}
-          <SectionCard title="Company Information" icon={<BusinessIcon color="secondary" />}>
-            <Grid2 container spacing={2}>
-              <DataRow label="Company Name" value={inf?.company?.name} />
-              <DataRow label="HR Name" value={inf?.company?.hr_name} />
-              <DataRow label="HR Email" value={inf?.company?.hr_email} />
-              <DataRow label="Industry" value={inf?.company?.industry} />
-              <DataRow label="Website" value={inf?.company?.website} />
-            </Grid2>
-          </SectionCard>
-
-          <SectionCard title="Submitted Company Profile" icon={<BusinessIcon color="secondary" />}>
-            <Grid2 container spacing={2}>
-              <DataRow label="Company Name" value={companyProfile?.name} />
-              <DataRow label="Sector" value={companyProfile?.sector} />
-              <DataRow label="Website" value={companyProfile?.website} />
-              <DataRow label="Number of Employees" value={companyProfile?.employeeCount} />
-              <DataRow label="Category / Organization Type" value={companyProfile?.categoryOrgType} />
-              <DataRow label="Date of Establishment" value={companyProfile?.dateOfEstablishment} />
-              <DataRow label="Annual Turnover" value={companyProfile?.annualTurnover} />
-              <DataRow label="LinkedIn URL" value={companyProfile?.linkedinUrl} />
-              <DataRow label="Industry Sector Tags" value={companyProfile?.industrySectorTags} />
-              <DataRow label="MNC HQ Country/City" value={companyProfile?.mncHqCountryCity} />
-              <DataRow label="Nature of Business" value={companyProfile?.natureOfBusiness} />
-              <Grid2 size={12}>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  Postal Address
-                </Typography>
-                <Typography variant="body2" mt={0.5}>
-                  {companyProfile?.postalAddress || "-"}
-                </Typography>
-              </Grid2>
-              <Grid2 size={12}>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  Company Description
-                </Typography>
-                <Typography variant="body2" mt={0.5} component="div" dangerouslySetInnerHTML={{ __html: companyProfile?.companyDescription || "-" }} />
-              </Grid2>
-            </Grid2>
-          </SectionCard>
-
-          {/* Internship Details */}
-          <SectionCard title="Internship Details" icon={<SchoolIcon color="secondary" />}>
-            {editMode ? (
-              <Stack spacing={2}>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth label="Internship Title" size="small" value={editFormData.internshipTitle ?? ""} onChange={(e) => updateEditField("internshipTitle", e.target.value)} />
-                  <TextField fullWidth label="Designation" size="small" value={editFormData.internshipDesignation ?? ""} onChange={(e) => updateEditField("internshipDesignation", e.target.value)} />
-                </Stack>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth label="Location" size="small" value={editFormData.internshipLocation ?? ""} onChange={(e) => updateEditField("internshipLocation", e.target.value)} />
-                  <TextField fullWidth label="Work Mode" size="small" value={editFormData.workMode ?? ""} onChange={(e) => updateEditField("workMode", e.target.value)} />
-                </Stack>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth label="Duration (weeks)" size="small" value={editFormData.duration ?? ""} onChange={(e) => updateEditField("duration", e.target.value)} />
-                  <TextField fullWidth label="Expected Hires" size="small" value={editFormData.expectedHires ?? ""} onChange={(e) => updateEditField("expectedHires", e.target.value)} />
-                </Stack>
-                <TextField fullWidth label="Joining Month" size="small" value={editFormData.joiningMonth ?? ""} onChange={(e) => updateEditField("joiningMonth", e.target.value)} />
-                <TextField fullWidth label="Registration Link" size="small" value={editFormData.registrationLink ?? ""} onChange={(e) => updateEditField("registrationLink", e.target.value)} />
-                <TextField fullWidth label="Internship Description" size="small" multiline minRows={3} value={editFormData.internshipDescription ?? ""} onChange={(e) => updateEditField("internshipDescription", e.target.value)} />
-                <TextField fullWidth label="Additional Info" size="small" multiline minRows={2} value={editFormData.additionalInfo ?? ""} onChange={(e) => updateEditField("additionalInfo", e.target.value)} />
-              </Stack>
-            ) : (
-              <Grid2 container spacing={2}>
-                <DataRow label="Internship Title" value={formData.internshipTitle || inf?.internship_title} />
-                <DataRow label="Designation" value={formData.internshipDesignation} />
-                <DataRow label="Location" value={formData.internshipLocation || inf?.internship_location} />
-                <DataRow label="Work Mode" value={formData.workMode} />
-                <DataRow label="Duration" value={formData.duration ? `${formData.duration} weeks` : (inf?.internship_duration_weeks ? `${inf.internship_duration_weeks} weeks` : null)} />
-                <DataRow label="Expected Hires" value={formData.expectedHires || inf?.vacancies} />
-                <DataRow label="Joining Month" value={formData.joiningMonth} />
-                <DataRow 
-                  label="Registration Link" 
-                  value={formData.registrationLink ? (
-                    <a href={formData.registrationLink} target="_blank" rel="noopener noreferrer">
-                      {formData.registrationLink}
-                    </a>
-                  ) : null} 
-                />
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block">Skills Required</Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.5}>
-                    {(formData.skills ?? []).length > 0 ? (
-                      formData.skills?.map((skill) => (
-                        <Chip key={skill} label={skill} size="small" variant="outlined" />
-                      ))
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">Not specified</Typography>
-                    )}
-                  </Stack>
+          {editMode ? (
+            <>
+              {/* Company Info */}
+              <SectionCard title="Company Information" icon={<BusinessIcon color="secondary" />}>
+                <Grid2 container spacing={2}>
+                  <DataRow label="Company Name" value={inf?.company?.name} />
+                  <DataRow label="HR Name" value={inf?.company?.hr_name} />
+                  <DataRow label="HR Email" value={inf?.company?.hr_email} />
+                  <DataRow label="Industry" value={inf?.company?.industry} />
+                  <DataRow label="Website" value={inf?.company?.website} />
                 </Grid2>
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block">Internship Description</Typography>
-                  <Paper variant="outlined" sx={{ p: 2, mt: 0.5, bgcolor: "grey.50" }}>
-                    <Typography variant="body2" component="div" dangerouslySetInnerHTML={{ __html: formData.internshipDescription || inf?.internship_description || "Not provided" }} />
-                  </Paper>
-                </Grid2>
-                {formData.additionalInfo && (
+              </SectionCard>
+
+              <SectionCard title="Submitted Company Profile" icon={<BusinessIcon color="secondary" />}>
+                <Grid2 container spacing={2}>
+                  <DataRow label="Company Name" value={companyProfile?.name} />
+                  <DataRow label="Sector" value={companyProfile?.sector} />
+                  <DataRow label="Website" value={companyProfile?.website} />
+                  <DataRow label="Number of Employees" value={companyProfile?.employeeCount} />
+                  <DataRow label="Category / Organization Type" value={companyProfile?.categoryOrgType} />
+                  <DataRow label="Date of Establishment" value={companyProfile?.dateOfEstablishment} />
+                  <DataRow label="Annual Turnover" value={companyProfile?.annualTurnover} />
+                  <DataRow label="LinkedIn URL" value={companyProfile?.linkedinUrl} />
+                  <DataRow label="Industry Sector Tags" value={companyProfile?.industrySectorTags} />
+                  <DataRow label="MNC HQ Country/City" value={companyProfile?.mncHqCountryCity} />
+                  <DataRow label="Nature of Business" value={companyProfile?.natureOfBusiness} />
                   <Grid2 size={12}>
-                    <Typography variant="caption" color="text.secondary" display="block">Additional Information</Typography>
-                    <Typography variant="body2" mt={0.5}>{formData.additionalInfo}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Postal Address
+                    </Typography>
+                    <Typography variant="body2" mt={0.5}>
+                      {companyProfile?.postalAddress || "-"}
+                    </Typography>
                   </Grid2>
-                )}
-              </Grid2>
-            )}
-          </SectionCard>
+                  <Grid2 size={12}>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Company Description
+                    </Typography>
+                    <Typography variant="body2" mt={0.5} style={{ whiteSpace: "pre-line" }}>
+                      {stripHtml(companyProfile?.companyDescription || "-")}
+                    </Typography>
+                  </Grid2>
+                </Grid2>
+              </SectionCard>
 
-          {/* Eligibility */}
-          <SectionCard title="Eligibility Criteria" icon={<WorkIcon color="secondary" />}>
-            {editMode ? (
-              <Stack spacing={2}>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              {/* Internship Details */}
+              <SectionCard title="Internship Details" icon={<SchoolIcon color="secondary" />}>
+                <Stack spacing={2}>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth label="Internship Title" size="small" value={editFormData.internshipTitle ?? ""} onChange={(e) => updateEditField("internshipTitle", e.target.value)} />
+                    <TextField fullWidth label="Designation" size="small" value={editFormData.internshipDesignation ?? ""} onChange={(e) => updateEditField("internshipDesignation", e.target.value)} />
+                  </Stack>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth label="Location" size="small" value={editFormData.internshipLocation ?? ""} onChange={(e) => updateEditField("internshipLocation", e.target.value)} />
+                    <TextField fullWidth label="Work Mode" size="small" value={editFormData.workMode ?? ""} onChange={(e) => updateEditField("workMode", e.target.value)} />
+                  </Stack>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth label="Duration (weeks)" size="small" value={editFormData.duration ?? ""} onChange={(e) => updateEditField("duration", e.target.value)} />
+                    <TextField fullWidth label="Expected Hires" size="small" value={editFormData.expectedHires ?? ""} onChange={(e) => updateEditField("expectedHires", e.target.value)} />
+                  </Stack>
+                  <TextField fullWidth label="Joining Month" size="small" value={editFormData.joiningMonth ?? ""} onChange={(e) => updateEditField("joiningMonth", e.target.value)} />
+                  <TextField fullWidth label="Registration Link" size="small" value={editFormData.registrationLink ?? ""} onChange={(e) => updateEditField("registrationLink", e.target.value)} />
+                  <TextField fullWidth label="Internship Description" size="small" multiline minRows={3} value={editFormData.internshipDescription ?? ""} onChange={(e) => updateEditField("internshipDescription", e.target.value)} />
+                  <TextField fullWidth label="Additional Info" size="small" multiline minRows={2} value={editFormData.additionalInfo ?? ""} onChange={(e) => updateEditField("additionalInfo", e.target.value)} />
+                </Stack>
+              </SectionCard>
+
+              {/* Eligibility */}
+              <SectionCard title="Eligibility Criteria" icon={<WorkIcon color="secondary" />}>
+                <Stack spacing={2}>
                   <TextField fullWidth label="Minimum CGPA" size="small" value={editFormData.globalCgpa ?? ""} onChange={(e) => updateEditField("globalCgpa", e.target.value)} />
                   <TextField fullWidth label="Gender Filter" size="small" value={editFormData.genderFilter ?? "all"} onChange={(e) => updateEditField("genderFilter", e.target.value)} />
+                  <FormControlLabel control={<Checkbox checked={editFormData.globalBacklogs ?? false} onChange={(e) => updateEditField("globalBacklogs", e.target.checked)} />} label="Backlogs Allowed" />
+                  <Typography variant="subtitle2" mt={1}>Eligible Branches</Typography>
+                  {(editFormData.eligibility ?? []).map((prog, progIdx) => (
+                    <Box key={prog.programme} sx={{ mb: 2, pl: 1, borderLeft: "2px solid", borderColor: "secondary.main" }}>
+                      <Typography variant="body2" fontWeight={600} color="secondary" mb={1}>{prog.programme}</Typography>
+                      <Stack direction="row" flexWrap="wrap" gap={1}>
+                        {prog.branches.map((branch: any, branchIdx: number) => (
+                          <FormControlLabel
+                            key={branch.branch}
+                            control={<Checkbox size="small" checked={branch.selected} onChange={() => toggleBranch(progIdx, branchIdx)} />}
+                            label={<Typography variant="body2">{branch.branch}</Typography>}
+                            sx={{ minWidth: 180 }}
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  ))}
                 </Stack>
-                <FormControlLabel control={<Checkbox checked={editFormData.globalBacklogs ?? false} onChange={(e) => updateEditField("globalBacklogs", e.target.checked)} />} label="Backlogs Allowed" />
-                <Typography variant="subtitle2" mt={1}>Eligible Branches ({selectedBranches.length} selected)</Typography>
-                {(editFormData.eligibility ?? []).map((prog, progIdx) => (
-                  <Box key={prog.programme}>
-                    <Typography variant="body2" fontWeight={600} mt={1}>{prog.programme}</Typography>
-                    <Stack direction="row" flexWrap="wrap" gap={0}>
-                      {prog.branches.map((branch, branchIdx) => (
-                        <FormControlLabel
-                          key={branch.branch}
-                          control={<Checkbox size="small" checked={branch.selected} onChange={() => toggleBranch(progIdx, branchIdx)} />}
-                          label={<Typography variant="body2">{branch.branch}</Typography>}
-                          sx={{ minWidth: 180 }}
-                        />
-                      ))}
-                    </Stack>
-                  </Box>
-                ))}
-              </Stack>
-            ) : (
-              <Grid2 container spacing={2}>
-                <DataRow label="Minimum CGPA" value={formData.globalCgpa} />
-                <DataRow label="Backlogs Allowed" value={formData.globalBacklogs ? "Yes" : "No"} />
-                <DataRow label="Gender Preference" value={formData.genderFilter?.toUpperCase()} />
-                <DataRow label="SLP Requirement" value={formData.slpRequirement} />
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    Eligible Branches ({selectedBranches.length} selected)
-                  </Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.5}>
-                    {selectedBranches.length > 0 ? (
-                      selectedBranches.map((branch) => (
-                        <Chip key={branch} label={branch} size="small" color="secondary" variant="outlined" />
-                      ))
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">No branches selected</Typography>
-                    )}
-                  </Stack>
-                </Grid2>
-              </Grid2>
-            )}
-          </SectionCard>
+              </SectionCard>
 
-          {/* Stipend */}
-          <SectionCard title="Stipend Details" icon={<PaidIcon color="secondary" />}>
-            {editMode ? (
-              <Stack spacing={2}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Currency"
-                  value={editFormData.currency ?? "INR"}
-                  onChange={(e) => updateEditField("currency", e.target.value)}
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={editFormData.ppoProvision ?? false}
-                      onChange={(e) => updateEditField("ppoProvision", e.target.checked)}
-                    />
-                  }
-                  label="PPO Provision"
-                />
-                {editFormData.ppoProvision && (
+              {/* Stipend */}
+              <SectionCard title="Stipend Details" icon={<PaidIcon color="secondary" />}>
+                <Stack spacing={2}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="PPO CTC"
-                    value={editFormData.ppoCtc ?? ""}
-                    onChange={(e) => updateEditField("ppoCtc", e.target.value)}
+                    label="Currency"
+                    value={editFormData.currency ?? "INR"}
+                    onChange={(e) => updateEditField("currency", e.target.value)}
                   />
-                )}
-                <Typography variant="subtitle2">Programme-wise Stipend</Typography>
-                {(editFormData.programmeStipends ?? formData.programmeStipends ?? []).map((s, idx) => (
-                  <Box key={s.programme}>
-                    <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            size="small"
-                            checked={s.enabled}
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={editFormData.ppoProvision ?? false}
+                        onChange={(e) => updateEditField("ppoProvision", e.target.checked)}
+                      />
+                    }
+                    label="PPO Provision"
+                  />
+                  {editFormData.ppoProvision && (
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="PPO CTC"
+                      value={editFormData.ppoCtc ?? ""}
+                      onChange={(e) => updateEditField("ppoCtc", e.target.value)}
+                    />
+                  )}
+                  <Typography variant="subtitle2">Programme-wise Stipend</Typography>
+                  {(editFormData.programmeStipends ?? formData.programmeStipends ?? []).map((s, idx) => (
+                    <Box key={s.programme}>
+                      <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={s.enabled}
+                              onChange={(e) => {
+                                const updated = JSON.parse(JSON.stringify(editFormData.programmeStipends ?? formData.programmeStipends ?? []));
+                                updated[idx].enabled = e.target.checked;
+                                updateEditField("programmeStipends", updated);
+                              }}
+                            />
+                          }
+                          label={<Typography variant="body2" fontWeight={600}>{s.programme}</Typography>}
+                        />
+                      </Stack>
+                      {s.enabled && (
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1} pl={2}>
+                          <TextField
+                            fullWidth size="small" label="Base Stipend /month"
+                            value={s.baseStipend ?? ""}
                             onChange={(e) => {
                               const updated = JSON.parse(JSON.stringify(editFormData.programmeStipends ?? formData.programmeStipends ?? []));
-                              updated[idx].enabled = e.target.checked;
+                              updated[idx].baseStipend = e.target.value;
+                              updated[idx].total = String((parseInt(e.target.value) || 0) + (parseInt(updated[idx].hra) || 0) + (parseInt(updated[idx].otherAllowances) || 0));
                               updateEditField("programmeStipends", updated);
                             }}
                           />
-                        }
-                        label={<Typography variant="body2" fontWeight={600}>{s.programme}</Typography>}
-                      />
-                    </Stack>
-                    {s.enabled && (
-                      <Stack direction={{ xs: "column", md: "row" }} spacing={1} pl={2}>
-                        <TextField
-                          fullWidth size="small" label="Base Stipend /month"
-                          value={s.baseStipend ?? ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(editFormData.programmeStipends ?? formData.programmeStipends ?? []));
-                            updated[idx].baseStipend = e.target.value;
-                            updated[idx].total = String((parseInt(e.target.value) || 0) + (parseInt(updated[idx].hra) || 0) + (parseInt(updated[idx].otherAllowances) || 0));
-                            updateEditField("programmeStipends", updated);
-                          }}
-                        />
-                        <TextField
-                          fullWidth size="small" label="HRA"
-                          value={s.hra ?? ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(editFormData.programmeStipends ?? formData.programmeStipends ?? []));
-                            updated[idx].hra = e.target.value;
-                            updated[idx].total = String((parseInt(updated[idx].baseStipend) || 0) + (parseInt(e.target.value) || 0) + (parseInt(updated[idx].otherAllowances) || 0));
-                            updateEditField("programmeStipends", updated);
-                          }}
-                        />
-                        <TextField
-                          fullWidth size="small" label="Other Allowances"
-                          value={s.otherAllowances ?? ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(editFormData.programmeStipends ?? formData.programmeStipends ?? []));
-                            updated[idx].otherAllowances = e.target.value;
-                            updated[idx].total = String((parseInt(updated[idx].baseStipend) || 0) + (parseInt(updated[idx].hra) || 0) + (parseInt(e.target.value) || 0));
-                            updateEditField("programmeStipends", updated);
-                          }}
-                        />
-                      </Stack>
-                    )}
-                  </Box>
-                ))}
-              </Stack>
-            ) : (
-              <Grid2 container spacing={2}>
-                <DataRow label="Currency" value={formData.currency || "INR"} />
-                <DataRow label="PPO Provision" value={formData.ppoProvision ? "Yes" : "No"} />
-                {formData.ppoProvision && formData.ppoCtc && (
-                  <DataRow label="PPO CTC" value={`${symbol}${parseInt(formData.ppoCtc).toLocaleString()}`} />
-                )}
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                    Programme-wise Stipend
-                  </Typography>
-                  {enabledStipends.length > 0 ? (
-                    <List dense disablePadding>
-                      {enabledStipends.map((s) => (
-                        <ListItem key={s.programme} disablePadding sx={{ py: 0.5 }}>
-                          <ListItemText
-                            primary={s.programme}
-                            secondary={`Base: ${symbol}${s.baseStipend ? parseInt(s.baseStipend).toLocaleString() : "-"}/month | HRA: ${symbol}${s.hra ? parseInt(s.hra).toLocaleString() : "0"} | Total: ${symbol}${s.total ? parseInt(s.total).toLocaleString() : "-"}/month`}
+                          <TextField
+                            fullWidth size="small" label="HRA"
+                            value={s.hra ?? ""}
+                            onChange={(e) => {
+                              const updated = JSON.parse(JSON.stringify(editFormData.programmeStipends ?? formData.programmeStipends ?? []));
+                              updated[idx].hra = e.target.value;
+                              updated[idx].total = String((parseInt(updated[idx].baseStipend) || 0) + (parseInt(e.target.value) || 0) + (parseInt(updated[idx].otherAllowances) || 0));
+                              updateEditField("programmeStipends", updated);
+                            }}
                           />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">No stipend details provided</Typography>
-                  )}
-                </Grid2>
-              </Grid2>
-            )}
-          </SectionCard>
-
-          {/* Selection Process */}
-          <SectionCard title="Selection Process" icon={<AssignmentIcon color="secondary" />}>
-            <Grid2 container spacing={2}>
-              <DataRow label="Team Members Required" value={formData.teamMembers} />
-              <DataRow label="Rooms Required" value={formData.roomsRequired} />
-              <Grid2 size={12}>
-                <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                  Selection Rounds ({enabledRounds.length})
-                </Typography>
-                {enabledRounds.length > 0 ? (
-                  <Stack spacing={1}>
-                    {enabledRounds.map((round, idx) => (
-                      <Paper key={round.id} variant="outlined" sx={{ p: 1.5 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip label={`Round ${idx + 1}`} size="small" color="secondary" />
-                            <Typography variant="body2" fontWeight={500}>
-                              {round.type.replace("_", " ")}
-                            </Typography>
-                          </Stack>
-                          <Stack direction="row" spacing={1}>
-                            <Chip label={round.mode} size="small" variant="outlined" />
-                            {round.duration && <Chip label={round.duration} size="small" variant="outlined" />}
-                          </Stack>
+                          <TextField
+                            fullWidth size="small" label="Other Allowances"
+                            value={s.otherAllowances ?? ""}
+                            onChange={(e) => {
+                              const updated = JSON.parse(JSON.stringify(editFormData.programmeStipends ?? formData.programmeStipends ?? []));
+                              updated[idx].otherAllowances = e.target.value;
+                              updated[idx].total = String((parseInt(updated[idx].baseStipend) || 0) + (parseInt(updated[idx].hra) || 0) + (parseInt(e.target.value) || 0));
+                              updateEditField("programmeStipends", updated);
+                            }}
+                          />
                         </Stack>
-                        {round.details && (
-                          <Typography variant="body2" color="text.secondary" mt={1}>
-                            {round.details}
-                          </Typography>
-                        )}
-                      </Paper>
-                    ))}
-                  </Stack>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">No selection rounds specified</Typography>
-                )}
-              </Grid2>
-            </Grid2>
-          </SectionCard>
+                      )}
+                    </Box>
+                  ))}
+                </Stack>
+              </SectionCard>
 
-          {/* Declaration */}
-          {formData.signatory && (
-            <SectionCard title="Declaration & Signatory" icon={<CheckCircleIcon color="secondary" />}>
-              <Grid2 container spacing={2}>
-                <DataRow label="Signatory Name" value={formData.signatory.name} />
-                <DataRow label="Designation" value={formData.signatory.designation} />
-                <DataRow label="Date" value={formData.signatory.date} />
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block">Declarations</Typography>
-                  <Typography variant="body2" color="success.main" mt={0.5}>
-                    ✅ All declarations accepted
-                  </Typography>
+              <SectionCard title="Selection Process" icon={<AssignmentIcon color="secondary" />}>
+                <SelectionProcessBuilder
+                  value={editFormData.selectionRounds ?? []}
+                  onChange={(rounds) => updateEditField("selectionRounds", rounds)}
+                />
+              </SectionCard>
+            </>
+          ) : (
+            <>
+              {/* System/HR Info (Admin only) */}
+              <SectionCard title="Company Information" icon={<BusinessIcon color="secondary" />}>
+                <Grid2 container spacing={2}>
+                  <DataRow label="Company Name" value={inf?.company?.name} />
+                  <DataRow label="HR Name" value={inf?.company?.hr_name} />
+                  <DataRow label="HR Email" value={inf?.company?.hr_email} />
+                  <DataRow label="Industry" value={inf?.company?.industry} />
+                  <DataRow label="Website" value={inf?.company?.website} />
                 </Grid2>
-              </Grid2>
-            </SectionCard>
+              </SectionCard>
+
+              {/* Standardized InfPreview component */}
+              <InfPreview
+                readOnly={true}
+                companyLogoUrl={inf?.company?.logo_url || formData.companyProfile?.logoUrl || null}
+                companyProfile={{
+                  name: formData.companyProfile?.name || inf?.company?.name || "",
+                  website: formData.companyProfile?.website || "",
+                  about: formData.companyProfile?.about || "",
+                  industry: formData.companyProfile?.industry || "",
+                  sector: formData.companyProfile?.sector || "",
+                  employeeCount: formData.companyProfile?.employeeCount || "",
+                  postalAddress: formData.companyProfile?.postalAddress || "",
+                  categoryOrgType: formData.companyProfile?.categoryOrgType || "",
+                  dateOfEstablishment: formData.companyProfile?.dateOfEstablishment || "",
+                  annualTurnover: formData.companyProfile?.annualTurnover || "",
+                  linkedinUrl: formData.companyProfile?.linkedinUrl || "",
+                  industrySectorTags: formData.companyProfile?.industrySectorTags || "",
+                  mncHqCountryCity: formData.companyProfile?.mncHqCountryCity || "",
+                  natureOfBusiness: formData.companyProfile?.natureOfBusiness || "",
+                  companyDescription: formData.companyProfile?.companyDescription || "",
+                }}
+                internshipDetails={{
+                  title: formData.internshipTitle || inf?.internship_title || "",
+                  designation: formData.internshipDesignation || "",
+                  location: formData.internshipLocation || inf?.internship_location || "",
+                  workMode: formData.workMode || "onsite",
+                  expectedHires: formData.expectedHires || inf?.vacancies?.toString() || "",
+                  duration: formData.duration || inf?.internship_duration_weeks?.toString() || "",
+                  joiningMonth: formData.joiningMonth || "",
+                  skills: formData.skills || [],
+                  description: formData.internshipDescription || inf?.internship_description || "",
+                  registrationLink: formData.registrationLink || "",
+                  additionalInfo: formData.additionalInfo || "",
+                }}
+                eligibility={formData.eligibility || []}
+                globalCgpa={formData.globalCgpa || "7.0"}
+                globalBacklogs={formData.globalBacklogs ?? false}
+                genderFilter={formData.genderFilter || "all"}
+                slpRequirement={formData.slpRequirement || ""}
+                graduatingBatch={formData.graduatingBatch || inf?.graduating_batch || ""}
+                stipend={{
+                  currency: (formData.currency as any) || "INR",
+                  programmeStipends: formData.programmeStipends || [],
+                  ppoProvision: formData.ppoProvision ?? false,
+                  ppoCtc: formData.ppoCtc || "",
+                }}
+                selectionProcess={{
+                  rounds: formData.selectionRounds || [],
+                }}
+                declarations={(formData.declarations as any) || {
+                  aipc: false,
+                  shortlistCriteria: false,
+                  infoVerified: false,
+                  consentLogo: false,
+                  confirmAccuracy: false,
+                  resultsViaCdc: false,
+                }}
+                signatory={formData.signatory || {
+                  name: "",
+                  designation: "",
+                  date: "",
+                }}
+              />
+            </>
           )}
 
         </Grid2>

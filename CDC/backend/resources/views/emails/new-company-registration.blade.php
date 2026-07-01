@@ -10,5 +10,10 @@
     <p><strong>Company:</strong> {{ $companyName }}</p>
     <p><strong>HR Contact:</strong> {{ $hrName }} ({{ $hrEmail }})</p>
     <p>Please review company details in the admin portal.</p>
+    <p>
+        <a href="{{ config('app.frontend_url') }}/auth/login/admin" style="display:inline-block;background:#c62828;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px;font-weight:600;">
+            Login to Admin Portal
+        </a>
+    </p>
 </body>
 </html>

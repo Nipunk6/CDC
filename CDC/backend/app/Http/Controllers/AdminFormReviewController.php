@@ -239,6 +239,7 @@ class AdminFormReviewController extends Controller
         $jnf->loadMissing('company:id,name,hr_name,hr_email,logo_path');
         $formData = is_array($jnf->form_data) ? $jnf->form_data : [];
         $companyProfile = is_array($formData['companyProfile'] ?? null) ? $formData['companyProfile'] : [];
+        $salaryComponents = is_array($formData['salaryComponents'] ?? null) ? $formData['salaryComponents'] : [];
 
         $headers = [
             'jnf_id',
@@ -257,10 +258,101 @@ class AdminFormReviewController extends Controller
             'skills',
             'registration_link',
             'job_description',
+            'min_cgpa',
+            'backlogs_allowed',
+            'gender_filter',
+            'slp_requirement',
+            'graduating_batch',
+            'eligible_branches',
+            'ctc_min',
+            'ctc_max',
+            'programme_salaries_breakup',
+            'joining_bonus',
+            'retention_bonus',
+            'performance_bonus',
+            'esops_stock_options',
+            'vesting_period',
+            'stocks_rsus',
+            'relocation_allowance',
+            'medical_allowance',
+            'deductions',
+            'bond_amount',
+            'bond_duration',
+            'detailed_ctc_breakup',
+            'selection_rounds',
             'admin_remarks',
-            'created_at',
-            'updated_at',
+            'form_submitted_at',
+            'form_accepted_at',
         ];
+
+        $eligibleBranches = $this->flattenSelectedBranches($formData['eligibility'] ?? []);
+        $eligibleBranchesStr = implode('; ', $eligibleBranches);
+
+        $progSalaries = is_array($formData['programmeSalaries'] ?? null) ? $formData['programmeSalaries'] : [];
+        $progSalariesParts = [];
+        foreach ($progSalaries as $ps) {
+            if (is_array($ps) && ($ps['enabled'] ?? false) === true) {
+                $prog = $ps['programme'] ?? 'Unknown';
+                $ctc = $ps['ctcAnnual'] ?? '';
+                $base = $ps['baseSalary'] ?? '';
+                $take = $ps['takeHome'] ?? '';
+                $progSalariesParts[] = "$prog: CTC $ctc, Base $base, Take-home $take";
+            }
+        }
+        $programmeSalariesStr = implode('; ', $progSalariesParts);
+
+        $rounds = is_array($formData['selectionRounds'] ?? null) ? $formData['selectionRounds'] : [];
+        $activeRounds = [];
+        $roundTypeNames = [
+            'ppt' => 'Pre-Placement Talk',
+            'resume' => 'Resume Shortlisting',
+            'written_test' => 'Written Test',
+            'aptitude_test' => 'Aptitude Test',
+            'technical_test' => 'Technical Test',
+            'group_discussion' => 'Group Discussion',
+            'hr_interview' => 'HR Interview',
+            'technical_interview' => 'Technical Interview',
+            'psychometric' => 'Psychometric Test',
+            'medical' => 'Medical Test',
+            'other' => 'Other',
+        ];
+        foreach ($rounds as $r) {
+            if (is_array($r) && ($r['enabled'] ?? false) === true) {
+                $type = $r['type'] ?? 'unknown';
+                $typeName = $roundTypeNames[$type] ?? ucfirst(str_replace('_', ' ', $type));
+                $mode = $r['mode'] ?? '';
+                $duration = $r['duration'] ?? '';
+                $details = $r['details'] ?? $r['description'] ?? '';
+                $infra = $r['infraRequirement'] ?? '';
+
+                $roundDetails = $typeName;
+                $subParts = [];
+                if ($mode) $subParts[] = "Mode: $mode";
+                if ($duration) $subParts[] = "Duration: $duration";
+                if ($details) $subParts[] = "Details: " . trim(strip_tags(html_entity_decode($details, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+                if ($infra) $subParts[] = "Infra: $infra";
+                
+                if (!empty($subParts)) {
+                    $roundDetails .= " (" . implode(', ', $subParts) . ")";
+                }
+                $activeRounds[] = $roundDetails;
+            }
+        }
+        $selectionRoundsStr = implode('; ', $activeRounds);
+
+        $submittedEntry = $jnf->statusHistories()
+            ->where('new_status', 'review_pending')
+            ->orderBy('created_at', 'asc')
+            ->first();
+        $submittedAt = $submittedEntry 
+            ? $submittedEntry->created_at 
+            : ($jnf->statusHistories()->orderBy('created_at', 'asc')->first()?->created_at ?? $jnf->created_at);
+
+        $acceptedEntry = $jnf->statusHistories()
+            ->where('new_status', 'accepted')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        $acceptedAt = $acceptedEntry ? $acceptedEntry->created_at : $jnf->updated_at;
 
         $row = [
             (string) $jnf->id,
@@ -278,10 +370,32 @@ class AdminFormReviewController extends Controller
             (string) ($formData['joiningMonth'] ?? ''),
             $this->csvValue($formData['skills'] ?? []),
             (string) ($formData['registrationLink'] ?? ''),
-            (string) ($formData['jobDescription'] ?? $jnf->job_description ?? ''),
+            $this->cleanHtmlField($formData['jobDescription'] ?? $jnf->job_description ?? ''),
+            (string) ($formData['globalCgpa'] ?? '7.0'),
+            (isset($formData['globalBacklogs']) ? ((bool) $formData['globalBacklogs'] ? 'Yes' : 'No') : 'No'),
+            (string) ($formData['genderFilter'] ?? 'all'),
+            (string) ($formData['slpRequirement'] ?? ''),
+            (string) ($formData['graduatingBatch'] ?? $jnf->graduating_batch ?? ''),
+            $eligibleBranchesStr,
+            (string) ($jnf->ctc_min ?? ''),
+            (string) ($jnf->ctc_max ?? ''),
+            $programmeSalariesStr,
+            (string) ($salaryComponents['joiningBonus'] ?? ''),
+            (string) ($salaryComponents['retentionBonus'] ?? ''),
+            (string) ($salaryComponents['performanceBonus'] ?? ''),
+            (string) ($salaryComponents['esops'] ?? ''),
+            (string) ($salaryComponents['vestPeriod'] ?? ''),
+            (string) ($salaryComponents['stocks'] ?? ''),
+            (string) ($salaryComponents['relocationAllowance'] ?? $salaryComponents['relocationBonus'] ?? ''),
+            (string) ($salaryComponents['medicalAllowance'] ?? ''),
+            (string) ($salaryComponents['deductions'] ?? ''),
+            (string) ($salaryComponents['bondAmount'] ?? ''),
+            (string) ($salaryComponents['bondDuration'] ?? $salaryComponents['bondYears'] ?? ''),
+            $this->cleanHtmlField($salaryComponents['ctcBreakup'] ?? ''),
+            $selectionRoundsStr,
             (string) ($jnf->admin_remarks ?? ''),
-            (string) $jnf->created_at,
-            (string) $jnf->updated_at,
+            $this->formatIstTime($submittedAt),
+            $this->formatIstTime($acceptedAt),
         ];
 
         return $this->streamCsvDownload(
@@ -320,10 +434,90 @@ class AdminFormReviewController extends Controller
             'skills',
             'registration_link',
             'internship_description',
+            'min_cgpa',
+            'backlogs_allowed',
+            'gender_filter',
+            'slp_requirement',
+            'graduating_batch',
+            'eligible_branches',
+            'stipend',
+            'programme_stipends_breakup',
+            'ppo_provision',
+            'ppo_ctc',
+            'selection_rounds',
             'admin_remarks',
-            'created_at',
-            'updated_at',
+            'form_submitted_at',
+            'form_accepted_at',
         ];
+
+        $eligibleBranches = $this->flattenSelectedBranches($formData['eligibility'] ?? []);
+        $eligibleBranchesStr = implode('; ', $eligibleBranches);
+
+        $progStipends = is_array($formData['programmeStipends'] ?? null) ? $formData['programmeStipends'] : [];
+        $progStipendsParts = [];
+        foreach ($progStipends as $ps) {
+            if (is_array($ps) && ($ps['enabled'] ?? false) === true) {
+                $prog = $ps['programme'] ?? 'Unknown';
+                $stipend = $ps['baseStipend'] ?? $ps['stipend'] ?? '';
+                $hra = $ps['hra'] ?? '';
+                $other = $ps['otherAllowances'] ?? $ps['otherPerks'] ?? '';
+                $progStipendsParts[] = "$prog: Stipend $stipend, HRA $hra, Other Allowances $other";
+            }
+        }
+        $programmeStipendsStr = implode('; ', $progStipendsParts);
+
+        $rounds = is_array($formData['selectionRounds'] ?? null) ? $formData['selectionRounds'] : [];
+        $activeRounds = [];
+        $roundTypeNames = [
+            'ppt' => 'Pre-Placement Talk',
+            'resume' => 'Resume Shortlisting',
+            'written_test' => 'Written Test',
+            'aptitude_test' => 'Aptitude Test',
+            'technical_test' => 'Technical Test',
+            'group_discussion' => 'Group Discussion',
+            'hr_interview' => 'HR Interview',
+            'technical_interview' => 'Technical Interview',
+            'psychometric' => 'Psychometric Test',
+            'medical' => 'Medical Test',
+            'other' => 'Other',
+        ];
+        foreach ($rounds as $r) {
+            if (is_array($r) && ($r['enabled'] ?? false) === true) {
+                $type = $r['type'] ?? 'unknown';
+                $typeName = $roundTypeNames[$type] ?? ucfirst(str_replace('_', ' ', $type));
+                $mode = $r['mode'] ?? '';
+                $duration = $r['duration'] ?? '';
+                $details = $r['details'] ?? $r['description'] ?? '';
+                $infra = $r['infraRequirement'] ?? '';
+
+                $roundDetails = $typeName;
+                $subParts = [];
+                if ($mode) $subParts[] = "Mode: $mode";
+                if ($duration) $subParts[] = "Duration: $duration";
+                if ($details) $subParts[] = "Details: " . trim(strip_tags(html_entity_decode($details, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+                if ($infra) $subParts[] = "Infra: $infra";
+                
+                if (!empty($subParts)) {
+                    $roundDetails .= " (" . implode(', ', $subParts) . ")";
+                }
+                $activeRounds[] = $roundDetails;
+            }
+        }
+        $selectionRoundsStr = implode('; ', $activeRounds);
+
+        $submittedEntry = $inf->statusHistories()
+            ->where('new_status', 'review_pending')
+            ->orderBy('created_at', 'asc')
+            ->first();
+        $submittedAt = $submittedEntry 
+            ? $submittedEntry->created_at 
+            : ($inf->statusHistories()->orderBy('created_at', 'asc')->first()?->created_at ?? $inf->created_at);
+
+        $acceptedEntry = $inf->statusHistories()
+            ->where('new_status', 'accepted')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        $acceptedAt = $acceptedEntry ? $acceptedEntry->created_at : $inf->updated_at;
 
         $row = [
             (string) $inf->id,
@@ -341,10 +535,21 @@ class AdminFormReviewController extends Controller
             (string) ($formData['joiningMonth'] ?? ''),
             $this->csvValue($formData['skills'] ?? []),
             (string) ($formData['registrationLink'] ?? ''),
-            (string) ($formData['internshipDescription'] ?? $inf->internship_description ?? ''),
+            $this->cleanHtmlField($formData['internshipDescription'] ?? $inf->internship_description ?? ''),
+            (string) ($formData['globalCgpa'] ?? '7.0'),
+            (isset($formData['globalBacklogs']) ? ((bool) $formData['globalBacklogs'] ? 'Yes' : 'No') : 'No'),
+            (string) ($formData['genderFilter'] ?? 'all'),
+            (string) ($formData['slpRequirement'] ?? ''),
+            (string) ($formData['graduatingBatch'] ?? $inf->graduating_batch ?? ''),
+            $eligibleBranchesStr,
+            (string) ($inf->stipend ?? ''),
+            $programmeStipendsStr,
+            (isset($formData['ppoProvision']) ? ((bool) $formData['ppoProvision'] ? 'Yes' : 'No') : 'No'),
+            (string) ($formData['ppoCtc'] ?? ''),
+            $selectionRoundsStr,
             (string) ($inf->admin_remarks ?? ''),
-            (string) $inf->created_at,
-            (string) $inf->updated_at,
+            $this->formatIstTime($submittedAt),
+            $this->formatIstTime($acceptedAt),
         ];
 
         return $this->streamCsvDownload(
@@ -849,7 +1054,7 @@ class AdminFormReviewController extends Controller
         $oldFormData = is_array($form->getAttribute('form_data')) ? $form->getAttribute('form_data') : [];
         $newFormData = $validated['form_data'];
 
-        $changedFields = $this->detectChangedFields($oldFormData, $newFormData);
+        $changedFields = $this->detectChangedFields($oldFormData, $newFormData, $formType);
 
         if (empty($changedFields)) {
             return response()->json(['message' => 'No changes detected.']);
@@ -871,6 +1076,27 @@ class AdminFormReviewController extends Controller
             if (isset($newFormData['expectedHires']) && is_numeric($newFormData['expectedHires'])) {
                 $form->setAttribute('vacancies', (int) $newFormData['expectedHires']);
             }
+
+            // Sync ctc_min and ctc_max based on enabled programmeSalaries
+            if (isset($newFormData['programmeSalaries']) && is_array($newFormData['programmeSalaries'])) {
+                $enabledSalaries = collect($newFormData['programmeSalaries'])
+                    ->filter(fn ($sal) => is_array($sal) && ($sal['enabled'] ?? false) === true);
+                if ($enabledSalaries->isNotEmpty()) {
+                    $ctcValues = $enabledSalaries
+                        ->map(fn ($sal) => ($sal['ctcAnnual'] !== null && $sal['ctcAnnual'] !== '') ? (float) $sal['ctcAnnual'] : null)
+                        ->filter(fn ($val) => $val !== null);
+                    if ($ctcValues->isNotEmpty()) {
+                        $form->setAttribute('ctc_min', (int) $ctcValues->min());
+                        $form->setAttribute('ctc_max', (int) $ctcValues->max());
+                    } else {
+                        $form->setAttribute('ctc_min', null);
+                        $form->setAttribute('ctc_max', null);
+                    }
+                } else {
+                    $form->setAttribute('ctc_min', null);
+                    $form->setAttribute('ctc_max', null);
+                }
+            }
         } else {
             if (isset($newFormData['internshipTitle'])) {
                 $form->setAttribute('internship_title', $newFormData['internshipTitle']);
@@ -886,6 +1112,24 @@ class AdminFormReviewController extends Controller
             }
             if (isset($newFormData['duration']) && is_numeric($newFormData['duration'])) {
                 $form->setAttribute('internship_duration_weeks', (int) $newFormData['duration']);
+            }
+
+            // Sync stipend based on enabled programmeStipends
+            if (isset($newFormData['programmeStipends']) && is_array($newFormData['programmeStipends'])) {
+                $enabledStipends = collect($newFormData['programmeStipends'])
+                    ->filter(fn ($st) => is_array($st) && ($st['enabled'] ?? false) === true);
+                if ($enabledStipends->isNotEmpty()) {
+                    $stipendValues = $enabledStipends
+                        ->map(fn ($st) => ($st['baseStipend'] !== null && $st['baseStipend'] !== '') ? (float) $st['baseStipend'] : null)
+                        ->filter(fn ($val) => $val !== null);
+                    if ($stipendValues->isNotEmpty()) {
+                        $form->setAttribute('stipend', (int) $stipendValues->first());
+                    } else {
+                        $form->setAttribute('stipend', null);
+                    }
+                } else {
+                    $form->setAttribute('stipend', null);
+                }
             }
         }
 
@@ -952,133 +1196,268 @@ class AdminFormReviewController extends Controller
         ]);
     }
 
-    /**
-     * @return array<string, array{old: string, new: string}>
-     */
-    private function detectChangedFields(array $oldData, array $newData): array
+    private function detectChangedFields(array $oldData, array $newData, string $formType): array
     {
         $changed = [];
 
-        $scalarKeys = [
-            'jobTitle' => 'Job Title',
-            'jobDesignation' => 'Job Designation',
-            'jobLocation' => 'Job Location',
-            'workMode' => 'Work Mode',
-            'expectedHires' => 'Expected Hires',
-            'minimumHires' => 'Minimum Hires',
-            'joiningMonth' => 'Joining Month',
-            'jobDescription' => 'Job Description',
-            'additionalInfo' => 'Additional Info',
-            'registrationLink' => 'Registration Link',
-            'globalCgpa' => 'Minimum CGPA',
-            'genderFilter' => 'Gender Filter',
-            'slpRequirement' => 'SLP Requirement',
-            'currency' => 'Currency',
-            // INF-specific
-            'internshipTitle' => 'Internship Title',
-            'internshipDesignation' => 'Internship Designation',
-            'internshipLocation' => 'Internship Location',
-            'duration' => 'Duration (weeks)',
-            'internshipDescription' => 'Internship Description',
-        ];
+        // Define JNF-specific and INF-specific keys
+        if ($formType === Jnf::class) {
+            $scalarKeys = [
+                'jobTitle' => 'Job Title',
+                'jobDesignation' => 'Job Designation',
+                'jobLocation' => 'Job Location',
+                'workMode' => 'Work Mode',
+                'expectedHires' => 'Expected Hires',
+                'minimumHires' => 'Minimum Hires',
+                'joiningMonth' => 'Joining Month',
+                'jobDescription' => 'Job Description',
+                'additionalInfo' => 'Additional Info',
+                'registrationLink' => 'Registration Link',
+                'globalCgpa' => 'Minimum CGPA',
+                'genderFilter' => 'Gender Filter',
+                'slpRequirement' => 'SLP Requirement',
+                'currency' => 'Currency',
+            ];
+        } else {
+            $scalarKeys = [
+                'internshipTitle' => 'Internship Title',
+                'internshipDesignation' => 'Internship Designation',
+                'internshipLocation' => 'Internship Location',
+                'duration' => 'Duration (weeks)',
+                'workMode' => 'Work Mode',
+                'expectedHires' => 'Expected Hires',
+                'joiningMonth' => 'Joining Month',
+                'internshipDescription' => 'Internship Description',
+                'additionalInfo' => 'Additional Info',
+                'registrationLink' => 'Registration Link',
+                'globalCgpa' => 'Minimum CGPA',
+                'genderFilter' => 'Gender Filter',
+                'slpRequirement' => 'SLP Requirement',
+                'currency' => 'Currency',
+            ];
+        }
 
         foreach ($scalarKeys as $key => $label) {
             $oldVal = (string) ($oldData[$key] ?? '');
             $newVal = (string) ($newData[$key] ?? '');
 
             if ($oldVal !== $newVal) {
-                $changed[$label] = ['old' => $oldVal, 'new' => $newVal];
-            }
-        }
-
-        // Boolean fields
-        $boolKeys = ['globalBacklogs' => 'Backlogs Allowed'];
-        foreach ($boolKeys as $key => $label) {
-            $oldVal = (bool) ($oldData[$key] ?? false);
-            $newVal = (bool) ($newData[$key] ?? false);
-
-            if ($oldVal !== $newVal) {
-                $changed[$label] = ['old' => $oldVal ? 'Yes' : 'No', 'new' => $newVal ? 'Yes' : 'No'];
-            }
-        }
-
-        // Salary component scalar fields
-        $salaryComponentKeys = [
-            'joiningBonus' => 'Joining Bonus',
-            'relocationBonus' => 'Relocation Bonus',
-            'retentionBonus' => 'Retention Bonus',
-            'esops' => 'ESOPs',
-            'bondYears' => 'Bond (Years)',
-        ];
-        $oldComponents = is_array($oldData['salaryComponents'] ?? null) ? $oldData['salaryComponents'] : [];
-        $newComponents = is_array($newData['salaryComponents'] ?? null) ? $newData['salaryComponents'] : [];
-        foreach ($salaryComponentKeys as $key => $label) {
-            $oldVal = (string) ($oldComponents[$key] ?? '');
-            $newVal = (string) ($newComponents[$key] ?? '');
-            if ($oldVal !== $newVal) {
                 $changed[$label] = ['old' => $oldVal ?: '—', 'new' => $newVal ?: '—'];
             }
         }
 
-        // Stipend component scalar fields (INF)
-        $stipendComponentKeys = [
-            'ppoCtc' => 'PPO CTC',
-            'ppoProvision' => 'PPO Provision',
-        ];
-        foreach ($stipendComponentKeys as $key => $label) {
-            $oldVal = (string) ($oldData[$key] ?? '');
-            $newVal = (string) ($newData[$key] ?? '');
-            if ($oldVal !== $newVal) {
-                $changed[$label] = ['old' => $oldVal ?: '—', 'new' => $newVal ?: '—'];
+        // Boolean fields (properly casted)
+        $oldBacklogs = isset($oldData['globalBacklogs']) ? (bool) $oldData['globalBacklogs'] : false;
+        $newBacklogs = isset($newData['globalBacklogs']) ? (bool) $newData['globalBacklogs'] : false;
+        if ($oldBacklogs !== $newBacklogs) {
+            $changed['Backlogs Allowed'] = [
+                'old' => $oldBacklogs ? 'Yes' : 'No',
+                'new' => $newBacklogs ? 'Yes' : 'No'
+            ];
+        }
+
+        if ($formType === Inf::class) {
+            $oldPpo = isset($oldData['ppoProvision']) ? (bool) $oldData['ppoProvision'] : false;
+            $newPpo = isset($newData['ppoProvision']) ? (bool) $newData['ppoProvision'] : false;
+            if ($oldPpo !== $newPpo) {
+                $changed['PPO Provision'] = [
+                    'old' => $oldPpo ? 'Yes' : 'No',
+                    'new' => $newPpo ? 'Yes' : 'No'
+                ];
+            }
+
+            $oldPpoCtc = (string) ($oldData['ppoCtc'] ?? '');
+            $newPpoCtc = (string) ($newData['ppoCtc'] ?? '');
+            if ($oldPpoCtc !== $newPpoCtc) {
+                $changed['PPO CTC'] = ['old' => $oldPpoCtc ?: '—', 'new' => $newPpoCtc ?: '—'];
             }
         }
 
-        // Programme Salaries summary
-        if (isset($newData['programmeSalaries']) || isset($oldData['programmeSalaries'])) {
+        // JNF Salary components scalar fields
+        if ($formType === Jnf::class) {
+            $salaryComponentKeys = [
+                'joiningBonus' => 'Joining Bonus',
+                'retentionBonus' => 'Retention Bonus',
+                'performanceBonus' => 'Performance/Variable Bonus',
+                'esops' => 'ESOPs / Stock Options',
+                'vestPeriod' => 'Vesting Period',
+                'stocks' => 'Stocks/RSUs',
+                'relocationAllowance' => 'Relocation Allowance',
+                'relocationBonus' => 'Relocation Bonus (Legacy)',
+                'medicalAllowance' => 'Medical Allowance / Insurance',
+                'deductions' => 'Deductions (PF, Tax, etc.)',
+                'bondAmount' => 'Bond Amount (if any)',
+                'bondDuration' => 'Bond Duration',
+                'bondYears' => 'Bond (Years) (Legacy)',
+                'ctcBreakup' => 'Detailed CTC Breakup',
+            ];
+            $oldComponents = is_array($oldData['salaryComponents'] ?? null) ? $oldData['salaryComponents'] : [];
+            $newComponents = is_array($newData['salaryComponents'] ?? null) ? $newData['salaryComponents'] : [];
+            foreach ($salaryComponentKeys as $key => $label) {
+                $oldVal = (string) ($oldComponents[$key] ?? '');
+                $newVal = (string) ($newComponents[$key] ?? '');
+                if ($oldVal !== $newVal) {
+                    $changed[$label] = ['old' => $oldVal ?: '—', 'new' => $newVal ?: '—'];
+                }
+            }
+        }
+
+        // Programme Salaries summary (JNF)
+        if ($formType === Jnf::class && (isset($newData['programmeSalaries']) || isset($oldData['programmeSalaries']))) {
             $oldSalaries = is_array($oldData['programmeSalaries'] ?? null) ? $oldData['programmeSalaries'] : [];
             $newSalaries = is_array($newData['programmeSalaries'] ?? null) ? $newData['programmeSalaries'] : [];
             $salaryDiffs = [];
-            foreach ($newSalaries as $newSal) {
-                if (! is_array($newSal) || ! ($newSal['enabled'] ?? false)) {
-                    continue;
-                }
-                $prog = $newSal['programme'] ?? 'Unknown';
+
+            $allProgrammes = array_unique(array_merge(
+                collect($oldSalaries)->pluck('programme')->toArray(),
+                collect($newSalaries)->pluck('programme')->toArray()
+            ));
+
+            foreach ($allProgrammes as $prog) {
+                if (empty($prog)) continue;
                 $oldSal = collect($oldSalaries)->firstWhere('programme', $prog);
-                $oldCtc = (string) ($oldSal['ctcAnnual'] ?? '');
-                $newCtc = (string) ($newSal['ctcAnnual'] ?? '');
-                if ($oldCtc !== $newCtc) {
-                    $salaryDiffs[] = sprintf('%s: CTC %s → %s', $prog, $oldCtc ?: '—', $newCtc ?: '—');
+                $newSal = collect($newSalaries)->firstWhere('programme', $prog);
+
+                $oldEnabled = (bool) ($oldSal['enabled'] ?? false);
+                $newEnabled = (bool) ($newSal['enabled'] ?? false);
+
+                if ($oldEnabled !== $newEnabled) {
+                    $salaryDiffs[] = sprintf('%s: %s → %s', $prog, $oldEnabled ? 'Enabled' : 'Disabled', $newEnabled ? 'Enabled' : 'Disabled');
+                } elseif ($newEnabled) {
+                    $oldCtc = (string) ($oldSal['ctcAnnual'] ?? '');
+                    $newCtc = (string) ($newSal['ctcAnnual'] ?? '');
+                    $oldBase = (string) ($oldSal['baseSalary'] ?? '');
+                    $newBase = (string) ($newSal['baseSalary'] ?? '');
+                    $oldTakeHome = (string) ($oldSal['takeHome'] ?? '');
+                    $newTakeHome = (string) ($newSal['takeHome'] ?? '');
+
+                    $subChanges = [];
+                    if ($oldCtc !== $newCtc) {
+                        $subChanges[] = sprintf('CTC %s → %s', $oldCtc ?: '—', $newCtc ?: '—');
+                    }
+                    if ($oldBase !== $newBase) {
+                        $subChanges[] = sprintf('Base %s → %s', $oldBase ?: '—', $newBase ?: '—');
+                    }
+                    if ($oldTakeHome !== $newTakeHome) {
+                        $subChanges[] = sprintf('Take Home %s → %s', $oldTakeHome ?: '—', $newTakeHome ?: '—');
+                    }
+
+                    if (!empty($subChanges)) {
+                        $salaryDiffs[] = sprintf('%s (%s)', $prog, implode(', ', $subChanges));
+                    }
                 }
             }
+
             if (! empty($salaryDiffs)) {
                 $changed['Programme Salaries'] = [
-                    'old' => 'See details',
+                    'old' => 'Active program salary details updated',
                     'new' => implode('; ', $salaryDiffs),
                 ];
             }
         }
 
         // Programme Stipends summary (INF)
-        if (isset($newData['programmeStipends']) || isset($oldData['programmeStipends'])) {
+        if ($formType === Inf::class && (isset($newData['programmeStipends']) || isset($oldData['programmeStipends']))) {
             $oldStipends = is_array($oldData['programmeStipends'] ?? null) ? $oldData['programmeStipends'] : [];
             $newStipends = is_array($newData['programmeStipends'] ?? null) ? $newData['programmeStipends'] : [];
             $stipendDiffs = [];
-            foreach ($newStipends as $newStip) {
-                if (! is_array($newStip) || ! ($newStip['enabled'] ?? false)) {
-                    continue;
-                }
-                $prog = $newStip['programme'] ?? 'Unknown';
+
+            $allProgrammes = array_unique(array_merge(
+                collect($oldStipends)->pluck('programme')->toArray(),
+                collect($newStipends)->pluck('programme')->toArray()
+            ));
+
+            foreach ($allProgrammes as $prog) {
+                if (empty($prog)) continue;
                 $oldStip = collect($oldStipends)->firstWhere('programme', $prog);
-                $oldAmt = (string) ($oldStip['stipend'] ?? '');
-                $newAmt = (string) ($newStip['stipend'] ?? '');
-                if ($oldAmt !== $newAmt) {
-                    $stipendDiffs[] = sprintf('%s: %s → %s', $prog, $oldAmt ?: '—', $newAmt ?: '—');
+                $newStip = collect($newStipends)->firstWhere('programme', $prog);
+
+                $oldEnabled = (bool) ($oldStip['enabled'] ?? false);
+                $newEnabled = (bool) ($newStip['enabled'] ?? false);
+
+                if ($oldEnabled !== $newEnabled) {
+                    $stipendDiffs[] = sprintf('%s: %s → %s', $prog, $oldEnabled ? 'Enabled' : 'Disabled', $newEnabled ? 'Enabled' : 'Disabled');
+                } elseif ($newEnabled) {
+                    $oldBase = (string) ($oldStip['baseStipend'] ?? $oldStip['stipend'] ?? '');
+                    $newBase = (string) ($newStip['baseStipend'] ?? $newStip['stipend'] ?? '');
+                    $oldHra = (string) ($oldStip['hra'] ?? '');
+                    $newHra = (string) ($newStip['hra'] ?? '');
+                    $oldOther = (string) ($oldStip['otherAllowances'] ?? $oldStip['otherPerks'] ?? '');
+                    $newOther = (string) ($newStip['otherAllowances'] ?? $newStip['otherPerks'] ?? '');
+
+                    $subChanges = [];
+                    if ($oldBase !== $newBase) {
+                        $subChanges[] = sprintf('Stipend %s → %s', $oldBase ?: '—', $newBase ?: '—');
+                    }
+                    if ($oldHra !== $newHra) {
+                        $subChanges[] = sprintf('HRA %s → %s', $oldHra ?: '—', $newHra ?: '—');
+                    }
+                    if ($oldOther !== $newOther) {
+                        $subChanges[] = sprintf('Other Allowances %s → %s', $oldOther ?: '—', $newOther ?: '—');
+                    }
+
+                    if (!empty($subChanges)) {
+                        $stipendDiffs[] = sprintf('%s (%s)', $prog, implode(', ', $subChanges));
+                    }
                 }
             }
+
             if (! empty($stipendDiffs)) {
                 $changed['Programme Stipends'] = [
-                    'old' => 'See details',
+                    'old' => 'Active program stipend details updated',
                     'new' => implode('; ', $stipendDiffs),
+                ];
+            }
+        }
+
+        // Selection Process (Rounds) diff (JNF and INF)
+        if (isset($newData['selectionRounds']) || isset($oldData['selectionRounds'])) {
+            $oldRounds = is_array($oldData['selectionRounds'] ?? null) ? $oldData['selectionRounds'] : [];
+            $newRounds = is_array($newData['selectionRounds'] ?? null) ? $newData['selectionRounds'] : [];
+            $roundDiffs = [];
+
+            $roundTypeNames = [
+                'ppt' => 'Pre-Placement Talk',
+                'resume' => 'Resume Shortlisting',
+                'written_test' => 'Written Test',
+                'aptitude_test' => 'Aptitude Test',
+                'technical_test' => 'Technical Test',
+                'group_discussion' => 'Group Discussion',
+                'hr_interview' => 'HR Interview',
+                'technical_interview' => 'Technical Interview',
+                'psychometric' => 'Psychometric Test',
+                'medical' => 'Medical Test',
+                'other' => 'Other',
+            ];
+
+            $allTypes = array_unique(array_merge(
+                collect($oldRounds)->pluck('type')->toArray(),
+                collect($newRounds)->pluck('type')->toArray()
+            ));
+
+            foreach ($allTypes as $type) {
+                if (empty($type)) continue;
+                $oldRound = collect($oldRounds)->firstWhere('type', $type);
+                $newRound = collect($newRounds)->firstWhere('type', $type);
+
+                $oldEnabled = (bool) ($oldRound['enabled'] ?? false);
+                $newEnabled = (bool) ($newRound['enabled'] ?? false);
+                $oldMode = (string) ($oldRound['mode'] ?? '');
+                $newMode = (string) ($newRound['mode'] ?? '');
+
+                $typeName = $roundTypeNames[$type] ?? ucfirst(str_replace('_', ' ', $type));
+
+                if ($oldEnabled !== $newEnabled) {
+                    $roundDiffs[] = sprintf('%s: %s → %s', $typeName, $oldEnabled ? 'Enabled' : 'Disabled', $newEnabled ? 'Enabled' : 'Disabled');
+                } elseif ($newEnabled && $oldMode !== $newMode) {
+                    $roundDiffs[] = sprintf('%s Mode: %s → %s', $typeName, $oldMode ?: 'not specified', $newMode ?: 'not specified');
+                }
+            }
+
+            if (! empty($roundDiffs)) {
+                $changed['Selection Process'] = [
+                    'old' => 'Rounds updated',
+                    'new' => implode('; ', $roundDiffs),
                 ];
             }
         }
@@ -1208,5 +1587,26 @@ class AdminFormReviewController extends Controller
         }
 
         return '';
+    }
+
+    private function cleanHtmlField(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+        $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $decoded = str_replace(["\xc2\xa0", '&nbsp;'], ' ', $decoded);
+        return trim(strip_tags($decoded));
+    }
+
+    private function formatIstTime(mixed $date): string
+    {
+        if ($date === null) {
+            return '';
+        }
+        if (!$date instanceof \Carbon\Carbon) {
+            $date = \Carbon\Carbon::parse($date);
+        }
+        return $date->setTimezone('Asia/Kolkata')->format('Y-m-d H:i:s') . ' IST';
     }
 }

@@ -27,6 +27,7 @@ class CompanyDashboardController extends Controller
                 'updated_at',
                 'edit_access_requested_at',
                 'edit_access_requested_reason',
+                'form_data',
             ]);
         $infItems = $company->infs()
             ->with(['statusHistories:id,form_id,form_type,new_status'])
@@ -38,16 +39,31 @@ class CompanyDashboardController extends Controller
                 'updated_at',
                 'edit_access_requested_at',
                 'edit_access_requested_reason',
+                'form_data',
             ]);
 
         $jnfItems->each(function (Jnf $jnf): void {
             $this->applyCompanyVisibleStatusToJnf($jnf);
             $jnf->unsetRelation('statusHistories');
+
+            $batch = 'Unknown Batch';
+            if (is_array($jnf->form_data) && isset($jnf->form_data['graduatingBatch'])) {
+                $batch = $jnf->form_data['graduatingBatch'];
+            }
+            $jnf->setAttribute('graduating_batch', $batch);
+            $jnf->makeHidden(['form_data']);
         });
 
         $infItems->each(function (Inf $inf): void {
             $this->applyCompanyVisibleStatusToInf($inf);
             $inf->unsetRelation('statusHistories');
+
+            $batch = 'Unknown Batch';
+            if (is_array($inf->form_data) && isset($inf->form_data['graduatingBatch'])) {
+                $batch = $inf->form_data['graduatingBatch'];
+            }
+            $inf->setAttribute('graduating_batch', $batch);
+            $inf->makeHidden(['form_data']);
         });
 
         return response()->json([

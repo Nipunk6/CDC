@@ -111,6 +111,7 @@ export default function EditJnfPage({ params }: { params: Promise<{ id: string }
         <JnfFormPro
           initialData={initialData}
           onSaved={() => router.push("/company")}
+          onCancel={() => router.push("/company")}
         />
       )}
     </Box>

@@ -146,13 +146,10 @@ export default function Home() {
                   width: "auto",
                 }}
               >
-                <Image
+                <img
                   src="/images/iitism-logo-banner.png"
                   alt="IIT ISM Dhanbad Logo"
-                  width={368}
-                  height={65}
                   style={{ objectFit: "contain", height: "100%", width: "auto" }}
-                  priority
                 />
               </Box>
               <Box
@@ -171,11 +168,9 @@ export default function Home() {
                   textDecoration: "none",
                 }}
               >
-                <Image
+                <img
                   src="/images/centenary-badge.png"
                   alt="Centenary Badge"
-                  width={65}
-                  height={65}
                   style={{ objectFit: "contain", height: "100%", width: "auto" }}
                 />
               </Box>

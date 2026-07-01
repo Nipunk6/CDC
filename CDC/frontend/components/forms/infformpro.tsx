@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   Box,
@@ -21,6 +22,12 @@ import {
   alpha,
   Radio,
   RadioGroup,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Chip,
 } from "@mui/material";
 import WorkIcon from "@mui/icons-material/Work";
 import BusinessIcon from "@mui/icons-material/Business";
@@ -31,6 +38,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import SaveIcon from "@mui/icons-material/Save";
 import SendIcon from "@mui/icons-material/Send";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 import {
   FormSection,
@@ -191,17 +199,34 @@ const tabs = [
   { label: "Preview & Submit", icon: <CheckCircleIcon /> },
 ];
 
+const hasContent = (html: string | undefined | null): boolean => {
+  if (!html) return false;
+  return html.replace(/<[^>]*>/g, '').trim().length > 0;
+};
+
 type InfFormProProps = {
   initialData?: Partial<InfFormData> & { id?: number };
   onSaved?: (id: number) => void;
+  onCancel?: () => void;
 };
 
-export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
+export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormProProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
-  const [formData, setFormData] = useState<InfFormData>(() => ({
-    ...initialFormData,
-    ...initialData,
-  }));
+  const [formData, setFormData] = useState<InfFormData>(() => {
+    const data = {
+      ...initialFormData,
+      ...initialData,
+    };
+    if (data.internshipTitle === "Untitled INF Draft") {
+      data.internshipTitle = "";
+    }
+    if (data.internshipDescription === "Draft in progress." || !hasContent(data.internshipDescription)) {
+      data.internshipDescription = "";
+    }
+    data.signatory.date = new Date().toLocaleDateString('en-CA');
+    return data;
+  });
   const [draftId, setDraftId] = useState<number | undefined>(initialData?.id);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -212,22 +237,65 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
     message: "",
     severity: "info",
   });
-  const [showBatchDialog, setShowBatchDialog] = useState(true);
+  const [showBatchDialog, setShowBatchDialog] = useState(() => !initialData?.graduatingBatch);
+  const [showLockWarning, setShowLockWarning] = useState(() => !!initialData?.graduatingBatch);
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      router.push("/company");
+    }
+  };
+
+  const saveDraftInstantly = async (updatedFormData: InfFormData) => {
+    setSaving(true);
+    try {
+      const normalizedTitle = updatedFormData.internshipTitle.trim();
+      const normalizedDescription = hasContent(updatedFormData.internshipDescription) ? updatedFormData.internshipDescription.trim() : "";
+
+      const payload = {
+        id: draftId,
+        internship_title: normalizedTitle || "Untitled INF Draft",
+        internship_description: normalizedDescription || "Draft in progress.",
+        internship_location: updatedFormData.internshipLocation,
+        form_data: JSON.stringify(updatedFormData),
+        status: "draft",
+      };
+
+      const response = await companyApi<{ inf: { id: number } }>(
+        "/company/infs/autosave",
+        { method: "POST", body: JSON.stringify(payload) }
+      );
+      setDraftId(response.inf.id);
+      setSnackbar({ open: true, message: "Draft saved", severity: "info" });
+    } catch (e) {
+      console.error("Auto-save failed:", e);
+      const message = e instanceof Error ? e.message : "Unable to save draft.";
+      if (message.includes("cannot be edited in its current status")) {
+        return;
+      }
+      setError(message);
+      setSnackbar({ open: true, message, severity: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleBatchConfirm = (batch: string) => {
-    setFormData((prev) => {
-      const updatedEligibility = prev.eligibility.map((prog) => ({
-        ...prog,
-        graduatingBatch: batch,
-        graduatingBatches: [batch],
-      }));
-      return {
-        ...prev,
-        graduatingBatch: batch,
-        eligibility: updatedEligibility,
-      };
-    });
+    const updatedEligibility = formData.eligibility.map((prog) => ({
+      ...prog,
+      graduatingBatch: batch,
+      graduatingBatches: [batch],
+    }));
+    const newFormData = {
+      ...formData,
+      graduatingBatch: batch,
+      eligibility: updatedEligibility,
+    };
+    setFormData(newFormData);
     setShowBatchDialog(false);
+    void saveDraftInstantly(newFormData);
   };
 
   useEffect(() => {
@@ -285,9 +353,9 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
               logoUrl: prev.companyProfile.logoUrl || response.company.logo_url || null,
             },
             signatory: {
-              name: prev.signatory.name || response.company.hr_name || "",
-              designation: prev.signatory.designation || response.company.hr_designation || "",
-              date: prev.signatory.date || new Date().toISOString().split("T")[0],
+              name: prev.signatory.name || "",
+              designation: prev.signatory.designation || "",
+              date: prev.signatory.date || new Date().toLocaleDateString('en-CA'),
             },
           };
         });
@@ -301,14 +369,14 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
 
   // Auto-save debounce
   const autoSave = useCallback(async () => {
-    if (submitting || submitted) {
+    if (submitting || submitted || !formData.graduatingBatch) {
       return;
     }
 
     setSaving(true);
     try {
       const normalizedTitle = formData.internshipTitle.trim();
-      const normalizedDescription = formData.internshipDescription.trim();
+      const normalizedDescription = hasContent(formData.internshipDescription) ? formData.internshipDescription.trim() : "";
 
       const payload = {
         id: draftId,
@@ -328,6 +396,9 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
     } catch (e) {
       console.error("Auto-save failed:", e);
       const message = e instanceof Error ? e.message : "Unable to save draft.";
+      if (message.includes("cannot be edited in its current status")) {
+        return;
+      }
       setError(message);
       setSnackbar({ open: true, message, severity: "error" });
     } finally {
@@ -337,7 +408,7 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
 
   // Debounced auto-save
   useEffect(() => {
-    if (submitting || submitted) {
+    if (submitting || submitted || !formData.graduatingBatch) {
       return;
     }
 
@@ -449,7 +520,7 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
       case 0:
         return true;
       case 1:
-        return !!formData.internshipTitle && !!formData.internshipDescription;
+        return !!formData.internshipTitle && hasContent(formData.internshipDescription);
       case 2:
         return (
           formData.eligibility.some((p) => p.branches.some((b) => b.selected)) &&
@@ -461,11 +532,11 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
         const todayStr = new Date().toLocaleDateString('en-CA');
         return (
           formData.selectionRounds.some((r) => r.enabled) &&
-          formData.selectionRounds.filter((r) => r.enabled).every((r) => !!r.date && r.date >= todayStr)
+          formData.selectionRounds.filter((r) => r.enabled).every((r) => !r.date || r.date >= todayStr)
         );
       }
       case 5:
-        return Object.values(formData.declarations).every(Boolean) && !!formData.signatory.name;
+        return Object.values(formData.declarations).every(Boolean);
       default:
         return true;
     }
@@ -475,11 +546,36 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
     <Box>
       {/* Graduating Batch Selection Dialog */}
       <GraduatingBatchDialog
-        open={showBatchDialog}
+        open={showBatchDialog && !formData.graduatingBatch}
         onConfirm={handleBatchConfirm}
+        onBack={handleCancel}
         initialBatch={formData.graduatingBatch || initialData?.graduatingBatch || ""}
         formType="INF"
       />
+
+      {/* Lock warning dialog for existing INF */}
+      <Dialog
+        open={showLockWarning}
+        onClose={() => setShowLockWarning(false)}
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'warning.light', color: 'warning.contrastText', py: 1.5 }}>
+          <WarningAmberIcon /> Lock Notice
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <DialogContentText>
+            You have selected graduating batch <strong>{formData.graduatingBatch}</strong>.
+            <br /><br />
+            The graduating batch for this INF is locked and cannot be modified. If you need to hire for a different batch, you will need to create a new INF.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setShowLockWarning(false)} variant="contained" color="warning" autoFocus>
+            I Understand
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Header */}
       <Paper
         sx={{
@@ -492,6 +588,11 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box>
+            {formData.internshipTitle && (
+              <Typography variant="h6" fontWeight={700} sx={{ color: "rgba(255, 255, 255, 0.95)", textTransform: "uppercase", fontSize: "1.1rem", mb: 0.5 }}>
+                🎓 {formData.internshipTitle}
+              </Typography>
+            )}
             <Typography variant="h5" fontWeight={600}>
               Internship Notification Form (INF)
             </Typography>
@@ -499,21 +600,54 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
               IIT (ISM) Dhanbad — Career Development Centre
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            {saving && (
-              <Stack direction="row" spacing={1} alignItems="center">
-                <CircularProgress size={16} sx={{ color: "white" }} />
-                <Typography variant="caption">Saving...</Typography>
-              </Stack>
+          <Stack direction="row" spacing={2} alignItems="center">
+            {formData.graduatingBatch && (
+              <Chip
+                icon={<SchoolIcon style={{ color: "white" }} />}
+                label={`Graduating Batch of ${formData.graduatingBatch}`}
+                sx={{
+                  bgcolor: "rgba(255, 255, 255, 0.2)",
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                  px: 1.5,
+                  py: 2,
+                  border: "1px solid rgba(255, 255, 255, 0.4)",
+                }}
+              />
             )}
-            {draftId && (
-              <Typography variant="caption" sx={{ bgcolor: alpha("#fff", 0.2), px: 1, py: 0.5, borderRadius: 1 }}>
-                Draft #{draftId}
-              </Typography>
-            )}
+            <Stack direction="row" spacing={1} alignItems="center">
+              {saving && (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CircularProgress size={16} sx={{ color: "white" }} />
+                  <Typography variant="caption">Saving...</Typography>
+                </Stack>
+              )}
+              {draftId && (
+                <Typography variant="caption" sx={{ bgcolor: alpha("#fff", 0.2), px: 1, py: 0.5, borderRadius: 1 }}>
+                  Draft #{draftId}
+                </Typography>
+              )}
+            </Stack>
           </Stack>
         </Stack>
       </Paper>
+
+      {formData.graduatingBatch && (
+        <Alert
+          severity="info"
+          icon={<SchoolIcon />}
+          sx={{
+            mb: 3,
+            fontWeight: 500,
+            bgcolor: (theme) => alpha(theme.palette.info.main, 0.08),
+            border: "1px solid",
+            borderColor: "info.light",
+          }}
+        >
+          You are currently Hiring for Graduating Batch <strong>{formData.graduatingBatch}</strong>. This choice is locked for this INF. If you need to hire for a different batch, you will need to create a new INF.
+        </Alert>
+      )}
 
       {/* Tab Navigation */}
       <Paper sx={{ mb: 3 }}>
@@ -908,10 +1042,9 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
           >
             <DeclarationChecklist
               formType="inf"
+              draftId={draftId}
               declarations={formData.declarations}
               onDeclarationsChange={(v) => updateFormData("declarations", v)}
-              signatory={formData.signatory}
-              onSignatoryChange={(v) => updateFormData("signatory", v)}
             />
           </FormSection>
         )}
@@ -919,6 +1052,7 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
         {/* Tab 6: Preview & Submit */}
         {activeTab === 6 && (
           <InfPreview
+            companyProfile={formData.companyProfile}
             internshipDetails={{
               title: formData.internshipTitle,
               designation: formData.internshipDesignation,
@@ -930,8 +1064,14 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
               skills: formData.skills,
               description: formData.internshipDescription,
               registrationLink: formData.registrationLink,
+              additionalInfo: formData.additionalInfo,
             }}
             eligibility={formData.eligibility}
+            globalCgpa={formData.globalCgpa}
+            globalBacklogs={formData.globalBacklogs}
+            genderFilter={formData.genderFilter}
+            slpRequirement={formData.slpRequirement}
+            graduatingBatch={formData.graduatingBatch}
             stipend={{
               currency: formData.currency,
               programmeStipends: formData.programmeStipends,
@@ -943,6 +1083,7 @@ export default function InfFormPro({ initialData, onSaved }: InfFormProProps) {
             }}
             declarations={formData.declarations}
             signatory={formData.signatory}
+            onSignatoryChange={(v) => updateFormData("signatory", v)}
             companyLogoUrl={formData.companyProfile.logoUrl}
             onNavigateToTab={setActiveTab}
           />

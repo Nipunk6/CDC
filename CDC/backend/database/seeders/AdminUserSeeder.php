@@ -13,10 +13,10 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         User::updateOrCreate(
-            ['email' => env('ADMIN_EMAIL', '24je0917@iitism.ac.in')],
+            ['email' => env('ADMIN_EMAIL')],
             [
                 'name' => env('ADMIN_NAME', 'CDC Admin'),
-                'password' => env('ADMIN_PASSWORD', 'Melody@2020'),
+                'password' => env('ADMIN_PASSWORD'),
                 'role' => 'admin',
                 'is_super_admin' => true,
                 'company_id' => null,

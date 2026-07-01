@@ -37,6 +37,8 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
 import { adminApi, adminDownload } from "@/lib/adminapi";
+import { JnfPreview, stripHtml } from "@/components/forms/shared/formpreview";
+import SelectionProcessBuilder from "@/components/forms/shared/selectionprocessbuilder";
 
 type FormData = {
   companyProfile?: {
@@ -423,7 +425,14 @@ export default function AdminJnfDetailPage() {
   const reviewNotes = statusHistory.filter((entry) => entry.remarks && !entry.remarks.startsWith("NOTE:"));
 
   const startEditing = () => {
-    setEditFormData(JSON.parse(JSON.stringify(formData)));
+    const data = JSON.parse(JSON.stringify(formData));
+    if (data.jobDescription) {
+      data.jobDescription = stripHtml(data.jobDescription);
+    }
+    if (data.companyProfile?.companyDescription) {
+      data.companyProfile.companyDescription = stripHtml(data.companyProfile.companyDescription);
+    }
+    setEditFormData(data);
     setEditMode(true);
   };
 
@@ -571,342 +580,339 @@ export default function AdminJnfDetailPage() {
             pr: { md: 1 },
           }}
         >
-          {/* Company Info */}
-          <SectionCard title="Company Information" icon={<BusinessIcon color="primary" />}>
-            <Grid2 container spacing={2}>
-              <DataRow label="Company Name" value={jnf?.company?.name} />
-              <DataRow label="HR Name" value={jnf?.company?.hr_name} />
-              <DataRow label="HR Email" value={jnf?.company?.hr_email} />
-              <DataRow label="Industry" value={jnf?.company?.industry} />
-              <DataRow label="Website" value={jnf?.company?.website} />
-            </Grid2>
-          </SectionCard>
-
-          <SectionCard title="Submitted Company Profile" icon={<BusinessIcon color="primary" />}>
-            <Grid2 container spacing={2}>
-              <DataRow label="Company Name" value={companyProfile?.name} />
-              <DataRow label="Sector" value={companyProfile?.sector} />
-              <DataRow label="Website" value={companyProfile?.website} />
-              <DataRow label="Number of Employees" value={companyProfile?.employeeCount} />
-              <DataRow label="Category / Organization Type" value={companyProfile?.categoryOrgType} />
-              <DataRow label="Date of Establishment" value={companyProfile?.dateOfEstablishment} />
-              <DataRow label="Annual Turnover" value={companyProfile?.annualTurnover} />
-              <DataRow label="LinkedIn URL" value={companyProfile?.linkedinUrl} />
-              <DataRow label="Industry Sector Tags" value={companyProfile?.industrySectorTags} />
-              <DataRow label="MNC HQ Country/City" value={companyProfile?.mncHqCountryCity} />
-              <DataRow label="Nature of Business" value={companyProfile?.natureOfBusiness} />
-              <Grid2 size={12}>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  Postal Address
-                </Typography>
-                <Typography variant="body2" mt={0.5}>
-                  {companyProfile?.postalAddress || "-"}
-                </Typography>
-              </Grid2>
-              <Grid2 size={12}>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  Company Description
-                </Typography>
-                <Typography variant="body2" mt={0.5} component="div" dangerouslySetInnerHTML={{ __html: companyProfile?.companyDescription || "-" }} />
-              </Grid2>
-            </Grid2>
-          </SectionCard>
-
-          {/* Job Details */}
-          <SectionCard title="Job Details" icon={<WorkIcon color="primary" />}>
-            {editMode ? (
-              <Stack spacing={2}>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth label="Job Title" size="small" value={editFormData.jobTitle ?? ""} onChange={(e) => updateEditField("jobTitle", e.target.value)} />
-                  <TextField fullWidth label="Designation" size="small" value={editFormData.jobDesignation ?? ""} onChange={(e) => updateEditField("jobDesignation", e.target.value)} />
-                </Stack>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth label="Location" size="small" value={editFormData.jobLocation ?? ""} onChange={(e) => updateEditField("jobLocation", e.target.value)} />
-                  <TextField fullWidth label="Work Mode" size="small" value={editFormData.workMode ?? ""} onChange={(e) => updateEditField("workMode", e.target.value)} />
-                </Stack>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth label="Expected Hires" size="small" value={editFormData.expectedHires ?? ""} onChange={(e) => updateEditField("expectedHires", e.target.value)} />
-                  <TextField fullWidth label="Minimum Hires" size="small" value={editFormData.minimumHires ?? ""} onChange={(e) => updateEditField("minimumHires", e.target.value)} />
-                </Stack>
-                <TextField fullWidth label="Joining Month" size="small" value={editFormData.joiningMonth ?? ""} onChange={(e) => updateEditField("joiningMonth", e.target.value)} />
-                <TextField fullWidth label="Registration Link" size="small" value={editFormData.registrationLink ?? ""} onChange={(e) => updateEditField("registrationLink", e.target.value)} />
-                <TextField fullWidth label="Job Description" size="small" multiline minRows={3} value={editFormData.jobDescription ?? ""} onChange={(e) => updateEditField("jobDescription", e.target.value)} />
-                <TextField fullWidth label="Additional Info" size="small" multiline minRows={2} value={editFormData.additionalInfo ?? ""} onChange={(e) => updateEditField("additionalInfo", e.target.value)} />
-              </Stack>
-            ) : (
-              <Grid2 container spacing={2}>
-                <DataRow label="Job Title" value={formData.jobTitle || jnf?.job_title} />
-                <DataRow label="Designation" value={formData.jobDesignation} />
-                <DataRow label="Location" value={formData.jobLocation || jnf?.job_location} />
-                <DataRow label="Work Mode" value={formData.workMode} />
-                <DataRow label="Expected Hires" value={formData.expectedHires || jnf?.vacancies} />
-                <DataRow label="Minimum Hires" value={formData.minimumHires} />
-                <DataRow label="Joining Month" value={formData.joiningMonth} />
-                <DataRow 
-                  label="Registration Link" 
-                  value={formData.registrationLink ? (
-                    <a href={formData.registrationLink} target="_blank" rel="noopener noreferrer">
-                      {formData.registrationLink}
-                    </a>
-                  ) : null} 
-                />
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block">Skills Required</Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.5}>
-                    {(formData.skills ?? []).length > 0 ? (
-                      formData.skills?.map((skill) => (
-                        <Chip key={skill} label={skill} size="small" variant="outlined" />
-                      ))
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">Not specified</Typography>
-                    )}
-                  </Stack>
+          {editMode ? (
+            <>
+              {/* Company Info */}
+              <SectionCard title="Company Information" icon={<BusinessIcon color="primary" />}>
+                <Grid2 container spacing={2}>
+                  <DataRow label="Company Name" value={jnf?.company?.name} />
+                  <DataRow label="HR Name" value={jnf?.company?.hr_name} />
+                  <DataRow label="HR Email" value={jnf?.company?.hr_email} />
+                  <DataRow label="Industry" value={jnf?.company?.industry} />
+                  <DataRow label="Website" value={jnf?.company?.website} />
                 </Grid2>
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block">Job Description</Typography>
-                  <Paper variant="outlined" sx={{ p: 2, mt: 0.5, bgcolor: "grey.50" }}>
-                    <Typography variant="body2" component="div" dangerouslySetInnerHTML={{ __html: formData.jobDescription || jnf?.job_description || "Not provided" }} />
-                  </Paper>
-                </Grid2>
-                {formData.additionalInfo && (
+              </SectionCard>
+
+              <SectionCard title="Submitted Company Profile" icon={<BusinessIcon color="primary" />}>
+                <Grid2 container spacing={2}>
+                  <DataRow label="Company Name" value={companyProfile?.name} />
+                  <DataRow label="Sector" value={companyProfile?.sector} />
+                  <DataRow label="Website" value={companyProfile?.website} />
+                  <DataRow label="Number of Employees" value={companyProfile?.employeeCount} />
+                  <DataRow label="Category / Organization Type" value={companyProfile?.categoryOrgType} />
+                  <DataRow label="Date of Establishment" value={companyProfile?.dateOfEstablishment} />
+                  <DataRow label="Annual Turnover" value={companyProfile?.annualTurnover} />
+                  <DataRow label="LinkedIn URL" value={companyProfile?.linkedinUrl} />
+                  <DataRow label="Industry Sector Tags" value={companyProfile?.industrySectorTags} />
+                  <DataRow label="MNC HQ Country/City" value={companyProfile?.mncHqCountryCity} />
+                  <DataRow label="Nature of Business" value={companyProfile?.natureOfBusiness} />
                   <Grid2 size={12}>
-                    <Typography variant="caption" color="text.secondary" display="block">Additional Information</Typography>
-                    <Typography variant="body2" mt={0.5}>{formData.additionalInfo}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Postal Address
+                    </Typography>
+                    <Typography variant="body2" mt={0.5}>
+                      {companyProfile?.postalAddress || "-"}
+                    </Typography>
                   </Grid2>
-                )}
-              </Grid2>
-            )}
-          </SectionCard>
-
-          {/* Eligibility */}
-          <SectionCard title="Eligibility Criteria" icon={<SchoolIcon color="primary" />}>
-            {editMode ? (
-              <Stack spacing={2}>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth label="Minimum CGPA" size="small" value={editFormData.globalCgpa ?? ""} onChange={(e) => updateEditField("globalCgpa", e.target.value)} />
-                  <TextField fullWidth label="Gender Filter" size="small" value={editFormData.genderFilter ?? "all"} onChange={(e) => updateEditField("genderFilter", e.target.value)} />
-                </Stack>
-                <FormControlLabel control={<Checkbox checked={editFormData.globalBacklogs ?? false} onChange={(e) => updateEditField("globalBacklogs", e.target.checked)} />} label="Backlogs Allowed" />
-                <Typography variant="subtitle2" mt={1}>Eligible Branches ({selectedBranches.length} selected)</Typography>
-                {(editFormData.eligibility ?? []).map((prog, progIdx) => (
-                  <Box key={prog.programme}>
-                    <Typography variant="body2" fontWeight={600} mt={1}>{prog.programme}</Typography>
-                    <Stack direction="row" flexWrap="wrap" gap={0}>
-                      {prog.branches.map((branch, branchIdx) => (
-                        <FormControlLabel
-                          key={branch.branch}
-                          control={<Checkbox size="small" checked={branch.selected} onChange={() => toggleBranch(progIdx, branchIdx)} />}
-                          label={<Typography variant="body2">{branch.branch}</Typography>}
-                          sx={{ minWidth: 180 }}
-                        />
-                      ))}
-                    </Stack>
-                  </Box>
-                ))}
-              </Stack>
-            ) : (
-              <Grid2 container spacing={2}>
-                <DataRow label="Minimum CGPA" value={formData.globalCgpa} />
-                <DataRow label="Backlogs Allowed" value={formData.globalBacklogs ? "Yes" : "No"} />
-                <DataRow label="Gender Preference" value={formData.genderFilter?.toUpperCase()} />
-                <DataRow label="SLP Requirement" value={formData.slpRequirement} />
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    Eligible Branches ({selectedBranches.length} selected)
-                  </Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.5}>
-                    {selectedBranches.length > 0 ? (
-                      selectedBranches.map((branch) => (
-                        <Chip key={branch} label={branch} size="small" color="primary" variant="outlined" />
-                      ))
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">No branches selected</Typography>
-                    )}
-                  </Stack>
+                  <Grid2 size={12}>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Company Description
+                    </Typography>
+                    <Typography variant="body2" mt={0.5} style={{ whiteSpace: "pre-line" }}>
+                      {stripHtml(companyProfile?.companyDescription || "-")}
+                    </Typography>
+                  </Grid2>
                 </Grid2>
-              </Grid2>
-            )}
-          </SectionCard>
+              </SectionCard>
 
-          {/* Compensation */}
-          <SectionCard title="Compensation Details" icon={<PaidIcon color="primary" />}>
-            {editMode ? (
-              <Stack spacing={2}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Currency"
-                  value={editFormData.currency ?? "INR"}
-                  onChange={(e) => updateEditField("currency", e.target.value)}
-                />
-                <Typography variant="subtitle2">Programme-wise Salary</Typography>
-                {(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []).map((s, idx) => (
-                  <Box key={s.programme}>
-                    <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            size="small"
-                            checked={s.enabled}
+              {/* Job Details */}
+              <SectionCard title="Job Details" icon={<WorkIcon color="primary" />}>
+                <Stack spacing={2}>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth label="Job Title" size="small" value={editFormData.jobTitle ?? ""} onChange={(e) => updateEditField("jobTitle", e.target.value)} />
+                    <TextField fullWidth label="Designation" size="small" value={editFormData.jobDesignation ?? ""} onChange={(e) => updateEditField("jobDesignation", e.target.value)} />
+                  </Stack>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth label="Location" size="small" value={editFormData.jobLocation ?? ""} onChange={(e) => updateEditField("jobLocation", e.target.value)} />
+                    <TextField fullWidth label="Work Mode" size="small" value={editFormData.workMode ?? ""} onChange={(e) => updateEditField("workMode", e.target.value)} />
+                  </Stack>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth label="Expected Hires" size="small" value={editFormData.expectedHires ?? ""} onChange={(e) => updateEditField("expectedHires", e.target.value)} />
+                    <TextField fullWidth label="Minimum Hires" size="small" value={editFormData.minimumHires ?? ""} onChange={(e) => updateEditField("minimumHires", e.target.value)} />
+                  </Stack>
+                  <TextField fullWidth label="Joining Month" size="small" value={editFormData.joiningMonth ?? ""} onChange={(e) => updateEditField("joiningMonth", e.target.value)} />
+                  <TextField fullWidth label="Registration Link" size="small" value={editFormData.registrationLink ?? ""} onChange={(e) => updateEditField("registrationLink", e.target.value)} />
+                  <TextField fullWidth label="Job Description" size="small" multiline minRows={3} value={editFormData.jobDescription ?? ""} onChange={(e) => updateEditField("jobDescription", e.target.value)} />
+                  <TextField fullWidth label="Additional Info" size="small" multiline minRows={2} value={editFormData.additionalInfo ?? ""} onChange={(e) => updateEditField("additionalInfo", e.target.value)} />
+                </Stack>
+              </SectionCard>
+
+              {/* Eligibility */}
+              <SectionCard title="Eligibility Criteria" icon={<SchoolIcon color="primary" />}>
+                <Stack spacing={2}>
+                  <TextField fullWidth size="small" label="Cutoff CGPA" value={editFormData.globalCgpa ?? ""} onChange={(e) => updateEditField("globalCgpa", e.target.value)} />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={editFormData.globalBacklogs ?? false}
+                        onChange={(e) => updateEditField("globalBacklogs", e.target.checked)}
+                      />
+                    }
+                    label="Backlogs Allowed"
+                  />
+                  <TextField fullWidth size="small" label="Gender Preference" value={editFormData.genderFilter ?? ""} onChange={(e) => updateEditField("genderFilter", e.target.value)} />
+                  <TextField fullWidth size="small" label="SLP Requirement" value={editFormData.slpRequirement ?? ""} onChange={(e) => updateEditField("slpRequirement", e.target.value)} />
+                  <Typography variant="subtitle2" mt={1}>Eligible Branches</Typography>
+                  {(editFormData.eligibility ?? formData.eligibility ?? []).map((prog, pIdx) => (
+                    <Box key={prog.programme} sx={{ mb: 2, pl: 1, borderLeft: "2px solid", borderColor: "primary.main" }}>
+                      <Typography variant="body2" fontWeight={600} color="primary" mb={1}>{prog.programme}</Typography>
+                      <Stack direction="row" flexWrap="wrap" gap={1}>
+                        {prog.branches.map((branch: any, bIdx: number) => (
+                          <FormControlLabel
+                            key={branch.branch}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={branch.selected}
+                                onChange={() => toggleBranch(pIdx, bIdx)}
+                              />
+                            }
+                            label={<Typography variant="body2">{branch.branch}</Typography>}
+                            sx={{ minWidth: 180 }}
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              </SectionCard>
+
+              {/* Compensation */}
+              <SectionCard title="Compensation Details" icon={<PaidIcon color="primary" />}>
+                <Stack spacing={2}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Currency"
+                    value={editFormData.currency ?? "INR"}
+                    onChange={(e) => updateEditField("currency", e.target.value)}
+                  />
+                  <Typography variant="subtitle2">Programme-wise Salary</Typography>
+                  {(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []).map((s, idx) => (
+                    <Box key={s.programme}>
+                      <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={s.enabled}
+                              onChange={(e) => {
+                                const updated = JSON.parse(JSON.stringify(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []));
+                                updated[idx].enabled = e.target.checked;
+                                updateEditField("programmeSalaries", updated);
+                              }}
+                            />
+                          }
+                          label={<Typography variant="body2" fontWeight={600}>{s.programme}</Typography>}
+                        />
+                      </Stack>
+                      {s.enabled && (
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1} pl={2}>
+                          <TextField
+                            fullWidth size="small" label="CTC Annual"
+                            value={s.ctcAnnual ?? ""}
                             onChange={(e) => {
                               const updated = JSON.parse(JSON.stringify(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []));
-                              updated[idx].enabled = e.target.checked;
+                              updated[idx].ctcAnnual = e.target.value;
                               updateEditField("programmeSalaries", updated);
                             }}
                           />
-                        }
-                        label={<Typography variant="body2" fontWeight={600}>{s.programme}</Typography>}
-                      />
-                    </Stack>
-                    {s.enabled && (
-                      <Stack direction={{ xs: "column", md: "row" }} spacing={1} pl={2}>
-                        <TextField
-                          fullWidth size="small" label="CTC Annual"
-                          value={s.ctcAnnual ?? ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []));
-                            updated[idx].ctcAnnual = e.target.value;
-                            updateEditField("programmeSalaries", updated);
-                          }}
-                        />
-                        <TextField
-                          fullWidth size="small" label="Base Salary"
-                          value={s.baseSalary ?? ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []));
-                            updated[idx].baseSalary = e.target.value;
-                            updateEditField("programmeSalaries", updated);
-                          }}
-                        />
-                        <TextField
-                          fullWidth size="small" label="Take Home"
-                          value={s.takeHome ?? ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []));
-                            updated[idx].takeHome = e.target.value;
-                            updateEditField("programmeSalaries", updated);
-                          }}
-                        />
-                      </Stack>
-                    )}
-                  </Box>
-                ))}
-                <Typography variant="subtitle2" mt={1}>Salary Components</Typography>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth size="small" label="Joining Bonus"
-                    value={editFormData.salaryComponents?.joiningBonus ?? ""}
-                    onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), joiningBonus: e.target.value })}
-                  />
-                  <TextField fullWidth size="small" label="Relocation Bonus"
-                    value={editFormData.salaryComponents?.relocationBonus ?? ""}
-                    onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), relocationBonus: e.target.value })}
-                  />
-                </Stack>
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  <TextField fullWidth size="small" label="Retention Bonus"
-                    value={editFormData.salaryComponents?.retentionBonus ?? ""}
-                    onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), retentionBonus: e.target.value })}
-                  />
-                  <TextField fullWidth size="small" label="ESOPs"
-                    value={editFormData.salaryComponents?.esops ?? ""}
-                    onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), esops: e.target.value })}
-                  />
-                  <TextField fullWidth size="small" label="Bond (Years)"
-                    value={editFormData.salaryComponents?.bondYears ?? ""}
-                    onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), bondYears: e.target.value })}
-                  />
-                </Stack>
-              </Stack>
-            ) : (
-              <Grid2 container spacing={2}>
-                <DataRow label="Currency" value={formData.currency || "INR"} />
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                    Programme-wise Salary
-                  </Typography>
-                  {enabledSalaries.length > 0 ? (
-                    <List dense disablePadding>
-                      {enabledSalaries.map((s) => (
-                        <ListItem key={s.programme} disablePadding sx={{ py: 0.5 }}>
-                          <ListItemText
-                            primary={s.programme}
-                            secondary={`CTC: ${symbol}${s.ctcAnnual ? parseInt(s.ctcAnnual).toLocaleString() : "-"} | Base: ${symbol}${s.baseSalary ? parseInt(s.baseSalary).toLocaleString() : "-"} | Take Home: ${symbol}${s.takeHome ? parseInt(s.takeHome).toLocaleString() : "-"}`}
+                          <TextField
+                            fullWidth size="small" label="Base Salary"
+                            value={s.baseSalary ?? ""}
+                            onChange={(e) => {
+                              const updated = JSON.parse(JSON.stringify(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []));
+                              updated[idx].baseSalary = e.target.value;
+                              updateEditField("programmeSalaries", updated);
+                            }}
                           />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">No salary details provided</Typography>
-                  )}
-                </Grid2>
-                {formData.salaryComponents && (
-                  <>
-                    <DataRow label="Joining Bonus" value={formData.salaryComponents.joiningBonus ? `${symbol}${parseInt(formData.salaryComponents.joiningBonus).toLocaleString()}` : null} />
-                    <DataRow label="Relocation Bonus" value={formData.salaryComponents.relocationBonus ? `${symbol}${parseInt(formData.salaryComponents.relocationBonus).toLocaleString()}` : null} />
-                    <DataRow label="Retention Bonus" value={formData.salaryComponents.retentionBonus ? `${symbol}${parseInt(formData.salaryComponents.retentionBonus).toLocaleString()}` : null} />
-                    <DataRow label="ESOPs" value={formData.salaryComponents.esops} />
-                    <DataRow label="Bond Years" value={formData.salaryComponents.bondYears ? `${formData.salaryComponents.bondYears} years` : null} />
-                  </>
-                )}
-              </Grid2>
-            )}
-          </SectionCard>
-
-          {/* Selection Process */}
-          <SectionCard title="Selection Process" icon={<AssignmentIcon color="primary" />}>
-            <Grid2 container spacing={2}>
-              <DataRow label="Team Members Required" value={formData.teamMembers} />
-              <DataRow label="Rooms Required" value={formData.roomsRequired} />
-              <Grid2 size={12}>
-                <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                  Selection Rounds ({enabledRounds.length})
-                </Typography>
-                {enabledRounds.length > 0 ? (
-                  <Stack spacing={1}>
-                    {enabledRounds.map((round, idx) => (
-                      <Paper key={round.id} variant="outlined" sx={{ p: 1.5 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip label={`Round ${idx + 1}`} size="small" color="primary" />
-                            <Typography variant="body2" fontWeight={500}>
-                              {round.type.replace("_", " ")}
-                            </Typography>
-                          </Stack>
-                          <Stack direction="row" spacing={1}>
-                            <Chip label={round.mode} size="small" variant="outlined" />
-                            {round.duration && <Chip label={round.duration} size="small" variant="outlined" />}
-                          </Stack>
+                          <TextField
+                            fullWidth size="small" label="Take Home"
+                            value={s.takeHome ?? ""}
+                            onChange={(e) => {
+                              const updated = JSON.parse(JSON.stringify(editFormData.programmeSalaries ?? formData.programmeSalaries ?? []));
+                              updated[idx].takeHome = e.target.value;
+                              updateEditField("programmeSalaries", updated);
+                            }}
+                          />
                         </Stack>
-                        {round.details && (
-                          <Typography variant="body2" color="text.secondary" mt={1}>
-                            {round.details}
-                          </Typography>
-                        )}
-                      </Paper>
-                    ))}
+                      )}
+                    </Box>
+                  ))}
+                  <Typography variant="subtitle2" mt={1}>Additional Compensation Components</Typography>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth size="small" label="Joining Bonus"
+                      value={editFormData.salaryComponents?.joiningBonus ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), joiningBonus: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Retention Bonus"
+                      value={editFormData.salaryComponents?.retentionBonus ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), retentionBonus: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Performance/Variable Bonus"
+                      value={editFormData.salaryComponents?.performanceBonus ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), performanceBonus: e.target.value })}
+                    />
                   </Stack>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">No selection rounds specified</Typography>
-                )}
-              </Grid2>
-            </Grid2>
-          </SectionCard>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth size="small" label="ESOPs / Stock Options"
+                      value={editFormData.salaryComponents?.esops ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), esops: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Vesting Period"
+                      value={editFormData.salaryComponents?.vestPeriod ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), vestPeriod: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Stocks/RSUs"
+                      value={editFormData.salaryComponents?.stocks ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), stocks: e.target.value })}
+                    />
+                  </Stack>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth size="small" label="Relocation Allowance"
+                      value={editFormData.salaryComponents?.relocationAllowance ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), relocationAllowance: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Relocation Bonus (Legacy)"
+                      value={editFormData.salaryComponents?.relocationBonus ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), relocationBonus: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Medical Allowance / Insurance"
+                      value={editFormData.salaryComponents?.medicalAllowance ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), medicalAllowance: e.target.value })}
+                    />
+                  </Stack>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField fullWidth size="small" label="Deductions (PF, Tax, etc.)"
+                      value={editFormData.salaryComponents?.deductions ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), deductions: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Bond Amount (if any)"
+                      value={editFormData.salaryComponents?.bondAmount ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), bondAmount: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Bond Duration"
+                      value={editFormData.salaryComponents?.bondDuration ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), bondDuration: e.target.value })}
+                    />
+                    <TextField fullWidth size="small" label="Bond (Years) (Legacy)"
+                      value={editFormData.salaryComponents?.bondYears ?? ""}
+                      onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), bondYears: e.target.value })}
+                    />
+                  </Stack>
+                  <TextField fullWidth size="small" label="Detailed CTC Breakup (Optional)" multiline minRows={2}
+                    value={editFormData.salaryComponents?.ctcBreakup ?? ""}
+                    onChange={(e) => updateEditField("salaryComponents", { ...(editFormData.salaryComponents ?? {}), ctcBreakup: e.target.value })}
+                  />
+                </Stack>
+              </SectionCard>
 
-          {/* Declaration */}
-          {formData.signatory && (
-            <SectionCard title="Declaration & Signatory" icon={<CheckCircleIcon color="primary" />}>
-              <Grid2 container spacing={2}>
-                <DataRow label="Signatory Name" value={formData.signatory.name} />
-                <DataRow label="Designation" value={formData.signatory.designation} />
-                <DataRow label="Date" value={formData.signatory.date} />
-                <Grid2 size={12}>
-                  <Typography variant="caption" color="text.secondary" display="block">Declarations</Typography>
-                  <Typography variant="body2" color="success.main" mt={0.5}>
-                    ✅ All declarations accepted
-                  </Typography>
+              <SectionCard title="Selection Process" icon={<AssignmentIcon color="primary" />}>
+                <SelectionProcessBuilder
+                  value={editFormData.selectionRounds ?? []}
+                  onChange={(rounds) => updateEditField("selectionRounds", rounds)}
+                />
+              </SectionCard>
+            </>
+          ) : (
+            <>
+              {/* System/HR Info (Admin only) */}
+              <SectionCard title="Company Information" icon={<BusinessIcon color="primary" />}>
+                <Grid2 container spacing={2}>
+                  <DataRow label="Company Name" value={jnf?.company?.name} />
+                  <DataRow label="HR Name" value={jnf?.company?.hr_name} />
+                  <DataRow label="HR Email" value={jnf?.company?.hr_email} />
+                  <DataRow label="Industry" value={jnf?.company?.industry} />
+                  <DataRow label="Website" value={jnf?.company?.website} />
                 </Grid2>
-              </Grid2>
-            </SectionCard>
+              </SectionCard>
+
+              {/* Standardized JnfPreview component */}
+              <JnfPreview
+                readOnly={true}
+                companyLogoUrl={jnf?.company?.logo_url || formData.companyProfile?.logoUrl || null}
+                companyProfile={{
+                  name: formData.companyProfile?.name || jnf?.company?.name || "",
+                  website: formData.companyProfile?.website || "",
+                  about: formData.companyProfile?.about || "",
+                  industry: formData.companyProfile?.industry || "",
+                  sector: formData.companyProfile?.sector || "",
+                  employeeCount: formData.companyProfile?.employeeCount || "",
+                  postalAddress: formData.companyProfile?.postalAddress || "",
+                  categoryOrgType: formData.companyProfile?.categoryOrgType || "",
+                  dateOfEstablishment: formData.companyProfile?.dateOfEstablishment || "",
+                  annualTurnover: formData.companyProfile?.annualTurnover || "",
+                  linkedinUrl: formData.companyProfile?.linkedinUrl || "",
+                  industrySectorTags: formData.companyProfile?.industrySectorTags || "",
+                  mncHqCountryCity: formData.companyProfile?.mncHqCountryCity || "",
+                  natureOfBusiness: formData.companyProfile?.natureOfBusiness || "",
+                  companyDescription: formData.companyProfile?.companyDescription || "",
+                }}
+                jobDetails={{
+                  title: formData.jobTitle || jnf?.job_title || "",
+                  designation: formData.jobDesignation || "",
+                  location: formData.jobLocation || jnf?.job_location || "",
+                  workMode: formData.workMode || "onsite",
+                  expectedHires: formData.expectedHires || jnf?.vacancies?.toString() || "",
+                  minimumHires: formData.minimumHires || "",
+                  joiningMonth: formData.joiningMonth || "",
+                  skills: formData.skills || [],
+                  description: formData.jobDescription || jnf?.job_description || "",
+                  registrationLink: formData.registrationLink || "",
+                  additionalInfo: formData.additionalInfo || "",
+                }}
+                eligibility={formData.eligibility || []}
+                globalCgpa={formData.globalCgpa || "7.0"}
+                globalBacklogs={formData.globalBacklogs ?? false}
+                genderFilter={formData.genderFilter || "all"}
+                slpRequirement={formData.slpRequirement || ""}
+                graduatingBatch={formData.graduatingBatch || jnf?.graduating_batch || ""}
+                salary={{
+                  currency: (formData.currency as any) || "INR",
+                  programmeSalaries: formData.programmeSalaries || [],
+                  components: {
+                    joiningBonus: formData.salaryComponents?.joiningBonus || "",
+                    retentionBonus: formData.salaryComponents?.retentionBonus || "",
+                    performanceBonus: formData.salaryComponents?.performanceBonus || "",
+                    esops: formData.salaryComponents?.esops || "",
+                    vestPeriod: formData.salaryComponents?.vestPeriod || "",
+                    relocationAllowance: formData.salaryComponents?.relocationAllowance || "",
+                    medicalAllowance: formData.salaryComponents?.medicalAllowance || "",
+                    deductions: formData.salaryComponents?.deductions || "",
+                    bondAmount: formData.salaryComponents?.bondAmount || "",
+                    bondDuration: formData.salaryComponents?.bondDuration || "",
+                    stocks: formData.salaryComponents?.stocks || "",
+                    ctcBreakup: formData.salaryComponents?.ctcBreakup || "",
+                  },
+                }}
+                selectionProcess={{
+                  rounds: formData.selectionRounds || [],
+                }}
+                declarations={(formData.declarations as any) || {
+                  aipc: false,
+                  shortlistCriteria: false,
+                  infoVerified: false,
+                  consentLogo: false,
+                  confirmAccuracy: false,
+                  resultsViaCdc: false,
+                }}
+                signatory={formData.signatory || {
+                  name: "",
+                  designation: "",
+                  date: "",
+                }}
+              />
+            </>
           )}
 
         </Grid2>

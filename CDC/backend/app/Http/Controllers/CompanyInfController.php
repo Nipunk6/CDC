@@ -293,16 +293,53 @@ class CompanyInfController extends Controller
         }
 
         // Create a copy with "Copy of" prefix
+        $formData = $inf->form_data;
+        if ($formData) {
+            if (is_string($formData)) {
+                $formData = json_decode($formData, true);
+            }
+            if (is_array($formData)) {
+                // Update title in form_data
+                $formData['internshipTitle'] = $formData['internshipTitle'] ?? $inf->internship_title;
+                
+                // Clear graduating batch
+                $formData['graduatingBatch'] = '';
+                if (isset($formData['eligibility']) && is_array($formData['eligibility'])) {
+                    foreach ($formData['eligibility'] as $k => $prog) {
+                        $formData['eligibility'][$k]['graduatingBatch'] = '';
+                        $formData['eligibility'][$k]['graduatingBatches'] = [];
+                    }
+                }
+
+                // Reset declarations to false
+                $formData['declarations'] = [
+                    'aipc' => false,
+                    'shortlistCriteria' => false,
+                    'infoVerified' => false,
+                    'consentLogo' => false,
+                    'confirmAccuracy' => false,
+                    'resultsViaCdc' => false,
+                ];
+
+                // Reset signatory to empty
+                $formData['signatory'] = [
+                    'name' => '',
+                    'designation' => '',
+                    'date' => '',
+                ];
+            }
+        }
+
         $newInf = Inf::create([
             'company_id' => $company->id,
-            'internship_title' => 'Copy of ' . $inf->internship_title,
+            'internship_title' => $inf->internship_title,
             'internship_description' => $inf->internship_description,
             'internship_location' => $inf->internship_location,
             'stipend' => $inf->stipend,
             'internship_duration_weeks' => $inf->internship_duration_weeks,
             'vacancies' => $inf->vacancies,
             'application_deadline' => $inf->application_deadline,
-            'form_data' => $inf->form_data,
+            'form_data' => $formData,
             'status' => 'draft',
         ]);
 

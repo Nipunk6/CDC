@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -19,10 +20,12 @@ import {
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 interface GraduatingBatchDialogProps {
   open: boolean;
   onConfirm: (batch: string) => void;
+  onBack?: () => void;
   initialBatch?: string;
   formType?: "JNF" | "INF";
 }
@@ -30,6 +33,7 @@ interface GraduatingBatchDialogProps {
 export default function GraduatingBatchDialog({
   open,
   onConfirm,
+  onBack,
   initialBatch = "",
   formType = "JNF",
 }: GraduatingBatchDialogProps) {
@@ -75,10 +79,12 @@ export default function GraduatingBatchDialog({
           alignItems: "center",
           gap: 1.5,
           py: 2.5,
+          px: 3,
+          position: "relative",
         }}
       >
         <SchoolIcon />
-        <Box>
+        <Box sx={{ pr: onBack ? 16 : 0 }}>
           <Typography variant="h6" fontWeight={700}>
             Select Graduating Batch
           </Typography>
@@ -88,6 +94,32 @@ export default function GraduatingBatchDialog({
               : "Internship Notification Form"}
           </Typography>
         </Box>
+        {onBack && (
+          <Button
+            onClick={onBack}
+            startIcon={<ArrowBackIcon />}
+            sx={{
+              position: "absolute",
+              right: 16,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "white",
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: "0.875rem",
+              borderRadius: 2,
+              px: 1.5,
+              py: 0.75,
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+              "&:hover": {
+                bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
+                borderColor: "white",
+              },
+            }}
+          >
+            Go Back
+          </Button>
+        )}
       </DialogTitle>
 
       <DialogContent sx={{ pt: 3, pb: 1 }}>

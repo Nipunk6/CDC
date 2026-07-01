@@ -39,6 +39,7 @@ interface PolicyDocument {
 
 interface DeclarationChecklistProps {
   formType: "jnf" | "inf";
+  draftId?: number;
   declarations: {
     aipc: boolean;
     shortlistCriteria: boolean;
@@ -48,12 +49,6 @@ interface DeclarationChecklistProps {
     resultsViaCdc: boolean;
   };
   onDeclarationsChange: (declarations: DeclarationChecklistProps["declarations"]) => void;
-  signatory: {
-    name: string;
-    designation: string;
-    date: string;
-  };
-  onSignatoryChange: (signatory: DeclarationChecklistProps["signatory"]) => void;
 }
 
 const declarationTexts = {
@@ -67,15 +62,45 @@ const declarationTexts = {
 
 export default function DeclarationChecklist({
   formType,
+  draftId,
   declarations,
   onDeclarationsChange,
-  signatory,
-  onSignatoryChange,
 }: DeclarationChecklistProps) {
   const [documents, setDocuments] = useState<PolicyDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<{url: string; title: string; docId: number} | null>(null);
   const [readDocs, setReadDocs] = useState<Record<number, boolean>>({});
+
+  const storageKey = draftId ? `cdc_read_guidelines_${formType}_${draftId}` : `cdc_read_guidelines_${formType}_temp`;
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          setReadDocs(JSON.parse(saved));
+        } else {
+          setReadDocs({});
+        }
+      } catch (e) {
+        console.error("Failed to load read guidelines", e);
+      }
+    }
+  }, [storageKey]);
+
+  const handleReadDoc = (docId: number) => {
+    setReadDocs((prev) => {
+      const updated = { ...prev, [docId]: true };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(updated));
+        } catch (e) {
+          console.error("Failed to save read guidelines", e);
+        }
+      }
+      return updated;
+    });
+  };
 
   useEffect(() => {
     const fetchDocs = async () => {
@@ -95,22 +120,20 @@ export default function DeclarationChecklist({
     onDeclarationsChange({ ...declarations, [key]: !declarations[key] });
   };
 
-  const updateSignatory = (field: keyof typeof signatory, value: string) => {
-    onSignatoryChange({ ...signatory, [field]: value });
-  };
 
   const handleOpenPdf = (e: React.MouseEvent, doc: PolicyDocument) => {
     e.preventDefault();
     setPdfUrl({ url: doc.url, title: doc.title, docId: doc.id });
+    handleReadDoc(doc.id);
   };
 
   const handleLinkClick = (doc: PolicyDocument) => {
-    setReadDocs((prev) => ({ ...prev, [doc.id]: true }));
+    handleReadDoc(doc.id);
   };
 
   const handleReachBottom = () => {
     if (pdfUrl) {
-      setReadDocs((prev) => ({ ...prev, [pdfUrl.docId]: true }));
+      handleReadDoc(pdfUrl.docId);
       setPdfUrl(null);
     }
   };
@@ -238,61 +261,7 @@ export default function DeclarationChecklist({
         )}
       </Paper>
 
-      <Divider sx={{ my: 3 }} />
 
-      {/* Self-Declaration / Signatory */}
-      <Paper
-        sx={{
-          p: 3,
-          background: (theme) => alpha(theme.palette.secondary.main, 0.05),
-          border: "1px solid",
-          borderColor: "secondary.light",
-        }}
-      >
-        <Typography variant="subtitle1" fontWeight={600} mb={2} color="secondary.dark">
-          ✍️ Authorised Signatory
-        </Typography>
-        <Typography variant="body2" color="text.secondary" mb={3}>
-          Please provide details of the authorised representative submitting this form.
-        </Typography>
-
-        <Stack spacing={2}>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-            <TextField
-              fullWidth
-              label="Full Name of Signatory"
-              value={signatory.name}
-              onChange={(e) => updateSignatory("name", e.target.value)}
-              required
-              placeholder="Enter full name"
-            />
-            <TextField
-              fullWidth
-              label="Designation"
-              value={signatory.designation}
-              onChange={(e) => updateSignatory("designation", e.target.value)}
-              required
-              placeholder="e.g., HR Manager, Campus Recruiter"
-            />
-          </Stack>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-            <TextField
-              type="date"
-              label="Date"
-              value={signatory.date}
-              onChange={(e) => updateSignatory("date", e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              required
-              sx={{ width: { xs: "100%", md: 200 } }}
-            />
-          </Stack>
-        </Stack>
-
-        <Typography variant="caption" color="text.secondary" mt={2} display="block">
-          By submitting this form, you confirm that you are authorised to represent your organisation
-          and that all information provided is accurate to the best of your knowledge.
-        </Typography>
-      </Paper>
 
       {/* PDF Modal */}
       <Dialog 

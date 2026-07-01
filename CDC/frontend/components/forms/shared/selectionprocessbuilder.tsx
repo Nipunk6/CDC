@@ -294,7 +294,6 @@ export default function SelectionProcessBuilder({
                         value={round.date ?? ""}
                         onChange={(e) => updateRound(round.id, "date", e.target.value)}
                         sx={{ minWidth: 180, maxWidth: 220 }}
-                        required
                       />
                     )}
 

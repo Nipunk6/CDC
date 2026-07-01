@@ -9,7 +9,10 @@ export default function NewInfPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto" }}>
-      <InfFormPro onSaved={(id) => router.push(`/company/inf/${id}`)} />
+      <InfFormPro
+        onSaved={(id) => router.push(`/company/inf/${id}`)}
+        onCancel={() => router.push("/company")}
+      />
     </Box>
   );
 }

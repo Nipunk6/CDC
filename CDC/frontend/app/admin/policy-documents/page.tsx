@@ -251,7 +251,7 @@ export default function AdminPolicyDocumentsPage() {
       )}
 
       <Paper sx={{ width: "100%", overflow: "hidden" }}>
-        <TableContainer>
+        <TableContainer sx={{ overflowX: "auto" }}>
           <Table>
             <TableHead>
               <TableRow>

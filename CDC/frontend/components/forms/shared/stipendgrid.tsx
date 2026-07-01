@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import {
   Box,
   InputAdornment,
@@ -20,6 +21,7 @@ import {
 } from "@mui/material";
 import CurrencySelector, { Currency, getCurrencySymbol } from "./currencyselector";
 import type { ProgrammeEligibility } from "./eligibilitygrid";
+import { getDisplayName } from "./salarygrid";
 
 export interface ProgrammeStipend {
   programme: string;
@@ -45,14 +47,63 @@ interface StipendGridProps {
 }
 
 const defaultProgrammeStipends: ProgrammeStipend[] = [
-  { programme: "B.Tech / Dual / Int. M.Tech", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: true },
-  { programme: "M.Tech", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
-  { programme: "MBA", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
-  { programme: "M.Sc / M.Sc.Tech", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
-  { programme: "Ph.D", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
+  { programme: "B.Tech (4 Year) / B.Tech Double Major (5 Year) / B.Tech-M.Tech Dual Degree (5 Year)", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: true },
+  { programme: "Integrated M.Tech (5 Year) - JEE Advanced", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
+  { programme: "M.Tech (2 Year) - GATE", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
+  { programme: "M.Sc. Tech (3 Year) - JAM", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
+  { programme: "MBA (2 Year) - CAT", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
+  { programme: "M.Sc (2 Year) - JAM", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
+  { programme: "M.A. (2 Year) - Digital Humanities & Social Sciences", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
+  { programme: "Ph.D - GATE/NET", baseStipend: "", hra: "", otherPerks: "", total: "", enabled: false },
 ];
 
 export { defaultProgrammeStipends };
+
+const normalizeProgrammeStipends = (loaded: ProgrammeStipend[]): ProgrammeStipend[] => {
+  if (!loaded || loaded.length === 0) return defaultProgrammeStipends;
+
+  const defaultNames = defaultProgrammeStipends.map(d => d.programme);
+  const loadedNames = loaded.map(l => l.programme);
+  const isUpToDate = defaultNames.every(name => loadedNames.includes(name));
+  if (isUpToDate) {
+    return defaultNames.map(name => loaded.find(l => l.programme === name)!);
+  }
+
+  return defaultProgrammeStipends.map(def => {
+    const exact = loaded.find(l => l.programme === def.programme);
+    if (exact) return exact;
+
+    let oldMatch: ProgrammeStipend | undefined;
+    const dp = def.programme.toLowerCase();
+    
+    if (dp.includes("b.tech") || dp.includes("integrated m.tech")) {
+      oldMatch = loaded.find(l => l.programme.includes("B.Tech / Dual / Int. M.Tech") || l.programme.includes("B.Tech"));
+    } else if (dp.includes("m.tech")) {
+      oldMatch = loaded.find(l => l.programme === "M.Tech" || l.programme.includes("M.Tech (2 Year)"));
+    } else if (dp.includes("mba")) {
+      oldMatch = loaded.find(l => l.programme === "MBA" || l.programme.includes("MBA (2 Year)"));
+    } else if (dp.includes("m.sc. tech") || dp.includes("m.sc.tech")) {
+      oldMatch = loaded.find(l => l.programme === "M.Sc. Tech" || l.programme.includes("M.Sc / M.Sc.Tech") || l.programme === "M.Sc.Tech");
+    } else if (dp.includes("m.sc") || dp.includes("m.a.")) {
+      oldMatch = loaded.find(l => l.programme === "M.Sc" || l.programme.includes("M.Sc / M.Sc.Tech"));
+    } else if (dp.includes("ph.d")) {
+      oldMatch = loaded.find(l => l.programme === "Ph.D" || l.programme.includes("Ph.D"));
+    }
+
+    if (oldMatch) {
+      return {
+        ...def,
+        baseStipend: oldMatch.baseStipend,
+        hra: oldMatch.hra,
+        otherPerks: oldMatch.otherPerks,
+        total: oldMatch.total,
+        enabled: def.enabled,
+      };
+    }
+
+    return def;
+  });
+};
 
 export default function StipendGrid({
   currency,
@@ -67,23 +118,40 @@ export default function StipendGrid({
   onPpoCtcChange,
   eligibleProgrammes,
 }: StipendGridProps) {
-  const stipends = programmeStipends.length > 0 ? programmeStipends : defaultProgrammeStipends;
+  const stipends = normalizeProgrammeStipends(programmeStipends);
   const symbol = getCurrencySymbol(currency);
 
-  const activeStipendCategories = new Set<string>();
-  if (eligibleProgrammes && eligibleProgrammes.length > 0) {
-    eligibleProgrammes.forEach(ep => {
-      const hasSelectedBranches = ep.branches.some(b => b.selected);
-      if (hasSelectedBranches) {
-        const p = ep.programme.toLowerCase();
-        if (p.includes("b.tech") || p.includes("integrated m.tech")) activeStipendCategories.add("B.Tech / Dual / Int. M.Tech");
-        if (p.includes("m.tech") && !p.includes("integrated")) activeStipendCategories.add("M.Tech");
-        if (p.includes("mba")) activeStipendCategories.add("MBA");
-        if (p.includes("m.sc") || p.includes("m.a.")) activeStipendCategories.add("M.Sc / M.Sc.Tech");
-        if (p.includes("ph.d")) activeStipendCategories.add("Ph.D");
+  const activeStipendCategories = useMemo(() => {
+    const categories = new Set<string>();
+    if (eligibleProgrammes && eligibleProgrammes.length > 0) {
+      eligibleProgrammes.forEach(ep => {
+        const hasSelectedBranches = ep.branches.some(b => b.selected);
+        if (hasSelectedBranches) {
+          categories.add(ep.programme);
+        }
+      });
+    }
+    return categories;
+  }, [eligibleProgrammes]);
+
+  // Sync active eligibility with the enabled property of stipends to reflect in preview
+  useEffect(() => {
+    let changed = false;
+    const updated = stipends.map(s => {
+      const isVisible = eligibleProgrammes && eligibleProgrammes.length > 0
+        ? activeStipendCategories.has(s.programme)
+        : true;
+      if (s.enabled !== isVisible) {
+        changed = true;
+        return { ...s, enabled: isVisible };
       }
+      return s;
     });
-  }
+
+    if (changed) {
+      onProgrammeStipendsChange(updated);
+    }
+  }, [activeStipendCategories, eligibleProgrammes, stipends, onProgrammeStipendsChange]);
 
   let firstVisibleIndex = 0;
   for (let i = 0; i < stipends.length; i++) {
@@ -191,7 +259,7 @@ export default function StipendGrid({
               >
                 <TableCell>
                   <Typography variant="body2" fontWeight={500}>
-                    {stipend.programme}
+                    {getDisplayName(stipend.programme)}
                   </Typography>
                 </TableCell>
                 <TableCell>

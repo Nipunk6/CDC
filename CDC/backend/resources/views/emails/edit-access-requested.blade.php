@@ -19,5 +19,13 @@
         </p>
         <p style="font-size: 12px; color: #666; word-break: break-all;">{{ $reviewUrl }}</p>
     @endif
+
+    @if(empty($reviewUrl))
+        <p style="margin-top: 18px;">
+            <a href="{{ config('app.frontend_url') }}/auth/login/admin" style="display:inline-block;background:#c62828;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px;font-weight:600;">
+                Login to Admin Portal
+            </a>
+        </p>
+    @endif
 </body>
 </html>

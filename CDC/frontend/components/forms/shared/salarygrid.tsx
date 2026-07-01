@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import {
   Box,
   InputAdornment,
@@ -58,11 +59,14 @@ interface SalaryGridProps {
 }
 
 const defaultProgrammeSalaries: ProgrammeSalary[] = [
-  { programme: "B.Tech / Dual / Int. M.Tech", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: true },
-  { programme: "M.Tech", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
-  { programme: "MBA", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
-  { programme: "M.Sc / M.Sc.Tech", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
-  { programme: "Ph.D", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
+  { programme: "B.Tech (4 Year) / B.Tech Double Major (5 Year) / B.Tech-M.Tech Dual Degree (5 Year)", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: true },
+  { programme: "Integrated M.Tech (5 Year) - JEE Advanced", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
+  { programme: "M.Tech (2 Year) - GATE", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
+  { programme: "M.Sc. Tech (3 Year) - JAM", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
+  { programme: "MBA (2 Year) - CAT", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
+  { programme: "M.Sc (2 Year) - JAM", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
+  { programme: "M.A. (2 Year) - Digital Humanities & Social Sciences", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
+  { programme: "Ph.D - GATE/NET", ctcAnnual: "", baseSalary: "", takeHome: "", enabled: false },
 ];
 
 const defaultSalaryComponents: SalaryComponents = {
@@ -82,6 +86,63 @@ const defaultSalaryComponents: SalaryComponents = {
 
 export { defaultProgrammeSalaries, defaultSalaryComponents };
 
+export const getDisplayName = (programme: string): string => {
+  // Remove year part: e.g. " (4 Year)", " (5 Year)"
+  let name = programme.replace(/\s*\(\d+\s*Year\)/gi, "");
+  // Remove exam part: e.g. " - JEE Advanced", " - GATE", " - JAM", " - CAT", " - GATE/NET"
+  name = name.replace(/\s*-\s*(JEE Advanced|GATE|JAM|CAT|GATE\/NET)$/gi, "");
+  
+  if (name === "B.Tech / B.Tech Double Major / B.Tech-M.Tech Dual Degree") {
+    return "B.Tech / Double Major / Dual Degree";
+  }
+  return name;
+};
+
+const normalizeProgrammeSalaries = (loaded: ProgrammeSalary[]): ProgrammeSalary[] => {
+  if (!loaded || loaded.length === 0) return defaultProgrammeSalaries;
+  
+  const defaultNames = defaultProgrammeSalaries.map(d => d.programme);
+  const loadedNames = loaded.map(l => l.programme);
+  const isUpToDate = defaultNames.every(name => loadedNames.includes(name));
+  if (isUpToDate) {
+    return defaultNames.map(name => loaded.find(l => l.programme === name)!);
+  }
+
+  return defaultProgrammeSalaries.map(def => {
+    const exact = loaded.find(l => l.programme === def.programme);
+    if (exact) return exact;
+
+    let oldMatch: ProgrammeSalary | undefined;
+    const dp = def.programme.toLowerCase();
+    
+    if (dp.includes("b.tech") || dp.includes("integrated m.tech")) {
+      oldMatch = loaded.find(l => l.programme.includes("B.Tech / Dual / Int. M.Tech") || l.programme.includes("B.Tech"));
+    } else if (dp.includes("m.tech")) {
+      oldMatch = loaded.find(l => l.programme === "M.Tech" || l.programme.includes("M.Tech (2 Year)"));
+    } else if (dp.includes("mba")) {
+      oldMatch = loaded.find(l => l.programme === "MBA" || l.programme.includes("MBA (2 Year)"));
+    } else if (dp.includes("m.sc. tech") || dp.includes("m.sc.tech")) {
+      oldMatch = loaded.find(l => l.programme === "M.Sc. Tech" || l.programme.includes("M.Sc / M.Sc.Tech") || l.programme === "M.Sc.Tech");
+    } else if (dp.includes("m.sc") || dp.includes("m.a.")) {
+      oldMatch = loaded.find(l => l.programme === "M.Sc" || l.programme.includes("M.Sc / M.Sc.Tech"));
+    } else if (dp.includes("ph.d")) {
+      oldMatch = loaded.find(l => l.programme === "Ph.D" || l.programme.includes("Ph.D"));
+    }
+
+    if (oldMatch) {
+      return {
+        ...def,
+        ctcAnnual: oldMatch.ctcAnnual,
+        baseSalary: oldMatch.baseSalary,
+        takeHome: oldMatch.takeHome,
+        enabled: def.enabled,
+      };
+    }
+
+    return def;
+  });
+};
+
 export default function SalaryGrid({
   currency,
   onCurrencyChange,
@@ -93,24 +154,41 @@ export default function SalaryGrid({
   onSalaryComponentsChange,
   eligibleProgrammes,
 }: SalaryGridProps) {
-  const salaries = programmeSalaries.length > 0 ? programmeSalaries : defaultProgrammeSalaries;
+  const salaries = normalizeProgrammeSalaries(programmeSalaries);
   const components = { ...defaultSalaryComponents, ...salaryComponents };
   const symbol = getCurrencySymbol(currency);
 
-  const activeSalaryCategories = new Set<string>();
-  if (eligibleProgrammes && eligibleProgrammes.length > 0) {
-    eligibleProgrammes.forEach(ep => {
-      const hasSelectedBranches = ep.branches.some(b => b.selected);
-      if (hasSelectedBranches) {
-        const p = ep.programme.toLowerCase();
-        if (p.includes("b.tech") || p.includes("integrated m.tech")) activeSalaryCategories.add("B.Tech / Dual / Int. M.Tech");
-        if (p.includes("m.tech") && !p.includes("integrated")) activeSalaryCategories.add("M.Tech");
-        if (p.includes("mba")) activeSalaryCategories.add("MBA");
-        if (p.includes("m.sc") || p.includes("m.a.")) activeSalaryCategories.add("M.Sc / M.Sc.Tech");
-        if (p.includes("ph.d")) activeSalaryCategories.add("Ph.D");
+  const activeSalaryCategories = useMemo(() => {
+    const categories = new Set<string>();
+    if (eligibleProgrammes && eligibleProgrammes.length > 0) {
+      eligibleProgrammes.forEach(ep => {
+        const hasSelectedBranches = ep.branches.some(b => b.selected);
+        if (hasSelectedBranches) {
+          categories.add(ep.programme);
+        }
+      });
+    }
+    return categories;
+  }, [eligibleProgrammes]);
+
+  // Sync active eligibility with the enabled property of salaries to reflect in preview
+  useEffect(() => {
+    let changed = false;
+    const updated = salaries.map(s => {
+      const isVisible = eligibleProgrammes && eligibleProgrammes.length > 0
+        ? activeSalaryCategories.has(s.programme)
+        : true;
+      if (s.enabled !== isVisible) {
+        changed = true;
+        return { ...s, enabled: isVisible };
       }
+      return s;
     });
-  }
+
+    if (changed) {
+      onProgrammeSalariesChange(updated);
+    }
+  }, [activeSalaryCategories, eligibleProgrammes, salaries, onProgrammeSalariesChange]);
 
   let firstVisibleIndex = 0;
   for (let i = 0; i < salaries.length; i++) {
@@ -208,7 +286,7 @@ export default function SalaryGrid({
               >
                 <TableCell>
                   <Typography variant="body2" fontWeight={500}>
-                    {salary.programme}
+                    {getDisplayName(salary.programme)}
                   </Typography>
                 </TableCell>
                 <TableCell>

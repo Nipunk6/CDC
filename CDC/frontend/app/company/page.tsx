@@ -73,6 +73,7 @@ type DashboardResponse = {
     updated_at: string;
     edit_access_requested_at?: string | null;
     edit_access_requested_reason?: string | null;
+    graduating_batch?: string;
   }>;
   recent_infs?: Array<{
     id: number;
@@ -81,6 +82,7 @@ type DashboardResponse = {
     updated_at: string;
     edit_access_requested_at?: string | null;
     edit_access_requested_reason?: string | null;
+    graduating_batch?: string;
   }>;
 };
 
@@ -327,11 +329,12 @@ export default function CompanyDashboard() {
           </Stack>
 
           {data?.recent_jnfs && data.recent_jnfs.length > 0 ? (
-            <TableContainer>
+            <TableContainer sx={{ overflowX: "auto" }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>Job Title / Profile</TableCell>
+                    <TableCell>Graduating Batch</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Last Updated</TableCell>
                     <TableCell align="right">Actions</TableCell>
@@ -342,6 +345,9 @@ export default function CompanyDashboard() {
                     <TableRow key={jnf.id} hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight={500}>{jnf.job_title}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{jnf.graduating_batch || "N/A"}</Typography>
                       </TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={1} alignItems="center">
@@ -455,11 +461,12 @@ export default function CompanyDashboard() {
           </Stack>
 
           {data?.recent_infs && data.recent_infs.length > 0 ? (
-            <TableContainer>
+            <TableContainer sx={{ overflowX: "auto" }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>Internship Title / Profile</TableCell>
+                    <TableCell>Graduating Batch</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Last Updated</TableCell>
                     <TableCell align="right">Actions</TableCell>
@@ -470,6 +477,9 @@ export default function CompanyDashboard() {
                     <TableRow key={inf.id} hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight={500}>{inf.internship_title}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{inf.graduating_batch || "N/A"}</Typography>
                       </TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={1} alignItems="center">

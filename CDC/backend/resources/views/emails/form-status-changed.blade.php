@@ -13,5 +13,10 @@
         <p><strong>Admin Remarks:</strong> {{ $remarks }}</p>
     @endif
     <p>Please login to the company portal for details.</p>
+    <p>
+        <a href="{{ config('app.frontend_url') }}/auth/login/recruiter" style="display:inline-block;background:#2e7d32;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px;font-weight:600;">
+            Login to Company Portal
+        </a>
+    </p>
 </body>
 </html>

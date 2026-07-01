@@ -50,7 +50,7 @@ type InfItem = {
   review_marked?: boolean;
   updated_at: string;
   created_at: string;
-  company?: { name: string };
+  company?: { name: string; logo_url?: string | null };
   edit_access_requested_at?: string | null;
   graduating_batch?: string;
 };
@@ -235,16 +235,16 @@ function InfQueueContent() {
                 </Stack>
               </AccordionSummary>
               <AccordionDetails sx={{ p: 0 }}>
-                <TableContainer>
+                <TableContainer sx={{ overflowX: "auto" }}>
                   <Table>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Internship Title</TableCell>
-                        <TableCell>Company</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Submitted</TableCell>
-                        <TableCell>Last Updated</TableCell>
-                        <TableCell align="right">Action</TableCell>
+                        <TableCell sx={{ width: "25%" }}>Internship Title</TableCell>
+                        <TableCell sx={{ width: "25%" }}>Company</TableCell>
+                        <TableCell sx={{ width: "15%" }}>Status</TableCell>
+                        <TableCell sx={{ width: "12%" }}>Submitted</TableCell>
+                        <TableCell sx={{ width: "13%" }}>Last Updated</TableCell>
+                        <TableCell align="right" sx={{ width: "10%" }}>Action</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -256,9 +256,18 @@ function InfQueueContent() {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" color="text.secondary">
-                              {inf.company?.name ?? "-"}
-                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Avatar
+                                src={inf.company?.logo_url || undefined}
+                                alt={inf.company?.name || "Logo"}
+                                sx={{ width: 24, height: 24, bgcolor: "grey.200", fontSize: "0.75rem" }}
+                              >
+                                {inf.company?.name ? inf.company.name.charAt(0).toUpperCase() : "-"}
+                              </Avatar>
+                              <Typography variant="body2" color="text.secondary">
+                                {inf.company?.name ?? "-"}
+                              </Typography>
+                            </Stack>
                           </TableCell>
                           <TableCell>
                             <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="nowrap">

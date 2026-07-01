@@ -121,7 +121,7 @@ export default function AdminAlumniOutreachPage() {
 
       <Card>
         <CardContent>
-          <TableContainer>
+          <TableContainer sx={{ overflowX: "auto" }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
