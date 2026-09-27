@@ -2,15 +2,15 @@
 Spec: PHASE2_IMPLEMENTATION_SPEC.md (v1.0). Stack: Laravel12+MySQL / Next16+JS(.jsx new files only) / MUI.
 
 ## CURRENT STATE
-- Working on: M0 complete → next is M1 task 1.1
-- Last completed: M0 acceptance checks (all green — see CHANGELOG 2026-09-27 M0-ACC)
+- Working on: M1 complete → next is M2 task 2.1
+- Last completed: M1 acceptance checks (all green — see CHANGELOG 2026-09-27 M1-ACC)
 - Half-done: nothing
-- Pending commands: none. (MySQL `iitism_placement` is at `migrate:fresh --seed` state as of M0; `storage:link` done; `composer require phpoffice/phpspreadsheet` + `npm i @mui/x-charts` installed.)
-- Nothing has been committed — the owner commits manually (owner rule: never commit without an explicit ask). M0.3 "each its own commit" was therefore NOT done as separate commits; the changes are staged-able as one M0 set.
-- NEXT ACTION: Start M1.1 — create migration `2026_09_27_000004_create_placement_cycles_table.php` (C2), `PlacementCycle` model, `AdminPlacementCycleController` (index/store/update/show/close, validate `allowed_programmes` via `App\Support\ProgrammeCatalogue`, audit via `App\Services\AuditService`), routes under the `['auth:sanctum','active','role:admin']` admin group in `routes/api.php`.
+- Pending commands: none. MySQL `iitism_placement` is at `migrate:fresh --seed` state (admin user + policy docs + mail_mode only; no cycles/enrolments left behind).
+- M0 is committed and pushed (origin/main `2ee8413`, authored by the CDC account). M1 is **uncommitted** — the owner commits manually.
+- NEXT ACTION: Start M2.1 — fill in the C3 schema inside the existing stub migration `database/migrations/2026_09_21_162407_create_student_profiles_table.php` (all columns per spec C3 + index on programme/branch/graduating_batch) and complete the `StudentProfile` model (fillable, casts, `belongsTo User`, `hasMany` Resume/Application/Offer/PlacementBlock/CycleEnrollment/BranchChangeRequest as those arrive). Then `php artisan migrate:fresh --seed`. Removing the stub's emptiness also clears the three KNOWN TRANSIENTS below that depend on `student_profiles.roll_no`.
 
 ## BLOCKED / QUESTIONS FOR OWNER
-- Q1 (lint baseline) — ANSWERED 2026-09-27: owner keeps the "no NEW lint errors in files Phase 2 creates or touches" policy (D14) and approved deleting the six root `test-*.js` scratch scripts (done, `git rm`, staged). Remaining pre-existing lint errors: 20, all in Phase 1 files Phase 2 does not edit.
+- Q1 (lint) — CLOSED 2026-09-27: owner kept the D14 policy, approved deleting the six root `test-*.js` scratch scripts, asked for the Phase 1 lint errors to be fixed (20 → 4, see D30/D31), then decided not to refactor the last four `react-hooks/set-state-in-effect` sites: they are suppressed with a pointer to D33 and tracked there as a deferred hardening item. **`npm run lint` now exits 0 (0 errors, 82 warnings).**
 - Q2 (`.env.example` mail password) — ANSWERED 2026-09-27: owner accepts it as is; no change.
 - Note (not a question): the build failed at baseline on 57 Phase 1 TS errors, not the 2 the spec lists; fixed type-only per the spec's method (D13). `next start` also failed at baseline with Auth.js `UntrustedHost`; fixed with `trustHost: true` (D17).
 
@@ -27,12 +27,19 @@ Spec: PHASE2_IMPLEMENTATION_SPEC.md (v1.0). Stack: Laravel12+MySQL / Next16+JS(.
   - [x] M0.5 Migrations C1 (`2026_09_27_000001`), C16 (`…000002`), C17 (`…000003`); models `PortalSetting`, `AuditLog`; `SettingsService`, `AuditService`; `config/programmes.php` (8/52, generated from TSX); `App\Support\ProgrammeCatalogue`; `EnsureUserIsActive` aliased `active` and applied to every `auth:sanctum` group; `PortalSettingSeeder`; `User.is_active` fillable/cast + `studentProfile()` hasOne
   - [x] M0.6 `types/next-auth.d.ts` (role union ×3 + `rollNo`), `auth.ts` (`StudentOnlyError`, `roll_no` passthrough, `trustHost`), `proxy.ts` (`/student` gate + matcher + fail-closed session), `AuthController@login`/`forgotPassword` accept `email` OR `roll_no` + 403 suspended, login page student variant (Roll Number field, student feature copy)
   - [x] M0 Acceptance: `migrate:fresh --seed` on MySQL ✔ (`users.role` = enum('admin','company','student')); `php artisan test` 25/25 ✔; admin login unchanged (live curl 200 + token, dashboard 200, logout → token 401) ✔; `POST /api/auth/admin/register` → 404 ✔; company `status: accepted` → 422 ✔ (test); proxy-pdf no session → 401 ✔ (live `next start`); `/student` unauth → `/auth/login/student?callbackUrl=/student` ✔; `tsc --noEmit` 0 errors ✔; `npm run build` ✔; lint: 0 new errors (baseline 25 pre-existing, see Q1)
-- [ ] M1 Placement cycles
-  - [ ] M1.1 C2 migration + `PlacementCycle` + `AdminPlacementCycleController` (index/store/update/show/close) + routes
-  - [ ] M1.2 C4 migration + enrol endpoints (roll list or Excel/CSV, per-row report) + unenrol + enrolled list (search+pagination)
-  - [ ] M1.3 Admin UI `app/admin/placement-cycles/page.jsx` + `[id]/page.jsx`; nav entry in adminshell
-  - [ ] M1 Acceptance
+- [x] M1 Placement cycles
+  - [x] M1.1 C2 migration (`2026_09_27_000004`) + `PlacementCycle` model + `AdminPlacementCycleController` (index with enrolled/postings/offers counts, store, show, update, close); `allowed_programmes` validated against `ProgrammeCatalogue`; every write audited (`cycle.create|update|close`); 8 routes under `['auth:sanctum','active','role:admin']`
+  - [x] M1.2 C4 migration (`2026_09_27_000005`) + `CycleEnrollment` model + `POST .../enroll` (pasted `roll_nos` OR uploaded xlsx/csv → `{enrolled, already_enrolled, errors:[{row, roll_no, reason}]}`), `DELETE .../enroll/{studentProfile}`, `GET .../enrollments` (search + 50/page); `SpreadsheetImportService` added
+  - [x] M1.3 `app/admin/placement-cycles/page.jsx` (card list, counts, Add-cycle dialog with programme/batch builder, close action) + `app/admin/placement-cycles/[id]/page.jsx` (Overview / Enrolled Students with bulk-enrol + error report + search + pagination / Postings placeholder); "Placement Cycles" added to adminshell nav
+  - [x] M1 Acceptance: cycle created live ✔; non-catalogue programme → 422 ✔; pasted roll list → per-row error report (unknown + duplicate rows both reported) ✔; CSV upload reports real spreadsheet row numbers (2, 3 — header skipped) ✔; enrollments list returns `meta` ✔; update + close ✔, second close → 422 ✔; `audit_logs` holds cycle.create/update/close with user + ip ✔; company user → 403 ✔; Phase 1 admin dashboard + JNF queue still 200 ✔; `migrate:fresh --seed` ✔; `php artisan test` 40/40 ✔; `tsc` 0 errors ✔; `npm run build` ✔ (routes `/admin/placement-cycles`, `/admin/placement-cycles/[id]`); `npm run lint` exits 0 (0 errors; the last 4 suppressed per D33)
 - [ ] M2 Students module
+  - [ ] M2.1 C3 schema into the stub migration + full `StudentProfile` model + `User` relations
+  - [ ] M2.2 `AdminStudentController` (store + invitation E1, bulkImport with `?dry_run=1`, import template, paginated index, show, update, `StudentAcademicSyncService`, suspend/reactivate)
+  - [ ] M2.3 Student self endpoints (profile read, limited PATCH, photo upload)
+  - [ ] M2.4 C15 branch-change requests (student submit/list, admin queue/approve/reject)
+  - [ ] M2.5 Admin frontend (students list + import dialog with dry-run preview, student detail tabs, branch-changes queue)
+  - [ ] M2.6 Student frontend (`lib/studentapi.js`, `studentshell.jsx`, `app/student/layout.jsx`, profile page, notifications page, dashboard placeholder)
+  - [ ] M2 Acceptance
 - [ ] M3 Resumes
 - [ ] M4 Phase 1 form change (numeric backlogs + 10th/12th)
 - [ ] M5 Floating & student job board
@@ -43,6 +50,8 @@ Spec: PHASE2_IMPLEMENTATION_SPEC.md (v1.0). Stack: Laravel12+MySQL / Next16+JS(.
 - [ ] M10 Dashboards, seeder, audit UI, final QA
 
 ## KNOWN TRANSIENTS (close in the named milestone)
+- Cycle enrolment cannot match anybody until M2.1 gives `student_profiles` a `roll_no` column: `AdminPlacementCycleController::studentDirectoryReady()` returns false, so every row lands in the error report (which is exactly what the M1 acceptance check exercises). Enrolment search filters are skipped for the same reason.
+- `AdminPlacementCycleController::relatedCount()` returns 0 for `job_postings` (M5) and `offers` (M7) until those tables exist.
 - Roll-number login/forgot-password query `student_profiles.roll_no`, which only exists after M2.1 replaces the C3 stub migration (D16). No student accounts can exist before M2, so unreachable in practice.
 - `Jnf::isFloated()` / `Inf::isFloated()` use `Schema::hasTable('job_postings')` until M5 adds the real relation (D3).
 - Login response does not yet eager-load `studentProfile` (so `session.user.rollNo` is null until M2 adds `->with('studentProfile')` in `AuthController@login`).
@@ -61,3 +70,9 @@ Spec: PHASE2_IMPLEMENTATION_SPEC.md (v1.0). Stack: Laravel12+MySQL / Next16+JS(.
 - 2026-09-27 · M0-TS · type-only fixes so `next build` passes (D13): frontend/app/admin/jnfs/[id]/page.tsx, app/admin/infs/[id]/page.tsx, app/company/jnf/[id]/page.tsx, app/company/inf/[id]/page.tsx
 - 2026-09-27 · M0-TEST · tests/Feature/Phase2FoundationsTest.php (10 tests: register 404, status lockdown, admin_remarks strip, draft delete, login validation, suspension login+middleware, active unaffected, SettingsService+audit, ProgrammeCatalogue)
 - 2026-09-27 · M0-ACC · acceptance run: MySQL migrate:fresh --seed, php artisan test 25/25, tsc 0, next build OK, live curl smoke (backend :8099, frontend `next start` :3999) all as expected
+- 2026-09-27 · M1.1 · database/migrations/2026_09_27_000004_create_placement_cycles_table.php, app/Models/PlacementCycle.php, app/Http/Controllers/AdminPlacementCycleController.php, routes/api.php
+- 2026-09-27 · M1.2 · database/migrations/2026_09_27_000005_create_cycle_enrollments_table.php, app/Models/CycleEnrollment.php, app/Services/SpreadsheetImportService.php, AdminPlacementCycleController (enroll/unenroll/enrollments)
+- 2026-09-27 · M1.3 · frontend/app/admin/placement-cycles/page.jsx, frontend/app/admin/placement-cycles/[id]/page.jsx, frontend/components/admin/adminshell.tsx (nav entry)
+- 2026-09-27 · M1-TEST · tests/Feature/AdminPlacementCycleTest.php (15 tests: create+audit, catalogue validation, date order, batch years, index counts, update before/after, close twice, company 403, unknown-roll report, duplicate report, CSV upload rows, enroll validation, paginated enrollments, unenroll 404+success+audit, FK cascade)
+- 2026-09-27 · M1-PERF · AdminPlacementCycleController: batched roll-number resolution (2 queries per batch, chunked at 500) replacing 2 queries per row; memoised Schema::hasTable probes (D28)
+- 2026-09-27 · M1-ACC · acceptance run: migrate:fresh --seed, php artisan test 40/40, tsc 0, next build OK, live curl walkthrough of all 8 endpoints + Phase 1 smoke

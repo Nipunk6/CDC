@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminCompanyController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFormReviewController;
 use App\Http\Controllers\AdminManagementController;
+use App\Http\Controllers\AdminPlacementCycleController;
 use App\Http\Controllers\AdminProgrammeBranchController;
 use App\Http\Controllers\AlumniOutreachController;
 use App\Http\Controllers\AuthController;
@@ -55,6 +56,15 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->prefix('admin')->gr
 
     Route::get('/dashboard', [AdminDashboardController::class, 'index']);
     Route::get('/alumni-outreach', [AlumniOutreachController::class, 'index']);
+
+    Route::get('/placement-cycles', [AdminPlacementCycleController::class, 'index']);
+    Route::post('/placement-cycles', [AdminPlacementCycleController::class, 'store']);
+    Route::get('/placement-cycles/{placementCycle}', [AdminPlacementCycleController::class, 'show']);
+    Route::patch('/placement-cycles/{placementCycle}', [AdminPlacementCycleController::class, 'update']);
+    Route::patch('/placement-cycles/{placementCycle}/close', [AdminPlacementCycleController::class, 'close']);
+    Route::get('/placement-cycles/{placementCycle}/enrollments', [AdminPlacementCycleController::class, 'enrollments']);
+    Route::post('/placement-cycles/{placementCycle}/enroll', [AdminPlacementCycleController::class, 'enroll']);
+    Route::delete('/placement-cycles/{placementCycle}/enroll/{studentProfile}', [AdminPlacementCycleController::class, 'unenroll']);
 
     Route::get('/programme-branches', [AdminProgrammeBranchController::class, 'index']);
     Route::post('/programme-branches', [AdminProgrammeBranchController::class, 'store']);

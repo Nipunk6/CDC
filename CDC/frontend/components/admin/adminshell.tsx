@@ -38,6 +38,7 @@ const handleSignOut = async () => {
 
 const baseNavItems = [
   { label: "Dashboard", href: "/admin" },
+  { label: "Placement Cycles", href: "/admin/placement-cycles" },
   { label: "Alumni Outreach", href: "/admin/alumni-outreach" },
   { label: "JNF Reviews", href: "/admin/jnfs" },
   { label: "INF Reviews", href: "/admin/infs" },
