@@ -30,6 +30,8 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import DescriptionIcon from "@mui/icons-material/Description";
 import { companyApi } from "@/lib/companyapi";
 import { JnfPreview } from "@/components/forms/shared/formpreview";
+import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
+import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
 
 type FormData = {
   companyProfile?: {
@@ -46,6 +48,8 @@ type FormData = {
     mncHqCountryCity?: string;
     natureOfBusiness?: string;
     companyDescription?: string;
+    about?: string;
+    industry?: string;
     logoUrl?: string | null;
   };
   jobTitle?: string;
@@ -60,11 +64,7 @@ type FormData = {
   additionalInfo?: string;
   registrationLink?: string;
   graduatingBatch?: string;
-  eligibility?: Array<{
-    programme: string;
-    batch?: string;
-    branches: Array<{ branch: string; selected: boolean; cgpa: string; backlogs: boolean }>;
-  }>;
+  eligibility?: ProgrammeEligibility[];
   globalCgpa?: string;
   globalBacklogs?: boolean;
   genderFilter?: "all" | "male" | "female";
@@ -81,23 +81,29 @@ type FormData = {
     joiningBonus?: string;
     relocationBonus?: string;
     retentionBonus?: string;
+    performanceBonus?: string;
     esops?: string;
+    vestPeriod?: string;
+    stocks?: string;
+    relocationAllowance?: string;
+    medicalAllowance?: string;
+    deductions?: string;
+    bondAmount?: string;
+    bondDuration?: string;
     bondYears?: string;
+    ctcBreakup?: string;
   };
-  selectionRounds?: Array<{
-    id: string;
-    type: string;
-    enabled: boolean;
-    mode: string;
-    duration?: number;
-    details?: string;
-    date?: string;
-    infraRequirement?: string;
-    description?: string;
-  }>;
+  selectionRounds?: SelectionRound[];
   teamMembers?: string;
   roomsRequired?: string;
-  declarations?: Record<string, boolean>;
+  declarations?: {
+    aipc: boolean;
+    shortlistCriteria: boolean;
+    infoVerified: boolean;
+    consentLogo: boolean;
+    confirmAccuracy: boolean;
+    resultsViaCdc: boolean;
+  };
   signatory?: {
     name: string;
     designation: string;
@@ -119,6 +125,7 @@ type Jnf = {
   edit_access_requested_at: string | null;
   edit_access_requested_reason: string | null;
   form_data?: FormData | string | null;
+  graduating_batch?: string | null;
   created_at: string;
   updated_at: string;
   company?: {

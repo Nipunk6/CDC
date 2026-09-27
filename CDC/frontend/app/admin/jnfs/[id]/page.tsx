@@ -39,6 +39,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import { adminApi, adminDownload } from "@/lib/adminapi";
 import { JnfPreview, stripHtml } from "@/components/forms/shared/formpreview";
 import SelectionProcessBuilder from "@/components/forms/shared/selectionprocessbuilder";
+import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
+import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
 
 type FormData = {
   companyProfile?: {
@@ -55,6 +57,9 @@ type FormData = {
     mncHqCountryCity?: string;
     natureOfBusiness?: string;
     companyDescription?: string;
+    about?: string;
+    industry?: string;
+    logoUrl?: string | null;
   };
   jobTitle?: string;
   jobDesignation?: string;
@@ -67,10 +72,8 @@ type FormData = {
   jobDescription?: string;
   additionalInfo?: string;
   registrationLink?: string;
-  eligibility?: Array<{
-    programme: string;
-    branches: Array<{ branch: string; selected: boolean; cgpa: string; backlogs: boolean }>;
-  }>;
+  graduatingBatch?: string;
+  eligibility?: ProgrammeEligibility[];
   globalCgpa?: string;
   globalBacklogs?: boolean;
   genderFilter?: "all" | "male" | "female";
@@ -87,17 +90,19 @@ type FormData = {
     joiningBonus?: string;
     relocationBonus?: string;
     retentionBonus?: string;
+    performanceBonus?: string;
     esops?: string;
+    vestPeriod?: string;
+    stocks?: string;
+    relocationAllowance?: string;
+    medicalAllowance?: string;
+    deductions?: string;
+    bondAmount?: string;
+    bondDuration?: string;
     bondYears?: string;
+    ctcBreakup?: string;
   };
-  selectionRounds?: Array<{
-    id: string;
-    type: string;
-    enabled: boolean;
-    mode: string;
-    duration: string;
-    details: string;
-  }>;
+  selectionRounds?: SelectionRound[];
   teamMembers?: string;
   roomsRequired?: string;
   declarations?: Record<string, boolean>;
@@ -122,6 +127,7 @@ type Jnf = {
   edit_access_requested_at: string | null;
   edit_access_requested_reason: string | null;
   form_data?: FormData | string | null;
+  graduating_batch?: string | null;
   created_at: string;
   updated_at: string;
   company?: { 

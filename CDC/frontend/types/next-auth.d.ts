@@ -6,9 +6,10 @@ declare module "next-auth" {
     accessToken?: string;
     user: {
       id: string;
-      role: "admin" | "company";
+      role: "admin" | "company" | "student";
       isSuperAdmin?: boolean;
       companyId?: number | null;
+      rollNo?: string | null;
       name?: string | null;
       email?: string | null;
       image?: string | null;
@@ -16,18 +17,20 @@ declare module "next-auth" {
   }
 
   interface User {
-    role: "admin" | "company";
+    role: "admin" | "company" | "student";
     isSuperAdmin?: boolean;
     companyId?: number | null;
+    rollNo?: string | null;
     accessToken?: string;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    role?: "admin" | "company";
+    role?: "admin" | "company" | "student";
     isSuperAdmin?: boolean;
     companyId?: number | null;
+    rollNo?: string | null;
     accessToken?: string;
   }
 }

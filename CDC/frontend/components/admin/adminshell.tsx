@@ -27,6 +27,15 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import { adminApi } from "@/lib/adminapi";
 
+const handleSignOut = async () => {
+  try {
+    await adminApi("/auth/logout", { method: "POST" }); // revoke the Sanctum token server-side
+  } catch {
+    // ignore - the client session is cleared regardless
+  }
+  await signOut({ callbackUrl: "/auth/login/admin" });
+};
+
 const baseNavItems = [
   { label: "Dashboard", href: "/admin" },
   { label: "Alumni Outreach", href: "/admin/alumni-outreach" },
@@ -140,7 +149,7 @@ export default function AdminShell({
             <Divider sx={{ my: 1 }} />
             <ListItem disablePadding>
               <ListItemButton
-                onClick={() => signOut({ callbackUrl: "/auth/login/admin" })}
+                onClick={handleSignOut}
                 sx={{ borderRadius: 1, color: "secondary.main" }}
               >
                 <ListItemText primary="Sign Out" primaryTypographyProps={{ fontWeight: 600 }} />
@@ -248,7 +257,7 @@ export default function AdminShell({
                 color="secondary"
                 variant="contained"
                 size="small"
-                onClick={() => signOut({ callbackUrl: "/auth/login/admin" })}
+                onClick={handleSignOut}
               >
                 Sign Out
               </Button>

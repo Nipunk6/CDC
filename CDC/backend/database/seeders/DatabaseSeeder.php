@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             // CompanySeeder::class,
             // FormSeeder::class,
             PolicyDocumentSeeder::class,
+            PortalSettingSeeder::class,
         ]);
     }
 }

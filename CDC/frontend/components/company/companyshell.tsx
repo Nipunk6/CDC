@@ -24,6 +24,16 @@ import {
   useTheme,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import { companyApi } from "@/lib/companyapi";
+
+const handleSignOut = async () => {
+  try {
+    await companyApi("/auth/logout", { method: "POST" }); // revoke the Sanctum token server-side
+  } catch {
+    // ignore - the client session is cleared regardless
+  }
+  await signOut({ callbackUrl: "/auth/login/recruiter" });
+};
 
 const navItems = [
   { label: "Dashboard", href: "/company" },
@@ -95,7 +105,7 @@ export default function CompanyShell({
             <Divider sx={{ my: 1 }} />
             <ListItem disablePadding>
               <ListItemButton
-                onClick={() => signOut({ callbackUrl: "/auth/login/recruiter" })}
+                onClick={handleSignOut}
                 sx={{ borderRadius: 1, color: "secondary.main" }}
               >
                 <ListItemText primary="Sign Out" primaryTypographyProps={{ fontWeight: 600 }} />
@@ -190,7 +200,7 @@ export default function CompanyShell({
                   color="secondary"
                   variant="contained"
                   size="small"
-                  onClick={() => signOut({ callbackUrl: "/auth/login/recruiter" })}
+                  onClick={handleSignOut}
                 >
                   Sign Out
                 </Button>

@@ -80,6 +80,7 @@ class CompanyInfController extends Controller
 
         $status = $request->input('status', 'draft');
         $validated = $request->validated();
+        unset($validated['admin_remarks']); // companies never write admin remarks
 
         if (isset($validated['form_data']) && is_string($validated['form_data'])) {
             $decoded = json_decode($validated['form_data'], true);
@@ -143,6 +144,7 @@ class CompanyInfController extends Controller
         $oldStatus = (string) $inf->status;
         $newStatus = (string) $request->input('status', $oldStatus);
         $validated = $request->validated();
+        unset($validated['admin_remarks']); // companies never write admin remarks
 
         if (isset($validated['form_data']) && is_string($validated['form_data'])) {
             $decoded = json_decode($validated['form_data'], true);
@@ -208,6 +210,16 @@ class CompanyInfController extends Controller
             return response()->json(['message' => 'INF not found.'], 404);
         }
 
+        $deletableStatuses = ['draft', 'submitted', 'under_review', 'accepted', 'rejected'];
+        $isDraft = (string) $inf->status === 'draft';
+        $isUnfloatedForm = in_array((string) $inf->status, $deletableStatuses, true) && ! $inf->isFloated();
+
+        if (! $isDraft && ! $isUnfloatedForm) {
+            return response()->json([
+                'message' => 'This INF has been floated to students and cannot be deleted.',
+            ], 422);
+        }
+
         $inf->delete();
 
         return response()->json(['message' => 'INF deleted successfully.']);
@@ -230,7 +242,6 @@ class CompanyInfController extends Controller
             'internship_duration_weeks' => ['nullable', 'integer', 'min:1'],
             'vacancies' => ['nullable', 'integer', 'min:1'],
             'application_deadline' => ['nullable', 'date'],
-            'admin_remarks' => ['nullable', 'string', 'max:2000'],
             'form_data' => ['nullable', 'string'],
         ]);
 

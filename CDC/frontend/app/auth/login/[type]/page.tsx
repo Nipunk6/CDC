@@ -35,23 +35,33 @@ import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import SettingsIcon from "@mui/icons-material/Settings";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
+import SchoolIcon from "@mui/icons-material/School";
+import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
+import DescriptionIcon from "@mui/icons-material/Description";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 
 const apiBase =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
   "http://127.0.0.1:8000/api";
 
-type LoginFormValues = {
-  email: string;
-  password: string;
-};
+type LoginVariant = "admin" | "recruiter" | "student";
 
+// `identifier` is the email (admin/recruiter) or the roll number (student); `$isStudent` comes from the
+// form's validation context. Keeping it a single required field keeps the yup/react-hook-form types aligned.
 const schema = yup.object({
-  email: yup
+  identifier: yup
     .string()
-    .email("Enter a valid email")
-    .required("Email is required"),
+    .trim()
+    .required("Email is required")
+    .when("$isStudent", {
+      is: true,
+      then: (field) => field.required("Roll number is required"),
+      otherwise: (field) => field.email("Enter a valid email"),
+    }),
   password: yup.string().required("Password is required"),
 });
+
+type LoginFormValues = yup.InferType<typeof schema>;
 
 const recruiterFeatures = [
   {
@@ -99,6 +109,29 @@ const adminFeatures = [
   },
 ];
 
+const studentFeatures = [
+  {
+    icon: <WorkOutlineIcon sx={{ fontSize: 28 }} />,
+    title: "Job & Internship Profiles",
+    desc: "Browse every drive floated for your batch and see your eligibility instantly",
+  },
+  {
+    icon: <DescriptionIcon sx={{ fontSize: 28 }} />,
+    title: "Resumes & Applications",
+    desc: "Upload verified resumes and apply with one click before the deadline",
+  },
+  {
+    icon: <SchoolIcon sx={{ fontSize: 28 }} />,
+    title: "Live Selection Trail",
+    desc: "Track shortlists, rounds and final results as CDC publishes them",
+  },
+  {
+    icon: <EventAvailableIcon sx={{ fontSize: 28 }} />,
+    title: "Events & Calendar",
+    desc: "PPTs, workshops and deadlines in one place",
+  },
+];
+
 type PageProps = {
   params: Promise<{ type: string }>;
 };
@@ -109,8 +142,10 @@ function LoginForm({ type }: { type: string }) {
   const callbackUrl = searchParams.get("callbackUrl") || "";
 
   // Validate the type parameter
-  const isAdmin = type === "admin";
-  const displayType = isAdmin ? "Admin" : "Recruiter";
+  const variant: LoginVariant = type === "admin" ? "admin" : type === "student" ? "student" : "recruiter";
+  const isAdmin = variant === "admin";
+  const isStudent = variant === "student";
+  const displayType = isAdmin ? "Admin" : isStudent ? "Student" : "Recruiter";
 
   const [error, setError] = useState<string | null>(null);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
@@ -125,15 +160,16 @@ function LoginForm({ type }: { type: string }) {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: yupResolver(schema),
+    context: { isStudent },
   });
 
   const onSubmit = async (values: LoginFormValues) => {
     setError(null);
 
     const result = await signIn("credentials", {
-      email: values.email,
+      ...(isStudent ? { rollNo: values.identifier } : { email: values.identifier }),
       password: values.password,
-      loginType: isAdmin ? "admin" : "recruiter",
+      loginType: variant,
       redirect: false,
     });
 
@@ -143,8 +179,10 @@ function LoginForm({ type }: { type: string }) {
         setError("This account is not authorized as an administrator. Please log in from the Recruiter portal.");
       } else if (errorMsg.includes("recruiter_only") || errorMsg.includes("RecruiterOnlyError")) {
         setError("This account is an administrator account. Please log in from the Admin portal.");
+      } else if (errorMsg.includes("student_only") || errorMsg.includes("StudentOnlyError")) {
+        setError("This account is not a student account. Please log in from the Recruiter or Admin portal.");
       } else {
-        setError("Invalid email or password.");
+        setError(isStudent ? "Invalid roll number or password." : "Invalid email or password.");
       }
       return;
     }
@@ -157,6 +195,11 @@ function LoginForm({ type }: { type: string }) {
       return;
     }
 
+    if (role === "student") {
+      router.replace(callbackUrl || "/student");
+      return;
+    }
+
     router.replace(callbackUrl || "/company");
   };
 
@@ -164,11 +207,13 @@ function LoginForm({ type }: { type: string }) {
     setResetError(null);
     setResetMessage(null);
 
-    const email = watch("email")?.trim();
+    const identifier = watch("identifier")?.trim();
 
-    if (!email) {
+    if (!identifier) {
       setResetError(
-        "Enter your registered email in the Email Address field first."
+        isStudent
+          ? "Enter your roll number in the Roll Number field first."
+          : "Enter your registered email in the Email Address field first."
       );
       return;
     }
@@ -182,7 +227,7 @@ function LoginForm({ type }: { type: string }) {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(isStudent ? { roll_no: identifier } : { email: identifier }),
       });
 
       const data = await response.json().catch(() => ({}));
@@ -196,7 +241,9 @@ function LoginForm({ type }: { type: string }) {
       }
 
       setResetMessage(
-        "We have sent a time-limited password reset link to your registered email address."
+        isStudent
+          ? "If the roll number is registered, a time-limited reset link has been sent to your institute email."
+          : "We have sent a time-limited password reset link to your registered email address."
       );
     } catch {
       setResetError("Network error while sending reset link. Please try again.");
@@ -205,7 +252,7 @@ function LoginForm({ type }: { type: string }) {
     }
   };
 
-  const currentFeatures = isAdmin ? adminFeatures : recruiterFeatures;
+  const currentFeatures = isAdmin ? adminFeatures : isStudent ? studentFeatures : recruiterFeatures;
   const leftPanelBg = isAdmin
     ? (theme: any) => `linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)` // Admin deep professional slate/dark teal
     : (theme: any) => `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${alpha(theme.palette.secondary.main, 0.8)} 100%)`; // Recruiter theme color
@@ -284,7 +331,9 @@ function LoginForm({ type }: { type: string }) {
             <Typography variant="body1" sx={{ opacity: 0.9, maxWidth: 400 }}>
               {isAdmin
                 ? "Manage all recruitment processes, JNF/INF reviews, and institutional configurations from a single secure dashboard."
-                : "Connect with India's premier engineering talent. Submit JNFs and INFs seamlessly for campus placements and internships."}
+                : isStudent
+                  ? "Your placement season, organised. Browse drives, apply with verified resumes and follow every round from one dashboard."
+                  : "Connect with India's premier engineering talent. Submit JNFs and INFs seamlessly for campus placements and internships."}
             </Typography>
           </Box>
 
@@ -395,18 +444,34 @@ function LoginForm({ type }: { type: string }) {
 
             <Box component="form" noValidate onSubmit={handleSubmit(onSubmit)}>
               <Stack spacing={3}>
-                <TextField
-                  label="Email Address"
-                  type="email"
-                  fullWidth
-                  placeholder={isAdmin ? "admin@iitism.ac.in" : "company@example.com"}
-                  {...register("email")}
-                  error={Boolean(errors.email)}
-                  helperText={errors.email?.message}
-                  InputProps={{
-                    sx: { borderRadius: 2 },
-                  }}
-                />
+                {isStudent ? (
+                  <TextField
+                    label="Roll Number"
+                    type="text"
+                    fullWidth
+                    placeholder="22JE0459"
+                    autoCapitalize="characters"
+                    {...register("identifier")}
+                    error={Boolean(errors.identifier)}
+                    helperText={errors.identifier?.message}
+                    InputProps={{
+                      sx: { borderRadius: 2, textTransform: "uppercase" },
+                    }}
+                  />
+                ) : (
+                  <TextField
+                    label="Email Address"
+                    type="email"
+                    fullWidth
+                    placeholder={isAdmin ? "admin@iitism.ac.in" : "company@example.com"}
+                    {...register("identifier")}
+                    error={Boolean(errors.identifier)}
+                    helperText={errors.identifier?.message}
+                    InputProps={{
+                      sx: { borderRadius: 2 },
+                    }}
+                  />
+                )}
                 <TextField
                   label="Password"
                   type={showPassword ? "text" : "password"}
@@ -465,7 +530,11 @@ function LoginForm({ type }: { type: string }) {
               </Stack>
             </Box>
 
-            {!isAdmin ? (
+            {isStudent ? (
+              <Typography variant="caption" color="text.secondary" textAlign="center">
+                Student accounts are created by CDC. Use the invitation email to set your password, then sign in with your roll number.
+              </Typography>
+            ) : !isAdmin ? (
               <>
                 <Divider>
                   <Typography variant="caption" color="text.secondary">

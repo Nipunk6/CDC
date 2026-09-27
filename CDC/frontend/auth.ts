@@ -11,7 +11,13 @@ class RecruiterOnlyError extends CredentialsSignin {
   code = "recruiter_only";
 }
 
+class StudentOnlyError extends CredentialsSignin {
+  code = "student_only";
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Self-hosted (not Vercel): without this, `next start` rejects every request with UntrustedHost.
+  trustHost: true,
   session: {
     strategy: "jwt",
   },
@@ -23,6 +29,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
+        rollNo: { label: "Roll Number", type: "text" },
         password: { label: "Password", type: "password" },
         loginType: { label: "Login Type", type: "text" },
       },
@@ -34,7 +41,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             Accept: "application/json",
           },
           body: JSON.stringify({
-            email: credentials.email,
+            ...(credentials.rollNo
+              ? { roll_no: credentials.rollNo }
+              : { email: credentials.email }),
             password: credentials.password,
           }),
         });
@@ -57,6 +66,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (loginType === "recruiter" && user.role !== "company") {
           throw new RecruiterOnlyError();
         }
+        if (loginType === "student" && user.role !== "student") {
+          throw new StudentOnlyError();
+        }
 
         return {
           id: String(user.id),
@@ -65,6 +77,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role: user.role,
           isSuperAdmin: Boolean(user.is_super_admin),
           companyId: user.company_id,
+          rollNo: user.student_profile?.roll_no ?? null,
           accessToken: data.token,
         };
       },
@@ -76,6 +89,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = user.role;
         token.isSuperAdmin = user.isSuperAdmin;
         token.companyId = user.companyId;
+        token.rollNo = user.rollNo;
         token.accessToken = user.accessToken;
       }
 
@@ -84,9 +98,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub ?? "";
-        session.user.role = token.role as "admin" | "company";
+        session.user.role = token.role as "admin" | "company" | "student";
         session.user.isSuperAdmin = Boolean(token.isSuperAdmin);
         session.user.companyId = token.companyId as number | null;
+        session.user.rollNo = (token.rollNo as string | null | undefined) ?? null;
       }
 
       session.accessToken = token.accessToken as string | undefined;

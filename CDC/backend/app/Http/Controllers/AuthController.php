@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\EnsureUserIsActive;
+use App\Models\StudentProfile;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -16,43 +18,29 @@ use Throwable;
 
 class AuthController extends Controller
 {
-    public function registerAdmin(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', "regex:/^[\\pL\\s'.-]+$/u"],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'confirmed', PasswordRule::min(8)->letters()->mixedCase()->numbers()],
-        ]);
-
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'],
-            'role' => 'admin',
-        ]);
-
-        $token = $user->createToken('admin-auth-token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Admin registered successfully.',
-            'token' => $token,
-            'user' => $user,
-        ], 201);
-    }
-
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'email'],
+            'email' => ['required_without:roll_no', 'nullable', 'email'],
+            'roll_no' => ['required_without:email', 'nullable', 'string', 'max:30'],
             'password' => ['required', 'string'],
+        ], [
+            'email.required_without' => 'Enter your email address.',
+            'roll_no.required_without' => 'Enter your roll number.',
         ]);
 
-        $user = User::with('company')->where('email', $validated['email'])->first();
+        $user = $this->resolveLoginUser($validated);
 
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
             return response()->json([
                 'message' => 'Invalid credentials.',
             ], 422);
+        }
+
+        if ($user->is_active === false) {
+            return response()->json([
+                'message' => EnsureUserIsActive::SUSPENDED_MESSAGE,
+            ], 403);
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
@@ -83,16 +71,29 @@ class AuthController extends Controller
     public function forgotPassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'email'],
+            'email' => ['required_without:roll_no', 'nullable', 'email'],
+            'roll_no' => ['required_without:email', 'nullable', 'string', 'max:30'],
+        ], [
+            'email.required_without' => 'Enter your email address.',
+            'roll_no.required_without' => 'Enter your roll number.',
         ]);
+
+        $email = $this->resolveResetEmail($validated);
+
+        if ($email === null) {
+            // Unknown roll number: same response as an unknown email so nothing can be enumerated.
+            return response()->json([
+                'message' => 'If the account exists, a password reset link has been sent.',
+            ]);
+        }
 
         try {
             $status = Password::sendResetLink([
-                'email' => $validated['email'],
+                'email' => $email,
             ]);
         } catch (TransportExceptionInterface $exception) {
             Log::error('Password reset email transport failure.', [
-                'email' => $validated['email'],
+                'email' => $email,
                 'error' => $exception->getMessage(),
             ]);
 
@@ -101,7 +102,7 @@ class AuthController extends Controller
             ], 503);
         } catch (Throwable $exception) {
             Log::error('Password reset email failed unexpectedly.', [
-                'email' => $validated['email'],
+                'email' => $email,
                 'error' => $exception->getMessage(),
             ]);
 
@@ -163,5 +164,40 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'The password reset link is invalid or has expired.',
         ], 422);
+    }
+
+    /**
+     * Students sign in with their roll number; admins and companies with email.
+     */
+    private function resolveLoginUser(array $validated): ?User
+    {
+        if (! empty($validated['roll_no'])) {
+            $rollNo = strtoupper(trim((string) $validated['roll_no']));
+
+            return StudentProfile::query()
+                ->where('roll_no', $rollNo)
+                ->first()
+                ?->user()
+                ->with('company')
+                ->first();
+        }
+
+        return User::with('company')->where('email', $validated['email'])->first();
+    }
+
+    /**
+     * Resolve the address a reset link should go to. Returns null for an unknown roll number.
+     */
+    private function resolveResetEmail(array $validated): ?string
+    {
+        if (! empty($validated['roll_no'])) {
+            $rollNo = strtoupper(trim((string) $validated['roll_no']));
+
+            return StudentProfile::query()
+                ->where('roll_no', $rollNo)
+                ->value('institute_email');
+        }
+
+        return $validated['email'];
     }
 }

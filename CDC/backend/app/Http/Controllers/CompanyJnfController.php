@@ -80,6 +80,7 @@ class CompanyJnfController extends Controller
 
         $status = $request->input('status', 'draft');
         $validated = $request->validated();
+        unset($validated['admin_remarks']); // companies never write admin remarks
 
         if (isset($validated['form_data']) && is_string($validated['form_data'])) {
             $decoded = json_decode($validated['form_data'], true);
@@ -143,6 +144,7 @@ class CompanyJnfController extends Controller
         $oldStatus = (string) $jnf->status;
         $newStatus = (string) $request->input('status', $oldStatus);
         $validated = $request->validated();
+        unset($validated['admin_remarks']); // companies never write admin remarks
 
         if (isset($validated['form_data']) && is_string($validated['form_data'])) {
             $decoded = json_decode($validated['form_data'], true);
@@ -208,6 +210,16 @@ class CompanyJnfController extends Controller
             return response()->json(['message' => 'JNF not found.'], 404);
         }
 
+        $deletableStatuses = ['draft', 'submitted', 'under_review', 'accepted', 'rejected'];
+        $isDraft = (string) $jnf->status === 'draft';
+        $isUnfloatedForm = in_array((string) $jnf->status, $deletableStatuses, true) && ! $jnf->isFloated();
+
+        if (! $isDraft && ! $isUnfloatedForm) {
+            return response()->json([
+                'message' => 'This JNF has been floated to students and cannot be deleted.',
+            ], 422);
+        }
+
         $jnf->delete();
 
         return response()->json(['message' => 'JNF deleted successfully.']);
@@ -230,7 +242,6 @@ class CompanyJnfController extends Controller
             'ctc_max' => ['nullable', 'integer', 'min:0', 'gte:ctc_min'],
             'vacancies' => ['nullable', 'integer', 'min:1'],
             'application_deadline' => ['nullable', 'date'],
-            'admin_remarks' => ['nullable', 'string', 'max:2000'],
             'form_data' => ['nullable', 'string'],
         ]);
 

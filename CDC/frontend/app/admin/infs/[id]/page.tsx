@@ -39,6 +39,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import { adminApi, adminDownload } from "@/lib/adminapi";
 import { InfPreview, stripHtml } from "@/components/forms/shared/formpreview";
 import SelectionProcessBuilder from "@/components/forms/shared/selectionprocessbuilder";
+import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
+import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
+import type { ProgrammeStipend } from "@/components/forms/shared/stipendgrid";
 
 type FormData = {
   companyProfile?: {
@@ -55,6 +58,9 @@ type FormData = {
     mncHqCountryCity?: string;
     natureOfBusiness?: string;
     companyDescription?: string;
+    about?: string;
+    industry?: string;
+    logoUrl?: string | null;
   };
   internshipTitle?: string;
   internshipDesignation?: string;
@@ -67,33 +73,17 @@ type FormData = {
   internshipDescription?: string;
   additionalInfo?: string;
   registrationLink?: string;
-  eligibility?: Array<{
-    programme: string;
-    branches: Array<{ branch: string; selected: boolean; cgpa: string; backlogs: boolean }>;
-  }>;
+  graduatingBatch?: string;
+  eligibility?: ProgrammeEligibility[];
   globalCgpa?: string;
   globalBacklogs?: boolean;
   genderFilter?: "all" | "male" | "female";
   slpRequirement?: string;
   currency?: string;
-  programmeStipends?: Array<{
-    programme: string;
-    enabled: boolean;
-    baseStipend: string;
-    hra: string;
-    otherAllowances: string;
-    total: string;
-  }>;
+  programmeStipends?: Array<ProgrammeStipend & { otherAllowances?: string }>;
   ppoProvision?: boolean;
   ppoCtc?: string;
-  selectionRounds?: Array<{
-    id: string;
-    type: string;
-    enabled: boolean;
-    mode: string;
-    duration: string;
-    details: string;
-  }>;
+  selectionRounds?: SelectionRound[];
   teamMembers?: string;
   roomsRequired?: string;
   declarations?: Record<string, boolean>;
@@ -118,6 +108,7 @@ type Inf = {
   edit_access_requested_at: string | null;
   edit_access_requested_reason: string | null;
   form_data?: FormData | string | null;
+  graduating_batch?: string | null;
   created_at: string;
   updated_at: string;
   company?: { 

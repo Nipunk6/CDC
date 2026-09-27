@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreJnfRequest extends FormRequest
 {
@@ -30,8 +31,7 @@ class StoreJnfRequest extends FormRequest
             'vacancies' => ['nullable', 'integer', 'min:1'],
             'application_deadline' => ['nullable', 'date'],
             'form_data' => ['nullable', 'json'],
-            'status' => ['nullable', 'in:draft,submitted,under_review,accepted,rejected'],
-            'admin_remarks' => ['nullable', 'string', 'max:2000'],
+            'status' => ['nullable', Rule::in(['draft', 'submitted'])],
         ];
     }
 }

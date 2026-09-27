@@ -23,13 +23,12 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
-    Route::post('/admin/register', [AuthController::class, 'registerAdmin']);
     Route::post('/company/register', [CompanyAuthController::class, 'register']);
     Route::post('/company/recruiter-email/verification-link', [CompanyAuthController::class, 'sendRecruiterEmailVerificationLink']);
     Route::get('/company/recruiter-email/verify', [CompanyAuthController::class, 'verifyRecruiterEmail']);
     Route::get('/company/recruiter-email/verification-status', [CompanyAuthController::class, 'recruiterEmailVerificationStatus']);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/user', [AuthController::class, 'user']);
 
@@ -41,15 +40,15 @@ Route::prefix('auth')->group(function () {
 
 Route::post('/alumni-outreach', [AlumniOutreachController::class, 'store']);
 
-Route::middleware('auth:sanctum')->get('/programme-branches', [EligibilityCatalogueController::class, 'programmeBranches']);
+Route::middleware(['auth:sanctum', 'active'])->get('/programme-branches', [EligibilityCatalogueController::class, 'programmeBranches']);
 
-Route::middleware(['auth:sanctum', 'role:admin'])->get('/admin/ping', function () {
+Route::middleware(['auth:sanctum', 'active', 'role:admin'])->get('/admin/ping', function () {
     return response()->json([
         'message' => 'Admin route access granted.',
     ]);
 });
 
-Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/manage-admins', [AdminManagementController::class, 'index']);
     Route::post('/manage-admins', [AdminManagementController::class, 'store']);
     Route::delete('/manage-admins/{user}', [AdminManagementController::class, 'destroy']);
@@ -85,13 +84,13 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::apiResource('/policy-documents', PolicyDocumentController::class);
 });
 
-Route::middleware(['auth:sanctum', 'role:company'])->get('/company/ping', function () {
+Route::middleware(['auth:sanctum', 'active', 'role:company'])->get('/company/ping', function () {
     return response()->json([
         'message' => 'Company route access granted.',
     ]);
 });
 
-Route::middleware(['auth:sanctum', 'role:company'])->prefix('company')->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'role:company'])->prefix('company')->group(function () {
     Route::get('/dashboard', [CompanyDashboardController::class, 'index']);
 
     Route::get('/profile', [CompanyProfileController::class, 'show']);
