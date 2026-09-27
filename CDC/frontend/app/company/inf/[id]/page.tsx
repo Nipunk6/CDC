@@ -32,6 +32,7 @@ import { companyApi } from "@/lib/companyapi";
 import { InfPreview } from "@/components/forms/shared/formpreview";
 import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
 import type { ProgrammeStipend } from "@/components/forms/shared/stipendgrid";
+import type { Currency } from "@/components/forms/shared/currencyselector";
 import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
 
 type FormData = {
@@ -377,7 +378,7 @@ export default function ViewInfPage({ params }: { params: Promise<{ id: string }
         slpRequirement={formData.slpRequirement || ""}
         graduatingBatch={formData.graduatingBatch || inf?.graduating_batch || ""}
         stipend={{
-          currency: (formData.currency as any) || "INR",
+          currency: (formData.currency as Currency) || "INR",
           programmeStipends: formData.programmeStipends || [],
           ppoProvision: formData.ppoProvision ?? false,
           ppoCtc: formData.ppoCtc || "",

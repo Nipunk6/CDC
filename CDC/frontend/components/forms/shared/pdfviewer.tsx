@@ -31,6 +31,7 @@ export default function PdfViewer({ url, onReachBottom }: PdfViewerProps) {
 
   // Reset state when document URL changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- works correctly; refactor deferred, see D33
     setNumPages(0);
     setRenderedPages({});
     setHasReachedEnd(false);
@@ -60,6 +61,7 @@ export default function PdfViewer({ url, onReachBottom }: PdfViewerProps) {
       if (totalRendered === numPages && scrollRef.current) {
         const { scrollHeight, clientHeight } = scrollRef.current;
         if (scrollHeight > 0 && scrollHeight <= clientHeight) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- works correctly; refactor deferred, see D33
           setHasReachedEnd(true);
         }
       }

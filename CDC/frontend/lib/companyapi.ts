@@ -56,7 +56,9 @@ export async function companyFileUpload(file: File): Promise<{ file: { path: str
   return (await response.json()) as { file: { path: string; url: string; name: string; size: number; mime: string } };
 }
 
-export async function companyLogoUpload(file: File): Promise<{ message: string; company: any }> {
+export async function companyLogoUpload(
+  file: File
+): Promise<{ message: string; company: { logo_url?: string | null } }> {
   const session = await getSession();
   const token = session?.accessToken;
 
@@ -81,5 +83,5 @@ export async function companyLogoUpload(file: File): Promise<{ message: string; 
     throw new Error(payload.message ?? "Logo upload failed.");
   }
 
-  return (await response.json()) as { message: string; company: any };
+  return (await response.json()) as { message: string; company: { logo_url?: string | null } };
 }

@@ -21,6 +21,7 @@ import {
   Typography,
   alpha,
 } from "@mui/material";
+import type { Theme } from "@mui/material/styles";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -254,8 +255,8 @@ function LoginForm({ type }: { type: string }) {
 
   const currentFeatures = isAdmin ? adminFeatures : isStudent ? studentFeatures : recruiterFeatures;
   const leftPanelBg = isAdmin
-    ? (theme: any) => `linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)` // Admin deep professional slate/dark teal
-    : (theme: any) => `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${alpha(theme.palette.secondary.main, 0.8)} 100%)`; // Recruiter theme color
+    ? () => `linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)` // Admin deep professional slate/dark teal
+    : (theme: Theme) => `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${alpha(theme.palette.secondary.main, 0.8)} 100%)`; // Recruiter theme color
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex" }}>

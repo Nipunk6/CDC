@@ -52,8 +52,8 @@ export default function AddAdminModal({ open, onClose, onSuccess }: AddAdminModa
       });
       reset();
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || "Failed to create admin");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create admin");
     }
   };
 

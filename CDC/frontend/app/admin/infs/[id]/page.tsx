@@ -42,6 +42,7 @@ import SelectionProcessBuilder from "@/components/forms/shared/selectionprocessb
 import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
 import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
 import type { ProgrammeStipend } from "@/components/forms/shared/stipendgrid";
+import type { Currency } from "@/components/forms/shared/currencyselector";
 
 type FormData = {
   companyProfile?: {
@@ -86,7 +87,14 @@ type FormData = {
   selectionRounds?: SelectionRound[];
   teamMembers?: string;
   roomsRequired?: string;
-  declarations?: Record<string, boolean>;
+  declarations?: {
+    aipc: boolean;
+    shortlistCriteria: boolean;
+    infoVerified: boolean;
+    consentLogo: boolean;
+    confirmAccuracy: boolean;
+    resultsViaCdc: boolean;
+  };
   signatory?: {
     name: string;
     designation: string;
@@ -641,7 +649,7 @@ export default function AdminInfDetailPage() {
                     <Box key={prog.programme} sx={{ mb: 2, pl: 1, borderLeft: "2px solid", borderColor: "secondary.main" }}>
                       <Typography variant="body2" fontWeight={600} color="secondary" mb={1}>{prog.programme}</Typography>
                       <Stack direction="row" flexWrap="wrap" gap={1}>
-                        {prog.branches.map((branch: any, branchIdx: number) => (
+                        {prog.branches.map((branch, branchIdx) => (
                           <FormControlLabel
                             key={branch.branch}
                             control={<Checkbox size="small" checked={branch.selected} onChange={() => toggleBranch(progIdx, branchIdx)} />}
@@ -802,7 +810,7 @@ export default function AdminInfDetailPage() {
                 slpRequirement={formData.slpRequirement || ""}
                 graduatingBatch={formData.graduatingBatch || inf?.graduating_batch || ""}
                 stipend={{
-                  currency: (formData.currency as any) || "INR",
+                  currency: (formData.currency as Currency) || "INR",
                   programmeStipends: formData.programmeStipends || [],
                   ppoProvision: formData.ppoProvision ?? false,
                   ppoCtc: formData.ppoCtc || "",
@@ -810,7 +818,7 @@ export default function AdminInfDetailPage() {
                 selectionProcess={{
                   rounds: formData.selectionRounds || [],
                 }}
-                declarations={(formData.declarations as any) || {
+                declarations={formData.declarations || {
                   aipc: false,
                   shortlistCriteria: false,
                   infoVerified: false,

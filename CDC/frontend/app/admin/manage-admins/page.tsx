@@ -57,8 +57,8 @@ export default function ManageAdminsPage() {
       setError(null);
       const response = await adminApi<{ admins: AdminUser[] }>("/admin/manage-admins");
       setAdmins(response.admins);
-    } catch (err: any) {
-      setError(err.message || "Failed to load admins.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load admins.");
     } finally {
       setLoading(false);
     }
@@ -73,8 +73,8 @@ export default function ManageAdminsPage() {
       await adminApi(`/admin/manage-admins/${adminId}`, { method: "DELETE" });
       setSuccess("Admin deleted successfully.");
       setAdmins((prev) => prev.filter((a) => a.id !== adminId));
-    } catch (err: any) {
-      setError(err.message || "Failed to delete admin.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete admin.");
     }
   };
 

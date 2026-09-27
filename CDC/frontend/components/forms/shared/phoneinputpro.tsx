@@ -44,6 +44,7 @@ export default function PhoneInputPro({
   
   useEffect(() => {
     if (parsed && parsed.country && parsed.country !== localCountry) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- works correctly; refactor deferred, see D33
       setLocalCountry(parsed.country);
     }
   }, [parsed?.country]); // eslint-disable-line react-hooks/exhaustive-deps

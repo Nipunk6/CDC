@@ -87,6 +87,7 @@ export default function SelectionProcessBuilder({
 }: SelectionProcessBuilderProps) {
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- works correctly; refactor deferred, see D33
     setIsMounted(true);
   }, []);
 
@@ -117,8 +118,16 @@ export default function SelectionProcessBuilder({
   };
 
   const addCustomRound = () => {
+    // Derive the id from the rounds already present rather than Date.now(): two rounds added in
+    // the same millisecond would share an id, and ids are used as React keys and dnd draggableIds.
+    const usedIds = new Set(rounds.map((r) => r.id));
+    let suffix = rounds.length + 1;
+    while (usedIds.has(`custom-${suffix}`)) {
+      suffix += 1;
+    }
+
     const newRound: SelectionRound = {
-      id: Date.now().toString(),
+      id: `custom-${suffix}`,
       type: "other",
       mode: "offline",
       duration: 30,

@@ -41,6 +41,7 @@ import { JnfPreview, stripHtml } from "@/components/forms/shared/formpreview";
 import SelectionProcessBuilder from "@/components/forms/shared/selectionprocessbuilder";
 import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
 import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
+import type { Currency } from "@/components/forms/shared/currencyselector";
 
 type FormData = {
   companyProfile?: {
@@ -105,7 +106,14 @@ type FormData = {
   selectionRounds?: SelectionRound[];
   teamMembers?: string;
   roomsRequired?: string;
-  declarations?: Record<string, boolean>;
+  declarations?: {
+    aipc: boolean;
+    shortlistCriteria: boolean;
+    infoVerified: boolean;
+    consentLogo: boolean;
+    confirmAccuracy: boolean;
+    resultsViaCdc: boolean;
+  };
   signatory?: {
     name: string;
     designation: string;
@@ -673,7 +681,7 @@ export default function AdminJnfDetailPage() {
                     <Box key={prog.programme} sx={{ mb: 2, pl: 1, borderLeft: "2px solid", borderColor: "primary.main" }}>
                       <Typography variant="body2" fontWeight={600} color="primary" mb={1}>{prog.programme}</Typography>
                       <Stack direction="row" flexWrap="wrap" gap={1}>
-                        {prog.branches.map((branch: any, bIdx: number) => (
+                        {prog.branches.map((branch, bIdx) => (
                           <FormControlLabel
                             key={branch.branch}
                             control={
@@ -884,7 +892,7 @@ export default function AdminJnfDetailPage() {
                 slpRequirement={formData.slpRequirement || ""}
                 graduatingBatch={formData.graduatingBatch || jnf?.graduating_batch || ""}
                 salary={{
-                  currency: (formData.currency as any) || "INR",
+                  currency: (formData.currency as Currency) || "INR",
                   programmeSalaries: formData.programmeSalaries || [],
                   components: {
                     joiningBonus: formData.salaryComponents?.joiningBonus || "",
@@ -904,7 +912,7 @@ export default function AdminJnfDetailPage() {
                 selectionProcess={{
                   rounds: formData.selectionRounds || [],
                 }}
-                declarations={(formData.declarations as any) || {
+                declarations={formData.declarations || {
                   aipc: false,
                   shortlistCriteria: false,
                   infoVerified: false,

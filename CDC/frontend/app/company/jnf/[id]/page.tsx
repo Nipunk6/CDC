@@ -32,6 +32,7 @@ import { companyApi } from "@/lib/companyapi";
 import { JnfPreview } from "@/components/forms/shared/formpreview";
 import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
 import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
+import type { Currency } from "@/components/forms/shared/currencyselector";
 
 type FormData = {
   companyProfile?: {
@@ -396,7 +397,7 @@ export default function ViewJnfPage({ params }: { params: Promise<{ id: string }
         slpRequirement={formData.slpRequirement || ""}
         graduatingBatch={formData.graduatingBatch || jnf?.graduating_batch || ""}
         salary={{
-          currency: (formData.currency as any) || "INR",
+          currency: (formData.currency as Currency) || "INR",
           programmeSalaries: formData.programmeSalaries || [],
           components: {
             joiningBonus: formData.salaryComponents?.joiningBonus || "",
