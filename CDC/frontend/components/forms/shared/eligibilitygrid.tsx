@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Box,
   Checkbox,
@@ -33,6 +34,9 @@ export interface BranchEligibility {
   selected: boolean;
   cgpa: string;
   backlogsAllowed: boolean;
+  /** Numeric caps (Phase 2). Blank/absent = unlimited; only meaningful while backlogsAllowed is true. */
+  maxOngoingBacklogs?: string;
+  maxTotalBacklogs?: string;
 }
 
 export interface ProgrammeEligibility {
@@ -272,6 +276,25 @@ export const mergeCustomBranchesIntoProgrammes = (
   return mergedProgrammes;
 };
 
+/** Blank = no cap; otherwise a whole number ≥ 0. */
+export const isValidBacklogCap = (value?: string) => !value || /^\d{1,3}$/.test(value.trim());
+
+/** Blank = no cutoff; otherwise 0–100 with at most two decimals. */
+export const isValidPercent = (value?: string) =>
+  !value || (/^\d{1,3}(\.\d{1,2})?$/.test(value.trim()) && Number(value) >= 0 && Number(value) <= 100);
+
+/** True when every Phase 2 numeric eligibility input on a form is in range (M4). */
+export const eligibilityNumbersValid = (
+  eligibility: ProgrammeEligibility[],
+  minTenthPercent?: string,
+  minTwelfthPercent?: string
+) =>
+  isValidPercent(minTenthPercent) &&
+  isValidPercent(minTwelfthPercent) &&
+  eligibility.every((p) =>
+    p.branches.every((b) => !b.selected || (isValidBacklogCap(b.maxOngoingBacklogs) && isValidBacklogCap(b.maxTotalBacklogs)))
+  );
+
 const requiresGraduatingBatch = (programmeName: string) => !/ph\.?d/i.test(programmeName);
 
 export default function EligibilityGrid({
@@ -285,6 +308,12 @@ export default function EligibilityGrid({
   batchReadOnly = false,
 }: EligibilityGridProps) {
   const programmes = normalizeProgrammes(value.length > 0 ? value : defaultProgrammes);
+  // Global numeric caps are a convenience for "Apply to All Selected"; the stored values live per branch.
+  const [globalMaxOngoing, setGlobalMaxOngoing] = useState("");
+  const [globalMaxTotal, setGlobalMaxTotal] = useState("");
+  const globalCaps = globalBacklogs
+    ? { maxOngoingBacklogs: globalMaxOngoing, maxTotalBacklogs: globalMaxTotal }
+    : { maxOngoingBacklogs: "", maxTotalBacklogs: "" };
 
   const getGraduatingBatchOptions = (courseDurationYears: number) => {
     const currentYear = new Date().getFullYear();
@@ -309,6 +338,7 @@ export default function EligibilityGrid({
         selected,
         cgpa: selected ? globalCgpa : b.cgpa,
         backlogsAllowed: selected ? globalBacklogs : b.backlogsAllowed,
+        ...(selected ? globalCaps : {}),
       })),
     };
     onChange(updated);
@@ -322,6 +352,7 @@ export default function EligibilityGrid({
       selected: !branch.selected,
       cgpa: !branch.selected ? globalCgpa : branch.cgpa,
       backlogsAllowed: !branch.selected ? globalBacklogs : branch.backlogsAllowed,
+      ...(!branch.selected ? globalCaps : {}),
     };
     onChange(updated);
   };
@@ -340,6 +371,22 @@ export default function EligibilityGrid({
     updated[progIndex].branches[branchIndex] = {
       ...updated[progIndex].branches[branchIndex],
       backlogsAllowed: allowed,
+      // Turning backlogs off keeps the legacy boolean meaning (zero backlogs), so the caps no longer apply.
+      ...(allowed ? {} : { maxOngoingBacklogs: "", maxTotalBacklogs: "" }),
+    };
+    onChange(updated);
+  };
+
+  const updateBranchCap = (
+    progIndex: number,
+    branchIndex: number,
+    field: "maxOngoingBacklogs" | "maxTotalBacklogs",
+    cap: string
+  ) => {
+    const updated = [...programmes];
+    updated[progIndex].branches[branchIndex] = {
+      ...updated[progIndex].branches[branchIndex],
+      [field]: cap,
     };
     onChange(updated);
   };
@@ -348,7 +395,7 @@ export default function EligibilityGrid({
     const updated = programmes.map((prog) => ({
       ...prog,
       branches: prog.branches.map((b) =>
-        b.selected ? { ...b, cgpa: globalCgpa, backlogsAllowed: globalBacklogs } : b
+        b.selected ? { ...b, cgpa: globalCgpa, backlogsAllowed: globalBacklogs, ...globalCaps } : b
       ),
     }));
     onChange(updated);
@@ -385,7 +432,7 @@ export default function EligibilityGrid({
           <Typography variant="subtitle2" fontWeight={600} color="primary">
             ⚙️ GLOBAL CONTROLS
           </Typography>
-          <Stack direction="row" spacing={2} alignItems="center">
+          <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             <TextField
               size="small"
               label="Global Min CGPA"
@@ -408,6 +455,28 @@ export default function EligibilityGrid({
                 />
               }
               label="Backlogs Allowed"
+            />
+            <TextField
+              size="small"
+              label="Max ongoing"
+              type="number"
+              value={globalMaxOngoing}
+              onChange={(e) => setGlobalMaxOngoing(e.target.value)}
+              disabled={!globalBacklogs}
+              placeholder="Any"
+              inputProps={{ min: 0, step: 1 }}
+              sx={{ width: 130 }}
+            />
+            <TextField
+              size="small"
+              label="Max total"
+              type="number"
+              value={globalMaxTotal}
+              onChange={(e) => setGlobalMaxTotal(e.target.value)}
+              disabled={!globalBacklogs}
+              placeholder="Any"
+              inputProps={{ min: 0, step: 1 }}
+              sx={{ width: 130 }}
             />
           </Stack>
           <Button variant="outlined" size="small" onClick={applyGlobalToAll}>
@@ -541,6 +610,8 @@ export default function EligibilityGrid({
                         <TableCell sx={{ fontWeight: 600 }}>Branch / Specialization</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 120 }}>Min CGPA</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 150 }}>Backlogs</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 100 }}>Max ongoing</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 100 }}>Max total</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -591,6 +662,21 @@ export default function EligibilityGrid({
                               }}
                             />
                           </TableCell>
+                          {(["maxOngoingBacklogs", "maxTotalBacklogs"] as const).map((field) => (
+                            <TableCell key={field}>
+                              <TextField
+                                size="small"
+                                type="number"
+                                placeholder="Any"
+                                value={branch[field] ?? ""}
+                                onChange={(e) => updateBranchCap(progIndex, branchIndex, field, e.target.value)}
+                                disabled={!branch.selected || !branch.backlogsAllowed}
+                                error={branch.selected && !isValidBacklogCap(branch[field])}
+                                inputProps={{ min: 0, step: 1 }}
+                                sx={{ width: 80 }}
+                              />
+                            </TableCell>
+                          ))}
                         </TableRow>
                       ))}
                     </TableBody>

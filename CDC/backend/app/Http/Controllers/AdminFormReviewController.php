@@ -8,6 +8,7 @@ use App\Models\FormStatusHistory;
 use App\Models\Inf;
 use App\Models\Jnf;
 use App\Models\User;
+use App\Services\AuditService;
 use App\Services\PortalNotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminFormReviewController extends Controller
 {
-    public function __construct(private readonly PortalNotificationService $notificationService)
+    public function __construct(
+        private readonly PortalNotificationService $notificationService,
+        private readonly AuditService $audit
+    )
     {
     }
 
@@ -262,6 +266,9 @@ class AdminFormReviewController extends Controller
             'backlogs_allowed',
             'gender_filter',
             'slp_requirement',
+            'min_tenth_percent',
+            'min_twelfth_percent',
+            'branch_backlog_caps',
             'graduating_batch',
             'eligible_branches',
             'ctc_min',
@@ -375,6 +382,9 @@ class AdminFormReviewController extends Controller
             (isset($formData['globalBacklogs']) ? ((bool) $formData['globalBacklogs'] ? 'Yes' : 'No') : 'No'),
             (string) ($formData['genderFilter'] ?? 'all'),
             (string) ($formData['slpRequirement'] ?? ''),
+            (string) ($formData['minTenthPercent'] ?? ''),
+            (string) ($formData['minTwelfthPercent'] ?? ''),
+            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
             (string) ($formData['graduatingBatch'] ?? $jnf->graduating_batch ?? ''),
             $eligibleBranchesStr,
             (string) ($jnf->ctc_min ?? ''),
@@ -438,6 +448,9 @@ class AdminFormReviewController extends Controller
             'backlogs_allowed',
             'gender_filter',
             'slp_requirement',
+            'min_tenth_percent',
+            'min_twelfth_percent',
+            'branch_backlog_caps',
             'graduating_batch',
             'eligible_branches',
             'stipend',
@@ -540,6 +553,9 @@ class AdminFormReviewController extends Controller
             (isset($formData['globalBacklogs']) ? ((bool) $formData['globalBacklogs'] ? 'Yes' : 'No') : 'No'),
             (string) ($formData['genderFilter'] ?? 'all'),
             (string) ($formData['slpRequirement'] ?? ''),
+            (string) ($formData['minTenthPercent'] ?? ''),
+            (string) ($formData['minTwelfthPercent'] ?? ''),
+            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
             (string) ($formData['graduatingBatch'] ?? $inf->graduating_batch ?? ''),
             $eligibleBranchesStr,
             (string) ($inf->stipend ?? ''),
@@ -578,6 +594,7 @@ class AdminFormReviewController extends Controller
             'changed_by' => $request->user()?->id,
             'remarks' => 'NOTE: ' . trim($validated['note']),
         ]);
+        $this->audit->log($request, 'form.note', $jnf, null, ['note' => trim($validated['note'])]);
 
         $this->notifyAdminsForCompanyFormAction(
             request: $request,
@@ -611,6 +628,7 @@ class AdminFormReviewController extends Controller
             'changed_by' => $request->user()?->id,
             'remarks' => 'NOTE: ' . trim($validated['note']),
         ]);
+        $this->audit->log($request, 'form.note', $inf, null, ['note' => trim($validated['note'])]);
 
         $this->notifyAdminsForCompanyFormAction(
             request: $request,
@@ -704,6 +722,11 @@ class AdminFormReviewController extends Controller
             'admin_remarks' => ['nullable', 'string'],
         ]);
 
+        // Phase 2 (D66): a form that is live on the student job board must stay accepted.
+        if ($validated['status'] !== 'accepted' && ($blocked = $this->floatedFormGuard($jnf))) {
+            return $blocked;
+        }
+
         $isDraftReviewAction = $validated['status'] === 'under_review' && $jnf->status === 'draft';
 
         if (in_array($validated['status'], ['under_review', 'rejected'], true) && ! $isDraftReviewAction && blank($validated['admin_remarks'] ?? null)) {
@@ -754,6 +777,11 @@ class AdminFormReviewController extends Controller
             'status' => ['required', 'in:draft,under_review,accepted,rejected'],
             'admin_remarks' => ['nullable', 'string'],
         ]);
+
+        // Phase 2 (D66): a form that is live on the student job board must stay accepted.
+        if ($validated['status'] !== 'accepted' && ($blocked = $this->floatedFormGuard($inf))) {
+            return $blocked;
+        }
 
         $isDraftReviewAction = $validated['status'] === 'under_review' && $inf->status === 'draft';
 
@@ -827,7 +855,7 @@ class AdminFormReviewController extends Controller
         }
         $form->save();
 
-        FormStatusHistory::create([
+        $history = FormStatusHistory::create([
             'form_type' => $formType,
             'form_id' => $form->getKey(),
             'old_status' => $oldStatus,
@@ -838,6 +866,7 @@ class AdminFormReviewController extends Controller
                     ? 'Draft marked for review.'
                     : ($isDraftReviewUnmarked ? 'Draft review mark removed.' : 'Status updated by admin.')),
         ]);
+        $this->audit->log($request, 'form.status', $form, ['status' => $oldStatus], ['status' => $history->new_status, 'remarks' => $history->remarks]);
 
         $company = $form->company;
         if (! $company || $isDraftMarkedForReview || $isDraftReviewUnmarked) {
@@ -971,12 +1000,14 @@ class AdminFormReviewController extends Controller
             return null;
         }
 
+        $before = ['remark' => $historyEntry->remarks];
         $historyEntry->update([
             'remarks' => $remark,
         ]);
 
         $form->setAttribute('admin_remarks', $remark);
         $form->save();
+        $this->audit->log($request, 'form.remark_edit', $form, $before, ['remark' => $remark]);
 
         return $remark;
     }
@@ -1137,6 +1168,7 @@ class AdminFormReviewController extends Controller
 
         $fieldListSummary = implode(', ', array_keys($changedFields));
         $remarks = 'Admin edited form fields: ' . $fieldListSummary;
+        $this->audit->log($request, 'form.edit', $form, array_map(fn (array $c) => $c['old'], $changedFields), array_map(fn (array $c) => $c['new'], $changedFields));
 
         FormStatusHistory::create([
             'form_type' => $formType,
@@ -1196,6 +1228,22 @@ class AdminFormReviewController extends Controller
         ]);
     }
 
+    /**
+     * Refuse to move a floated form out of `accepted` while its posting is live (D66).
+     */
+    private function floatedFormGuard(Jnf|Inf $form): ?JsonResponse
+    {
+        $posting = $form->jobPosting()->first();
+
+        if (! $posting || $posting->status === 'cancelled') {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'This form is live for students as a job posting. Cancel the posting first if it really needs to go back for review.',
+        ], 422);
+    }
+
     private function detectChangedFields(array $oldData, array $newData, string $formType): array
     {
         $changed = [];
@@ -1216,6 +1264,8 @@ class AdminFormReviewController extends Controller
                 'globalCgpa' => 'Minimum CGPA',
                 'genderFilter' => 'Gender Filter',
                 'slpRequirement' => 'SLP Requirement',
+                'minTenthPercent' => 'Minimum 10th %',
+                'minTwelfthPercent' => 'Minimum 12th %',
                 'currency' => 'Currency',
             ];
         } else {
@@ -1233,6 +1283,8 @@ class AdminFormReviewController extends Controller
                 'globalCgpa' => 'Minimum CGPA',
                 'genderFilter' => 'Gender Filter',
                 'slpRequirement' => 'SLP Requirement',
+                'minTenthPercent' => 'Minimum 10th %',
+                'minTwelfthPercent' => 'Minimum 12th %',
                 'currency' => 'Currency',
             ];
         }
@@ -1499,14 +1551,93 @@ class AdminFormReviewController extends Controller
                     'new' => count($newBranches) . ' branches selected (' . implode('; ', $parts) . ')',
                 ];
             }
+
+            // Cut-offs of branches selected both before and after — an edit to only these is a change too (QA F-007).
+            $oldRules = $this->flattenBranchRules($oldData['eligibility'] ?? []);
+            $ruleDiffs = [];
+            foreach (array_intersect_key($this->flattenBranchRules($newData['eligibility'] ?? []), $oldRules) as $branch => $rule) {
+                if ($oldRules[$branch] !== $rule) {
+                    $ruleDiffs[] = sprintf('%s: %s → %s', $branch, $oldRules[$branch], $rule);
+                }
+            }
+
+            if ($ruleDiffs !== []) {
+                $changed['Branch Cut-offs'] = [
+                    'old' => count($ruleDiffs) . ' branch(es) changed',
+                    'new' => implode('; ', array_slice($ruleDiffs, 0, 10)) . (count($ruleDiffs) > 10 ? sprintf(' +%d more', count($ruleDiffs) - 10) : ''),
+                ];
+            }
         }
 
         return $changed;
     }
 
     /**
+     * Each selected branch's own cut-offs, keyed "Branch (Programme)".
+     *
+     * @return array<string, string>
+     */
+    private function flattenBranchRules(mixed $eligibility): array
+    {
+        $rules = [];
+
+        foreach (is_array($eligibility) ? $eligibility : [] as $programme) {
+            foreach (is_array($programme['branches'] ?? null) ? $programme['branches'] : [] as $branch) {
+                if (! is_array($branch) || ($branch['selected'] ?? false) !== true) {
+                    continue;
+                }
+
+                $backlogs = (bool) ($branch['backlogsAllowed'] ?? false);
+                $parts = ['CGPA ≥ ' . (trim((string) ($branch['cgpa'] ?? '')) ?: '—'), $backlogs ? 'backlogs allowed' : 'no backlogs'];
+                foreach (['maxOngoingBacklogs' => 'ongoing', 'maxTotalBacklogs' => 'total'] as $key => $label) {
+                    if ($backlogs && trim((string) ($branch[$key] ?? '')) !== '') {
+                        $parts[] = sprintf('%s ≤ %s', $label, trim((string) $branch[$key]));
+                    }
+                }
+
+                $rules[sprintf('%s (%s)', $branch['branch'] ?? 'Unknown', $programme['programme'] ?? '')] = implode(', ', $parts);
+            }
+        }
+
+        return $rules;
+    }
+
+    /**
      * @return string[]
      */
+    /**
+     * Phase 2 numeric backlog caps per selected branch, e.g. "Mining Engineering (B.Tech ...): ongoing ≤ 1, total ≤ 2".
+     *
+     * @return list<string>
+     */
+    private function flattenBacklogCaps(mixed $eligibility): array
+    {
+        $caps = [];
+
+        foreach (is_array($eligibility) ? $eligibility : [] as $programme) {
+            foreach (is_array($programme['branches'] ?? null) ? $programme['branches'] : [] as $branch) {
+                if (! is_array($branch) || ($branch['selected'] ?? false) !== true || ! ($branch['backlogsAllowed'] ?? false)) {
+                    continue;
+                }
+
+                $parts = [];
+                foreach (['maxOngoingBacklogs' => 'ongoing', 'maxTotalBacklogs' => 'total'] as $key => $label) {
+                    if (isset($branch[$key]) && trim((string) $branch[$key]) !== '') {
+                        $parts[] = sprintf('%s ≤ %s', $label, trim((string) $branch[$key]));
+                    }
+                }
+
+                if ($parts !== []) {
+                    $caps[] = sprintf('%s (%s): %s', $branch['branch'] ?? 'Unknown', $programme['programme'] ?? '', implode(', ', $parts));
+                }
+            }
+        }
+
+        sort($caps);
+
+        return $caps;
+    }
+
     private function flattenSelectedBranches(mixed $eligibility): array
     {
         if (! is_array($eligibility)) {

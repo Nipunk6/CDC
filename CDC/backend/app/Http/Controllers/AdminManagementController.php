@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -11,6 +12,10 @@ use Illuminate\Support\Str;
 
 class AdminManagementController extends Controller
 {
+    public function __construct(private readonly AuditService $audit)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         if (!$request->user()->is_super_admin) {
@@ -48,6 +53,7 @@ class AdminManagementController extends Controller
         Password::sendResetLink([
             'email' => $user->email,
         ]);
+        $this->audit->log($request, 'admin.create', $user, null, $user->only(['name', 'email', 'role']));
 
         return response()->json([
             'message' => 'Admin created successfully. An invitation has been sent to their email.',
@@ -74,6 +80,7 @@ class AdminManagementController extends Controller
         }
 
         $user->delete();
+        $this->audit->log($request, 'admin.delete', $user, $user->only(['name', 'email', 'role']), null);
 
         return response()->json([
             'message' => 'Admin deleted successfully.',

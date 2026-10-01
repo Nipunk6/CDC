@@ -115,4 +115,11 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    | Broadcast mails (new openings, events, round results) go out as one message per batch with the
+    | students in BCC. Keep this at or below the SMTP provider's per-message recipient limit.
+    */
+
+    'bulk_batch_size' => (int) env('MAIL_BULK_BATCH_SIZE', 100),
+
 ];

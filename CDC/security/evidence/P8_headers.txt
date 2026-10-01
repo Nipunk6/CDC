@@ -1,0 +1,38 @@
+== API GET /api/auth/login (OPTIONS from allowed origin)
+HTTP/1.0 204 No Content
+Access-Control-Allow-Origin: http://localhost:3000
+Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Methods: POST
+Access-Control-Allow-Headers:
+Access-Control-Max-Age: 0
+== API authenticated GET /api/student/profile (normal student request)
+HTTP/1.1 200 OK
+X-Powered-By: PHP/8.5.5
+Cache-Control: no-cache, private
+== /storage logo
+HTTP/1.1 200 OK
+== GET http://localhost:3000/
+HTTP/1.1 200 OK
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Cache-Control: no-cache, must-revalidate
+== GET http://localhost:3000/auth/login/student
+HTTP/1.1 200 OK
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Cache-Control: no-cache, must-revalidate
+== GET http://localhost:3000/student
+HTTP/1.1 307 Temporary Redirect
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+location: /auth/login/student?callbackUrl=%2Fstudent

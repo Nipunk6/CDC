@@ -41,6 +41,7 @@ const navItems = [
   { label: "JNF Form", href: "/company/jnf/new" },
   { label: "INF Form", href: "/company/inf/new" },
   { label: "Submissions", href: "/company/submissions" },
+  { label: "Drives", href: "/company/postings" },
   { label: "Notifications", href: "/company/notifications" },
 ];
 

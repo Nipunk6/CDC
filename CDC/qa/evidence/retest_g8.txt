@@ -1,0 +1,4 @@
+## G8 npm run build
+✓ Compiled successfully in 4.5s
+  Finished TypeScript in 4.1s ...
+build_exit=0

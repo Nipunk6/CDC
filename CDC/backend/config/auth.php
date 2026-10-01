@@ -99,6 +99,14 @@ return [
             'expire' => 60,
             'throttle' => 60,
         ],
+
+        // Student invitation (E1) set-password links: 7 days (owner decision, QA F-011).
+        'invites' => [
+            'provider' => 'users',
+            'table' => 'student_invite_tokens',
+            'expire' => 7 * 24 * 60,
+            'throttle' => 0,
+        ],
     ],
 
     /*

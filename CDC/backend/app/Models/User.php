@@ -92,9 +92,12 @@ class User extends Authenticatable
             'email' => $this->getEmailForPasswordReset(),
         ]);
 
+        // Students get the roll-number flavour of the page so they land on the student login afterwards (D53).
+        $path = $this->role === 'student' ? '/auth/student/set-password' : '/auth/reset-password';
+
         Mail::to($this->email)->send(new PasswordResetLinkMail(
             name: (string) $this->name,
-            resetUrl: "{$frontendUrl}/auth/reset-password?{$query}",
+            resetUrl: "{$frontendUrl}{$path}?{$query}",
         ));
     }
 }

@@ -4,10 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class Jnf extends Model
 {
@@ -65,15 +64,13 @@ class Jnf extends Model
      * True once an admin has floated this form into a placement cycle (job_postings row exists).
      * The table is created in Phase 2 M5; until then no form can be floated.
      */
+    public function jobPosting(): MorphOne
+    {
+        return $this->morphOne(JobPosting::class, 'postable');
+    }
+
     public function isFloated(): bool
     {
-        if (! Schema::hasTable('job_postings')) {
-            return false;
-        }
-
-        return DB::table('job_postings')
-            ->where('postable_type', self::class)
-            ->where('postable_id', $this->id)
-            ->exists();
+        return $this->jobPosting()->exists();
     }
 }

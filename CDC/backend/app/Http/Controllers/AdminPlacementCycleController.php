@@ -6,6 +6,7 @@ use App\Models\CycleEnrollment;
 use App\Models\PlacementCycle;
 use App\Models\StudentProfile;
 use App\Services\AuditService;
+use App\Services\BlockingPolicy;
 use App\Services\SpreadsheetImportService;
 use App\Support\ProgrammeCatalogue;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,7 +35,8 @@ class AdminPlacementCycleController extends Controller
 
     public function __construct(
         private readonly AuditService $audit,
-        private readonly SpreadsheetImportService $spreadsheets
+        private readonly SpreadsheetImportService $spreadsheets,
+        private readonly BlockingPolicy $blocking
     ) {
     }
 
@@ -121,6 +123,13 @@ class AdminPlacementCycleController extends Controller
         ]);
     }
 
+    public function exportStudents(Request $request, PlacementCycle $placementCycle, \App\Services\ExportService $exports): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->audit->log($request, 'cycle.export', $placementCycle, null, ['enrolled' => $placementCycle->enrollments()->count()]);
+
+        return $exports->studentsWorkbook($placementCycle);
+    }
+
     /**
      * Paginated list of the students enrolled in this cycle.
      */
@@ -142,7 +151,7 @@ class AdminPlacementCycleController extends Controller
 
         $search = trim((string) ($validated['search'] ?? ''));
 
-        if ($search !== '' && $this->studentDirectoryReady()) {
+        if ($search !== '') {
             $query->whereHas('studentProfile', function (Builder $student) use ($search): void {
                 $student->where('roll_no', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
@@ -210,6 +219,7 @@ class AdminPlacementCycleController extends Controller
         $enrolledIds = array_fill_keys($placementCycle->enrollments()->pluck('student_profile_id')->all(), true);
 
         $enrolled = [];
+        $newStudentIds = [];
         $alreadyEnrolled = 0;
 
         foreach ($rollNumbers as $rowNumber => $rollNo) {
@@ -247,7 +257,11 @@ class AdminPlacementCycleController extends Controller
 
             $enrolledIds[$student->id] = true;
             $enrolled[] = $rollNo;
+            $newStudentIds[] = $student->id;
         }
+
+        // Owner decision (QA F-004): an offer block follows the student into a cycle they join later.
+        $carried = $this->blocking->carryForward($placementCycle, $newStudentIds, $request->user()?->id);
 
         if ($enrolled !== []) {
             $this->audit->log($request, 'cycle.enroll', $placementCycle, null, [
@@ -257,6 +271,9 @@ class AdminPlacementCycleController extends Controller
                 'roll_nos' => array_slice($enrolled, 0, self::AUDIT_SAMPLE),
                 'roll_nos_truncated' => count($enrolled) > self::AUDIT_SAMPLE,
             ]);
+        }
+        foreach ($carried as $block) {
+            $this->audit->log($request, 'block.create', $block, null, $block->only(['student_profile_id', 'placement_cycle_id', 'scope', 'reason', 'offer_id']) + ['via' => 'enrolment']);
         }
 
         return response()->json([
@@ -268,6 +285,7 @@ class AdminPlacementCycleController extends Controller
             ),
             'enrolled' => count($enrolled),
             'already_enrolled' => $alreadyEnrolled,
+            'blocks_carried' => $carried->count(),
             'errors' => $errors,
         ]);
     }
@@ -280,6 +298,14 @@ class AdminPlacementCycleController extends Controller
 
         if (! $enrollment) {
             return response()->json(['message' => 'This student is not enrolled in this cycle.'], 404);
+        }
+
+        // Keep placement history consistent: someone with an offer or applications here stays enrolled (suspend instead).
+        $hasActivity = \App\Models\Offer::query()->where('placement_cycle_id', $placementCycle->id)->where('student_profile_id', $studentProfile->id)->exists()
+            || \App\Models\Application::query()->where('student_profile_id', $studentProfile->id)
+                ->whereHas('jobPosting', fn ($q) => $q->where('placement_cycle_id', $placementCycle->id))->exists();
+        if ($hasActivity) {
+            return response()->json(['message' => 'This student has applications or offers in this cycle and cannot be removed.'], 422);
         }
 
         $before = $enrollment->only(['placement_cycle_id', 'student_profile_id', 'status']);
@@ -377,7 +403,7 @@ class AdminPlacementCycleController extends Controller
      */
     private function findStudentsByRollNumber(array $rollNumbers): array
     {
-        if ($rollNumbers === [] || ! $this->studentDirectoryReady()) {
+        if ($rollNumbers === []) {
             return [];
         }
 
@@ -390,13 +416,5 @@ class AdminPlacementCycleController extends Controller
         }
 
         return $found;
-    }
-
-    /**
-     * True once M2 has replaced the student_profiles stub with the real columns.
-     */
-    private function studentDirectoryReady(): bool
-    {
-        return Schema::hasColumn('student_profiles', 'roll_no');
     }
 }

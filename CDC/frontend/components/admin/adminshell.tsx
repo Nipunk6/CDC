@@ -18,6 +18,7 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
+  ListSubheader,
   Stack,
   Toolbar,
   Typography,
@@ -25,6 +26,8 @@ import {
   useTheme,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import NotificationsIcon from "@mui/icons-material/NotificationsNone";
 import { adminApi } from "@/lib/adminapi";
 
 const handleSignOut = async () => {
@@ -36,17 +39,38 @@ const handleSignOut = async () => {
   await signOut({ callbackUrl: "/auth/login/admin" });
 };
 
-const baseNavItems = [
-  { label: "Dashboard", href: "/admin" },
-  { label: "Placement Cycles", href: "/admin/placement-cycles" },
-  { label: "Alumni Outreach", href: "/admin/alumni-outreach" },
-  { label: "JNF Reviews", href: "/admin/jnfs" },
-  { label: "INF Reviews", href: "/admin/infs" },
-  { label: "Companies", href: "/admin/companies" },
-  { label: "Branch Manager", href: "/admin/programme-branches" },
-  { label: "Policy Documents", href: "/admin/policy-documents" },
-  { label: "Notifications", href: "/admin/notifications" },
+type NavItem = { label: string; href: string; group: string; primary?: boolean };
+
+// `primary` pages sit in the top row from 1024px; everything is in the grouped menu drawer (QA F-024, decision 7).
+const NAV_GROUPS = ["Placement", "Company forms", "Administration"];
+const baseNavItems: NavItem[] = [
+  { label: "Dashboard", href: "/admin", group: "Placement", primary: true },
+  { label: "Cycles", href: "/admin/placement-cycles", group: "Placement", primary: true },
+  { label: "Postings", href: "/admin/postings", group: "Placement", primary: true },
+  { label: "Students", href: "/admin/students", group: "Placement", primary: true },
+  { label: "Proposals", href: "/admin/proposals", group: "Placement" },
+  { label: "Resumes", href: "/admin/resumes", group: "Placement" },
+  { label: "Branch Changes", href: "/admin/branch-changes", group: "Placement" },
+  { label: "Events", href: "/admin/events", group: "Placement" },
+  { label: "Calendar", href: "/admin/calendar", group: "Placement" },
+  { label: "Analytics", href: "/admin/analytics", group: "Placement" },
+  { label: "JNF Reviews", href: "/admin/jnfs", group: "Company forms", primary: true },
+  { label: "INF Reviews", href: "/admin/infs", group: "Company forms", primary: true },
+  { label: "Companies", href: "/admin/companies", group: "Company forms" },
+  { label: "Policy Documents", href: "/admin/policy-documents", group: "Company forms" },
+  { label: "Alumni Outreach", href: "/admin/alumni-outreach", group: "Company forms" },
+  { label: "Notifications", href: "/admin/notifications", group: "Administration" },
+  { label: "Branch Manager", href: "/admin/programme-branches", group: "Administration" },
+  { label: "Audit Log", href: "/admin/audit-logs", group: "Administration" },
+  { label: "Settings", href: "/admin/settings", group: "Administration" },
 ];
+
+const ROW = "@media (min-width:1024px)";
+// Between 1024 and 1279px the row needs the room, so the title shortens to "CDC Admin".
+const TIGHT = "@media (min-width:1024px) and (max-width:1279.98px)";
+
+const isActive = (pathname: string, href: string) =>
+  href === "/admin" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
 export default function AdminShell({
   children,
@@ -62,7 +86,7 @@ export default function AdminShell({
   const navItems = useMemo(() => {
     const items = [...baseNavItems];
     if (session?.user?.isSuperAdmin) {
-      items.push({ label: "Manage Admins", href: "/admin/manage-admins" });
+      items.push({ label: "Manage Admins", href: "/admin/manage-admins", group: "Administration" });
     }
     return items;
   }, [session?.user?.isSuperAdmin]);
@@ -118,35 +142,40 @@ export default function AdminShell({
           <Typography variant="subtitle1" fontWeight={700} color="primary" sx={{ mb: 2, px: 1 }}>
             Admin Navigation
           </Typography>
-          <List>
-            {navItems.map((item) => {
-              const active = pathname === item.href;
-              const isNotificationItem = item.href === "/admin/notifications";
-              return (
-                <ListItem key={item.href} disablePadding sx={{ mb: 0.5 }}>
-                  <ListItemButton
-                    component={Link}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    selected={active}
-                    sx={{
-                      borderRadius: 1,
-                      "&.Mui-selected": {
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                        color: "primary.main",
-                        "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.15) }
-                      }
-                    }}
-                  >
-                    <ListItemText 
-                      primary={item.label}
-                      secondary={isNotificationItem && unreadNotifications > 0 ? `${unreadNotifications} unread` : null}
-                      primaryTypographyProps={{ fontWeight: active ? 700 : 500 }}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
+          <List dense>
+            {NAV_GROUPS.flatMap((group) => [
+              <ListSubheader key={group} disableSticky sx={{ lineHeight: "32px", fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", fontSize: "0.7rem" }}>
+                {group}
+              </ListSubheader>,
+              ...navItems.filter((item) => item.group === group).map((item) => {
+                const active = isActive(pathname, item.href);
+                const isNotificationItem = item.href === "/admin/notifications";
+                return (
+                  <ListItem key={item.href} disablePadding sx={{ mb: 0.25 }}>
+                    <ListItemButton
+                      component={Link}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      selected={active}
+                      sx={{
+                        borderRadius: 1,
+                        "&.Mui-selected": {
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: "primary.main",
+                          "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.15) }
+                        }
+                      }}
+                    >
+                      <ListItemText 
+                        primary={item.label}
+                        secondary={isNotificationItem && unreadNotifications > 0 ? `${unreadNotifications} unread` : null}
+                        primaryTypographyProps={{ fontWeight: active ? 700 : 500 }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                );
+              }),
+            ])}
             <Divider sx={{ my: 1 }} />
             <ListItem disablePadding>
               <ListItemButton
@@ -179,8 +208,9 @@ export default function AdminShell({
             <Stack direction="row" alignItems="center" spacing={1.5}>
               <IconButton
                 color="inherit"
+                aria-label="Open menu"
                 onClick={() => setMobileMenuOpen(true)}
-                sx={{ display: { xs: "flex", lg: "none" }, ml: -1 }}
+                sx={{ display: "flex", ml: -1, [ROW]: { display: "none" } }}
               >
                 <MenuIcon />
               </IconButton>
@@ -210,55 +240,56 @@ export default function AdminShell({
                   fontSize: { xs: "1rem", sm: "1.25rem" }
                 }}
               >
-                <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                <Box component="span" sx={{ display: { xs: "none", sm: "inline" }, [TIGHT]: { display: "none" } }}>
                   IIT ISM CDC - Admin Portal
                 </Box>
-                <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                <Box component="span" sx={{ display: { xs: "inline", sm: "none" }, [TIGHT]: { display: "inline" } }}>
                   CDC Admin
                 </Box>
               </Typography>
             </Stack>
 
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ display: { xs: "none", lg: "flex" } }}
-            >
-              {navItems.map((item) => {
-                const active = pathname === item.href;
-                const isNotificationItem = item.href === "/admin/notifications";
-                return (
-                  <Button
-                    key={item.href}
-                    component={Link}
-                    href={item.href}
-                    variant={active ? "contained" : "text"}
-                    color={active ? "primary" : "inherit"}
-                    size="small"
-                  >
-                    {isNotificationItem ? (
-                      <Badge
-                        color="error"
-                        badgeContent={unreadNotifications}
-                        max={99}
-                        overlap="circular"
-                        invisible={unreadNotifications === 0}
-                      >
-                        <span>{item.label}</span>
-                      </Badge>
-                    ) : (
-                      item.label
-                    )}
-                  </Button>
-                );
-              })}
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ display: "none", [ROW]: { display: "flex" } }}>
+                {navItems.filter((item) => item.primary).map((item) => {
+                  const active = isActive(pathname, item.href);
+                  return (
+                    <Button
+                      key={item.href}
+                      component={Link}
+                      href={item.href}
+                      variant={active ? "contained" : "text"}
+                      color={active ? "primary" : "inherit"}
+                      size="small"
+                      sx={{ whiteSpace: "nowrap" }}
+                    >
+                      {item.label}
+                    </Button>
+                  );
+                })}
+                <Button
+                  color="inherit"
+                  size="small"
+                  endIcon={<MoreHorizIcon />}
+                  onClick={() => setMobileMenuOpen(true)}
+                  sx={{ whiteSpace: "nowrap" }}
+                >
+                  More
+                </Button>
+              </Stack>
+
+              <IconButton component={Link} href="/admin/notifications" color="inherit" aria-label="Notifications">
+                <Badge color="error" badgeContent={unreadNotifications} max={99} invisible={unreadNotifications === 0}>
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
 
               <Button
                 color="secondary"
                 variant="contained"
                 size="small"
                 onClick={handleSignOut}
+                sx={{ display: "none", [ROW]: { display: "inline-flex" }, whiteSpace: "nowrap" }}
               >
                 Sign Out
               </Button>

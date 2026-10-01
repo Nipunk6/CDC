@@ -37,7 +37,8 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // Lets the browser read the export file names (D88).
+    'exposed_headers' => ['Content-Disposition'],
 
     'max_age' => 0,
 

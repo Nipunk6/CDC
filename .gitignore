@@ -66,3 +66,6 @@ bootstrap/cache/
 # IDE specific
 .phpintel/
 .phpunit.result.cache
+
+# Scratch / Transfer folders
+_xfer/

@@ -1,0 +1,12 @@
+close posting 7:
+HTTP 200 0.030357s
+round1=18
+CO_B replacement_request:
+{"message":"Proposal sent to the CDC. Results become visible to students only after the CDC publishes them.","proposal":{"job_posting_id":7,"posting_round_id":18,"proposed_by":129,"kind":"replacement_
+HTTP 201 0.035548s
+approve proposal 2:
+{"message":"Proposal approved: 1 draft result(s) written. Publish the round to notify students.","errors":[]}
+HTTP 200 0.023096s
+publish round 1:
+{"message":"Published: 1 selected, 0 waitlisted, 0 not selected. Students have been notified.","counts":{"selected":1,"waitlisted":0,"rejected":0,"published_at":"2026-10-01 06:16:14"}}
+HTTP 200 0.021940s

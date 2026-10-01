@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\StudentProfile;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class FileUploadService
 {
@@ -40,6 +42,25 @@ class FileUploadService
             'name' => $file->getClientOriginalName(),
             'size' => $file->getSize() ?: 0,
             'mime' => $file->getClientMimeType() ?: 'application/octet-stream',
+        ];
+    }
+
+    /**
+     * Store a resume PDF on the PRIVATE disk (never public): resumes/{roll_no}/{slot}_{uuid}.pdf
+     *
+     * @return array{path:string,size:int}
+     */
+    public function uploadResume(UploadedFile $file, StudentProfile $student, int $slot): array
+    {
+        $path = $file->storeAs(
+            "resumes/{$student->roll_no}",
+            sprintf('%d_%s.pdf', $slot, Str::uuid()),
+            'local'
+        );
+
+        return [
+            'path' => $path,
+            'size' => $file->getSize() ?: 0,
         ];
     }
 }

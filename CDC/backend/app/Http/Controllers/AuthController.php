@@ -136,24 +136,30 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'confirmed', PasswordRule::min(8)->letters()->mixedCase()->numbers()],
         ]);
 
-        $status = Password::reset(
-            [
-                'email' => $validated['email'],
-                'password' => $validated['password'],
-                'password_confirmation' => $request->input('password_confirmation'),
-                'token' => $validated['token'],
-            ],
-            function (User $user, string $password): void {
-                $user->forceFill([
-                    'password' => $password,
-                    'remember_token' => Str::random(60),
-                ])->save();
+        $credentials = [
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+            'password_confirmation' => $request->input('password_confirmation'),
+            'token' => $validated['token'],
+        ];
+        $setPassword = function (User $user, string $password): void {
+            $user->forceFill([
+                'password' => $password,
+                'remember_token' => Str::random(60),
+            ])->save();
 
-                $user->tokens()->delete();
+            $user->tokens()->delete();
+            // Whichever link was used, an outstanding invitation link stops working too.
+            Password::broker('invites')->deleteToken($user);
 
-                event(new PasswordReset($user));
-            }
-        );
+            event(new PasswordReset($user));
+        };
+
+        $status = Password::reset($credentials, $setPassword);
+        if ($status === Password::INVALID_TOKEN) {
+            // Invitation links come from their own 7-day broker (QA F-011).
+            $status = Password::broker('invites')->reset($credentials, $setPassword);
+        }
 
         if ($status === Password::PASSWORD_RESET) {
             return response()->json([
@@ -178,11 +184,11 @@ class AuthController extends Controller
                 ->where('roll_no', $rollNo)
                 ->first()
                 ?->user()
-                ->with('company')
+                ->with(['company', 'studentProfile'])
                 ->first();
         }
 
-        return User::with('company')->where('email', $validated['email'])->first();
+        return User::with(['company', 'studentProfile'])->where('email', $validated['email'])->first();
     }
 
     /**

@@ -1,0 +1,13 @@
+questions: [{"id":4,"qtype":"text","options":null},{"id":5,"qtype":"text","options":null},{"id":6,"qtype":"mcq_single","options":["Bengaluru","Hyderabad"]},{"id":7,"qtype":"mcq_multi","options":["Go","Python","Java"]}]
+S01 | list={"eligible":true,"reasons":[]} | detail[200]={"eligible":true,"reasons":[]} | apply[submitted.]=
+S02 | list={"eligible":false,"reasons":["CGPA below cutoff (6.2 < 7.0)"]} | detail[200]={"eligible":false,"reasons":["CGPA below cutoff (6.2 < 7.0)"]} | apply[422]=You are not eligible for this posting.
+S03 | list={"eligible":false,"reasons":["Ongoing backlogs above the limit (1 > 0).","Total backlogs above the limit (2 > 1)."]} | detail[200]={"eligible":false,"reasons":["Ongoing backlogs above the limit (1 > 0).","Total backlogs above the limit (2 > 1)."]} | apply[422]=You are not eligible for this posting.
+S04 | list={"eligible":true,"reasons":[]} | detail[200]={"eligible":true,"reasons":[]} | apply[submitted.]=
+S05 | list={"eligible":true,"reasons":[]} | detail[200]={"eligible":true,"reasons":[]} | apply[submitted.]=
+S06 | list={"eligible":false,"reasons":["Your branch is not eligible."]} | detail[200]={"eligible":false,"reasons":["Your branch is not eligible."]} | apply[422]=You are not eligible for this posting.
+S07 | list={"eligible":false,"reasons":["Open to the 2027 graduating batch only."]} | detail[200]={"eligible":false,"reasons":["Open to the 2027 graduating batch only."]} | apply[422]=You are not eligible for this posting.
+S08 | list={"eligible":false,"reasons":["10th % below cutoff (55.0 < 60.0)"]} | detail[200]={"eligible":false,"reasons":["10th % below cutoff (55.0 < 60.0)"]} | apply[422]=You are not eligible for this posting.
+S09 | list="NOT IN LIST" | detail[404]="Posting not found." | apply[404]=Posting not found.
+S10 | list="NOT IN LIST" | detail[401]="Unauthenticated." | apply[401]=Unauthenticated.
+S11 | list={"eligible":false,"reasons":["You are debarred from this placement cycle. (QA debarment for misconduct)"]} | detail[200]={"eligible":false,"reasons":["You are debarred from this placement cycle. (QA debarment for misconduct)"]} | apply[422]=You are not eligible for this posting.
+S16 | list={"eligible":false,"reasons":["12th % below cutoff (59.0 < 60.0)"]} | detail[200]={"eligible":false,"reasons":["12th % below cutoff (59.0 < 60.0)"]} | apply[422]=You are not eligible for this posting.

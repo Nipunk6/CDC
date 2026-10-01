@@ -1,0 +1,28 @@
+## E2E-1 re-run after the Part 10 fixes (2026-10-01, live MySQL `iitism_placement`, backend MAIL_MAILER=log, Next dev :3000)
+Browser steps (in-app browser, QA Admin A): Float dialog, Waitlist "Move", Results console publish. Other steps via the API helpers (qa/api.sh).
+
+1. Float JNF #39 (Alpha Systems QA) — BROWSER. Dialog shows "Offer category" (Full-Time / Intern + Full-Time) with the rule caption and the
+   "Blocking rules when results are announced" box; deadline field "Application deadline (IST)" defaulting to 23:59 IST.
+   Preview "5 of 15 enrolled students are eligible". Floated → posting #42, offer_type=fulltime, offer_label "Full-Time",
+   application_deadline stored 2026-10-08T18:29:00Z (= 23:59 IST)  [F-005, decision 1, decision 11]
+2. `php artisan placement:extend-offer-blocks` (one-off backfill for blocks created before the rule change):
+   "11 block(s) added, 2 live application(s) flagged as placed elsewhere." 26QA0015 (accepted PPO in QA Intern) now blocked c3:all + c4:all.
+   Eligible list (GET /admin/postings/42/eligible) → 4: 26QA0005, 26QA0012 (intern offer: FT open), 26QA0013 (PPO offered: no block), 26QA0014.  [F-004, F-009]
+3. 4 students apply (API) → 201 ×4. 26QA0015 sees posting #42 with "Blocked: accepted a PPO."  [decision 1/2]
+4. Close applications; Aptitude Test: 26QA0005 selected, 26QA0012 + 26QA0013 waitlisted, rest not selected → "Published: 1 selected, 2 waitlisted, 1 not selected."
+5. Waitlist tab → "Move to Group Discussion" on 26QA0013 (the LAST waitlistee, as in the CR-01 repro) — BROWSER.
+   Confirm text: "Move 26QA0013 off the waitlist into Group Discussion? The student is told straight away."
+   Toast: "26QA0013 moved off the waitlist and into Group Discussion. The student has been notified."
+   DB: Aptitude Test row → selected, published, remark "Promoted from waitlist"; Group Discussion rows: 0 (nothing pre-decided);
+   audit waitlist.promote by qa-admin-a@cdc.qa.test; results/prepare → selected [] waitlisted [] + blocked_reason "Publish Group Discussion first"
+   (CR-01 symptom — a pre-ticked offer for the moved student — gone).  [F-002]
+6. Queue drained with `MAIL_MAILER=log php artisan queue:work --stop-when-empty`: email_logs rows of this run went queued → sent
+   (Shortlisted ×3, Waitlisted ×1, Update ×1, Application received ×4, New opening ×4 — E2 evaluated at send time, so the backfilled 26QA0015 was not mailed).  [F-015]
+7. Group Discussion: 26QA0005 + 26QA0013 selected and published; Technical Interview drafts for both. prepare → both Full-Time, block {scope: all}, CTC 1,800,000.
+8. Results console — BROWSER: header "Full-Time · Final round: Technical Interview · 5 vacancies", blocking-rules box, both rows pre-ticked
+   (the real final-round selections), block "Completely — every cycle". Publish & notify →
+   "2 offer(s) announced · 4 block(s) · 0 regret mail(s) · 1 other application(s) flagged as placed elsewhere."
+   Blocks: 26QA0005 c3:all,c4:all (1 other application flagged); 26QA0013 c3:all,c4:all. Posting #42 completed.
+   Offer mails (log) carry "As per CDC policy you are now blocked from all further placement and internship opportunities in the placement cycles you are registered for."
+   26QA0013's internship board: every INF "Blocked: accepted a Full-Time offer."  [decision 1]
+Result: PASS

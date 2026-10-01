@@ -1,0 +1,278 @@
+
+> frontend@0.1.0 test:e2e
+> playwright test --reporter=line
+
+
+Running 18 tests using 4 workers
+
+[1A[2K[1/18] [chromium] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders
+[1A[2K[2/18] [chromium] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content
+[1A[2K[3/18] [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /
+[1A[2K[4/18] [chromium] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable
+[1A[2K  1) [chromium] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders ─────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-mac-arm64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  2) [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for / 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-mac-arm64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  3) [chromium] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-mac-arm64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  4) [chromium] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-mac-arm64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[5/18] [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login
+[1A[2K[6/18] [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register
+[1A[2K[7/18] [firefox] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders
+[1A[2K[8/18] [firefox] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content
+[1A[2K  5) [firefox] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders ──────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/firefox-1509/firefox/Nightly.app/Contents/MacOS/firefox
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  6) [firefox] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/firefox-1509/firefox/Nightly.app/Contents/MacOS/firefox
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  7) [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-mac-arm64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  8) [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-mac-arm64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[9/18] [firefox] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable
+[1A[2K[10/18] [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /
+[1A[2K  9) [firefox] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/firefox-1509/firefox/Nightly.app/Contents/MacOS/firefox
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  10) [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for / 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/firefox-1509/firefox/Nightly.app/Contents/MacOS/firefox
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[11/18] [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login
+[1A[2K  11) [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/firefox-1509/firefox/Nightly.app/Contents/MacOS/firefox
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[12/18] [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register
+[1A[2K  12) [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/firefox-1509/firefox/Nightly.app/Contents/MacOS/firefox
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[13/18] [webkit] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content
+[1A[2K[14/18] [webkit] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders
+[1A[2K  13) [webkit] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders ──────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/webkit-2248/pw_run.sh
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  14) [webkit] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/webkit-2248/pw_run.sh
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[15/18] [webkit] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable
+[1A[2K  15) [webkit] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/webkit-2248/pw_run.sh
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[16/18] [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /
+[1A[2K  16) [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for / 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/webkit-2248/pw_run.sh
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[17/18] [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login
+[1A[2K[18/18] [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register
+[1A[2K  17) [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/webkit-2248/pw_run.sh
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  18) [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/admin/Library/Caches/ms-playwright/webkit-2248/pw_run.sh
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  18 failed
+    [chromium] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders ──────────────
+    [chromium] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content 
+    [chromium] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable 
+    [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for / 
+    [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login 
+    [chromium] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register 
+    [firefox] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders ───────────────
+    [firefox] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content ─
+    [firefox] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable 
+    [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for / 
+    [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login 
+    [firefox] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register 
+    [webkit] › tests/e2e/smoke.spec.ts:4:7 › Public route smoke › home page renders ────────────────
+    [webkit] › tests/e2e/smoke.spec.ts:9:7 › Public route smoke › login page renders auth content ──
+    [webkit] › tests/e2e/smoke.spec.ts:15:7 › Public route smoke › company registration page is reachable 
+    [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for / 
+    [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /auth/login 
+    [webkit] › tests/performance/navigation.perf.spec.ts:12:7 › navigation timings remain within baseline for /company/register 

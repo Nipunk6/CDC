@@ -1,0 +1,15 @@
+== ok_1_9mb.pdf (slot 2)
+{"message":"Resume uploaded. It will be verified by the CDC.","resume":{"id":135,"student_profile_id":133,"slot":2,"label":"Upload test 2","file_size":1992294,"status":"pending","admin_remark":null,"reviewed_by":null,"re
+HTTP 201 1.064324s
+== big_2mb_plus1.pdf (slot 3)
+{"message":"The resume must be 2 MB or smaller.","errors":{"file":["The resume must be 2 MB or smaller."]}}
+HTTP 422 1.046496s
+== UPPER.PDF (slot 4)
+{"message":"Resume uploaded. It will be verified by the CDC.","resume":{"id":136,"student_profile_id":133,"slot":4,"label":"Upload test 4","file_size":193,"status":"pending","admin_remark":null,"reviewed_by":null,"review
+HTTP 201 0.019052s
+== image_renamed.pdf (slot 5)
+{"message":"The resume must be a PDF.","errors":{"file":["The resume must be a PDF."]}}
+HTTP 422 0.013662s
+== resume.docx (slot 6)
+{"message":"The resume must be a PDF.","errors":{"file":["The resume must be a PDF."]}}
+HTTP 422 0.013485s

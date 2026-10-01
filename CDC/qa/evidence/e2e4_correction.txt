@@ -1,0 +1,6 @@
+re-add without confirm:
+{"message":"The confirm field is required.","errors":{"confirm":["The confirm field is required."]}}
+HTTP 422 0.015328s
+re-add with confirm+remark (ADMIN_B):
+{"message":"Candidate re-added as a draft and the company has been notified. Publish the round to inform the student."}
+HTTP 200 0.023226s

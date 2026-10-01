@@ -1,0 +1,25 @@
+tables=36
+alumni_outreach_submissions,application_round_results,applications,audit_logs,branch_change_requests,cache,cache_locks,companies,cycle_enrollments,email_logs,events,failed_jobs,form_status_histories,infs,jnfs,job_batches,job_postings,jobs,migrations,notifications,offers,password_reset_tokens,personal_access_tokens,placement_blocks,placement_cycles,policy_documents,portal_settings,posting_questions,posting_rounds,programme_branches,recruiter_email_verifications,resumes,sessions,shortlist_proposals,student_profiles,users
+users                       124
+student_profiles            120
+placement_cycles            2
+cycle_enrollments           240
+resumes                     120
+branch_change_requests      0
+job_postings                3
+posting_questions           3
+posting_rounds              8
+applications                115
+application_round_results   98
+shortlist_proposals         0
+offers                      8
+placement_blocks            8
+events                      2
+portal_settings             1
+audit_logs                  0
+email_logs                  0
+notifications               0
+jobs                        0
+companies                   3
+jnfs                        2
+infs                        1

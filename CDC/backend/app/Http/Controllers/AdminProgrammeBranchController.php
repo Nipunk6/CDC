@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ProgrammeBranch;
 use App\Models\User;
+use App\Services\AuditService;
 use App\Services\PortalNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,8 +12,10 @@ use Illuminate\Validation\Rule;
 
 class AdminProgrammeBranchController extends Controller
 {
-    public function __construct(private readonly PortalNotificationService $notificationService)
-    {
+    public function __construct(
+        private readonly PortalNotificationService $notificationService,
+        private readonly AuditService $audit
+    ) {
     }
 
     public function index(): JsonResponse
@@ -63,6 +66,10 @@ class AdminProgrammeBranchController extends Controller
             'is_active' => ['required', 'boolean'],
         ]);
 
+        $before = ProgrammeBranch::query()
+            ->where(['programme_name' => $validated['programme_name'], 'branch_name' => $validated['branch_name'], 'is_custom' => false])
+            ->value('is_active');
+
         $programmeBranch = ProgrammeBranch::updateOrCreate(
             [
                 'programme_name' => $validated['programme_name'],
@@ -74,6 +81,8 @@ class AdminProgrammeBranchController extends Controller
                 'created_by' => $request->user()?->id,
             ]
         );
+
+        $this->audit->log($request, 'branch.status', $programmeBranch, ['is_active' => $before === null ? null : (bool) $before], $programmeBranch->only(['programme_name', 'branch_name', 'is_active']));
 
         $this->notifyAdmins(
             request: $request,
@@ -100,6 +109,7 @@ class AdminProgrammeBranchController extends Controller
         $branchName = $programmeBranch->branch_name;
 
         $programmeBranch->delete();
+        $this->audit->log(request(), 'branch.delete', $programmeBranch, $programmeBranch->only(['programme_name', 'branch_name', 'is_active']), null);
 
         $this->notifyAdmins(
             request: request(),
@@ -135,6 +145,8 @@ class AdminProgrammeBranchController extends Controller
             'is_active' => true,
             'created_by' => $request->user()?->id,
         ]);
+
+        $this->audit->log($request, 'branch.create', $branch, null, $branch->only(['programme_name', 'branch_name', 'is_active']));
 
         $this->notifyAdmins(
             request: $request,

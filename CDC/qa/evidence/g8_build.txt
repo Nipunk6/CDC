@@ -1,0 +1,89 @@
+
+> frontend@0.1.0 build
+> next build
+
+▲ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.5s
+  Running TypeScript ...
+  Finished TypeScript in 4.0s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/47) ...
+Warning: Please use the `legacy` build in Node.js environments.
+Warning: Please use the `legacy` build in Node.js environments.
+  Generating static pages using 7 workers (11/47) 
+  Generating static pages using 7 workers (23/47) 
+  Generating static pages using 7 workers (35/47) 
+✓ Generating static pages using 7 workers (47/47) in 435ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ○ /admin/alumni-outreach
+├ ○ /admin/analytics
+├ ○ /admin/audit-logs
+├ ○ /admin/branch-changes
+├ ○ /admin/calendar
+├ ○ /admin/companies
+├ ƒ /admin/companies/[id]
+├ ○ /admin/events
+├ ○ /admin/infs
+├ ƒ /admin/infs/[id]
+├ ○ /admin/jnfs
+├ ƒ /admin/jnfs/[id]
+├ ○ /admin/manage-admins
+├ ○ /admin/notifications
+├ ○ /admin/placement-cycles
+├ ƒ /admin/placement-cycles/[id]
+├ ○ /admin/policy-documents
+├ ○ /admin/postings
+├ ƒ /admin/postings/[id]
+├ ƒ /admin/postings/[id]/results
+├ ○ /admin/programme-branches
+├ ○ /admin/proposals
+├ ○ /admin/resumes
+├ ○ /admin/settings
+├ ○ /admin/students
+├ ƒ /admin/students/[id]
+├ ○ /alumni
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/proxy-pdf
+├ ○ /auth/forgot-password
+├ ○ /auth/login
+├ ƒ /auth/login/[type]
+├ ○ /auth/reset-password
+├ ○ /auth/student/set-password
+├ ○ /company
+├ ƒ /company/inf/[id]
+├ ƒ /company/inf/[id]/edit
+├ ○ /company/inf/new
+├ ƒ /company/jnf/[id]
+├ ƒ /company/jnf/[id]/edit
+├ ○ /company/jnf/new
+├ ○ /company/notifications
+├ ○ /company/postings
+├ ƒ /company/postings/[id]
+├ ○ /company/profile
+├ ○ /company/register
+├ ○ /company/submissions
+├ ○ /icon.png
+├ ○ /student
+├ ○ /student/applications
+├ ○ /student/calendar
+├ ○ /student/events
+├ ○ /student/notifications
+├ ○ /student/postings
+├ ƒ /student/postings/[id]
+├ ○ /student/profile
+└ ○ /student/resumes
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

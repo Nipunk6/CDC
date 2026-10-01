@@ -1,0 +1,9 @@
+posting id=4 raw_deadline=2026-10-08 12:30:00 status=open
+rounds: Aptitude Test/aptitude_test sched=2027-01-15 04:30:00 | Group Discussion/group_discussion sched= | Technical Interview/technical_interview(FINAL) sched=
+questions: text*:Why do you want to join Alpha? | text:Anything else you want us to know? | mcq_single*:Preferred work location [Bengaluru/Hyderabad] | mcq_multi:Languages you know [Go/Python/Java]
+snapshot keys: globalCgpa,eligibility,genderFilter,globalBacklogs,graduatingBatch,minTenthPercent,minTwelfthPercent
+queued jobs=1 eligibleQuery=26QA0001,26QA0004,26QA0005,26QA0012,26QA0013,26QA0014,26QA0015
+audit posting.float by user 125
+2
+E2 logs: 26QA0001,26QA0004,26QA0005,26QA0012,26QA0013,26QA0014,26QA0015
+in-app: 7

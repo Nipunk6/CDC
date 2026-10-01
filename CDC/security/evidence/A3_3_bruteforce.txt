@@ -1,0 +1,10 @@
+## (a) 50 wrong passwords against 26QA0004, then the correct password
+    10 422
+    40 429
+     1 statuses:
+  first 429 at attempt: 11
+  correct password right after: 429
+## waiting 65 s for the per-IP bucket to reset
+## (b) one wrong guess each against 50 different accounts (scale students 27SC0101..0150)
+    50 422
+     1 statuses:

@@ -1,0 +1,81 @@
+ADMIN_A /admin/students                                search='                 -> 200 0.020971 
+ADMIN_A /admin/students                                search="                 -> 200 0.016071 
+ADMIN_A /admin/students                                search=)                 -> 200 0.016565 
+ADMIN_A /admin/students                                search=' --              -> 200 0.012074 
+ADMIN_A /admin/students                                search=%                 -> 200 0.013033 
+ADMIN_A /admin/students                                search=_                 -> 200 0.019229 
+ADMIN_A /admin/students                                search=' AND SLEEP(2)--  -> 200 0.015203 
+ADMIN_A /admin/students                                search=1) OR SLEEP(2)#   -> 200 0.018918 
+ADMIN_A /admin/students                                search=1 OR 1=1          -> 200 0.018392 
+ADMIN_A /admin/companies                               search='                 -> 200 0.017672 
+ADMIN_A /admin/companies                               search="                 -> 200 0.014899 
+ADMIN_A /admin/companies                               search=)                 -> 200 0.014954 
+ADMIN_A /admin/companies                               search=' --              -> 200 0.013147 
+ADMIN_A /admin/companies                               search=%                 -> 200 0.015724 
+ADMIN_A /admin/companies                               search=_                 -> 200 0.014155 
+ADMIN_A /admin/companies                               search=' AND SLEEP(2)--  -> 200 0.016319 
+ADMIN_A /admin/companies                               search=1) OR SLEEP(2)#   -> 200 0.014540 
+ADMIN_A /admin/companies                               search=1 OR 1=1          -> 200 0.014743 
+ADMIN_A /admin/audit-logs                              action='                 -> 200 0.022288 
+ADMIN_A /admin/audit-logs                              action="                 -> 200 0.020472 
+ADMIN_A /admin/audit-logs                              action=)                 -> 200 0.015990 
+ADMIN_A /admin/audit-logs                              action=' --              -> 200 0.019622 
+ADMIN_A /admin/audit-logs                              action=%                 -> 200 0.023732 
+ADMIN_A /admin/audit-logs                              action=_                 -> 200 0.023148 
+ADMIN_A /admin/audit-logs                              action=' AND SLEEP(2)--  -> 200 0.021964 
+ADMIN_A /admin/audit-logs                              action=1) OR SLEEP(2)#   -> 200 0.020972 
+ADMIN_A /admin/audit-logs                              action=1 OR 1=1          -> 200 0.020342 
+ADMIN_A /admin/postings?placement_cycle_id=3           status='                 -> 422 0.011624 
+ADMIN_A /admin/postings?placement_cycle_id=3           status="                 -> 422 0.011420 
+ADMIN_A /admin/postings?placement_cycle_id=3           status=)                 -> 422 0.011671 
+ADMIN_A /admin/postings?placement_cycle_id=3           status=' --              -> 422 0.011961 
+ADMIN_A /admin/postings?placement_cycle_id=3           status=%                 -> 422 0.010966 
+ADMIN_A /admin/postings?placement_cycle_id=3           status=_                 -> 422 0.011336 
+ADMIN_A /admin/postings?placement_cycle_id=3           status=' AND SLEEP(2)--  -> 422 0.012842 
+ADMIN_A /admin/postings?placement_cycle_id=3           status=1) OR SLEEP(2)#   -> 422 0.011965 
+ADMIN_A /admin/postings?placement_cycle_id=3           status=1 OR 1=1          -> 422 0.011159 
+ADMIN_A /admin/resumes                                 status='                 -> 422 0.011323 
+ADMIN_A /admin/resumes                                 status="                 -> 422 0.013855 
+ADMIN_A /admin/resumes                                 status=)                 -> 422 0.011333 
+ADMIN_A /admin/resumes                                 status=' --              -> 422 0.011058 
+ADMIN_A /admin/resumes                                 status=%                 -> 422 0.011337 
+ADMIN_A /admin/resumes                                 status=_                 -> 422 0.011282 
+ADMIN_A /admin/resumes                                 status=' AND SLEEP(2)--  -> 422 0.011586 
+ADMIN_A /admin/resumes                                 status=1) OR SLEEP(2)#   -> 422 0.011187 
+ADMIN_A /admin/resumes                                 status=1 OR 1=1          -> 422 0.013290 
+STU_A  /student/postings                              search='                 -> 200 0.035490 
+STU_A  /student/postings                              search="                 -> 200 0.025984 
+STU_A  /student/postings                              search=)                 -> 200 0.026026 
+STU_A  /student/postings                              search=' --              -> 200 0.024942 
+STU_A  /student/postings                              search=%                 -> 200 0.024483 
+STU_A  /student/postings                              search=_                 -> 200 0.024538 
+STU_A  /student/postings                              search=' AND SLEEP(2)--  -> 200 0.025466 
+STU_A  /student/postings                              search=1) OR SLEEP(2)#   -> 200 0.026866 
+STU_A  /student/postings                              search=1 OR 1=1          -> 200 0.024341 
+STU_A  /student/postings                              type='                   -> 422 0.011501 
+STU_A  /student/postings                              type="                   -> 422 0.011884 
+STU_A  /student/postings                              type=)                   -> 422 0.011809 
+STU_A  /student/postings                              type=' --                -> 422 0.011451 
+STU_A  /student/postings                              type=%                   -> 422 0.011550 
+STU_A  /student/postings                              type=_                   -> 422 0.011847 
+STU_A  /student/postings                              type=' AND SLEEP(2)--    -> 422 0.011951 
+STU_A  /student/postings                              type=1) OR SLEEP(2)#     -> 422 0.011647 
+STU_A  /student/postings                              type=1 OR 1=1            -> 422 0.011262 
+STU_A  /student/calendar                              month='                  -> 422 0.012186 
+STU_A  /student/calendar                              month="                  -> 422 0.011521 
+STU_A  /student/calendar                              month=)                  -> 422 0.011836 
+STU_A  /student/calendar                              month=' --               -> 422 0.011428 
+STU_A  /student/calendar                              month=%                  -> 422 0.010490 
+STU_A  /student/calendar                              month=_                  -> 422 0.011765 
+STU_A  /student/calendar                              month=' AND SLEEP(2)--   -> 422 0.010825 
+STU_A  /student/calendar                              month=1) OR SLEEP(2)#    -> 422 0.011128 
+STU_A  /student/calendar                              month=1 OR 1=1           -> 422 0.011731 
+CO_A   /company/jnfs                                  status='                 -> 200 0.033557 
+CO_A   /company/jnfs                                  status="                 -> 200 0.031521 
+CO_A   /company/jnfs                                  status=)                 -> 200 0.029533 
+CO_A   /company/jnfs                                  status=' --              -> 200 0.029920 
+CO_A   /company/jnfs                                  status=%                 -> 200 0.029722 
+CO_A   /company/jnfs                                  status=_                 -> 200 0.029410 
+CO_A   /company/jnfs                                  status=' AND SLEEP(2)--  -> 200 0.030982 
+CO_A   /company/jnfs                                  status=1) OR SLEEP(2)#   -> 200 0.031982 
+CO_A   /company/jnfs                                  status=1 OR 1=1          -> 200 0.030090 

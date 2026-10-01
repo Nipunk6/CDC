@@ -42,7 +42,10 @@ import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 
-import { adminApi } from "@/lib/adminapi";
+import { adminApi, adminDownload } from "@/lib/adminapi";
+import DownloadIcon from "@mui/icons-material/Download";
+import CyclePostings from "@/components/admin/cyclepostings";
+import StudentBlocksPanel from "@/components/admin/studentblockspanel";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -271,7 +274,15 @@ export default function AdminPlacementCycleDetailPage({ params }) {
               </Stack>
             </Box>
           </Stack>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<DownloadIcon />}
+              onClick={() => adminDownload(`/admin/placement-cycles/${id}/students/export`, `cycle-${id}-students.xlsx`).catch((e) => setError(e.message))}
+            >
+              Export Students
+            </Button>
             {cycle.status === "open" && (
               <Button variant="contained" color="secondary" startIcon={<LockIcon />} onClick={handleCloseCycle}>
                 Close Cycle
@@ -310,6 +321,7 @@ export default function AdminPlacementCycleDetailPage({ params }) {
           <Tab label="Overview" />
           <Tab label={`Enrolled Students (${cycle.enrolled_students_count ?? 0})`} />
           <Tab label="Postings" />
+          <Tab label="Blocks" />
         </Tabs>
       </Paper>
 
@@ -561,16 +573,12 @@ export default function AdminPlacementCycleDetailPage({ params }) {
         </Stack>
       )}
 
-      {tab === 2 && (
+      {tab === 2 && <CyclePostings cycleId={id} />}
+
+      {tab === 3 && (
         <Card>
-          <CardContent sx={{ textAlign: "center", py: 6 }}>
-            <WorkOutlineIcon sx={{ fontSize: 56, color: "text.disabled", mb: 1 }} />
-            <Typography variant="h6" gutterBottom>
-              No postings in this cycle yet
-            </Typography>
-            <Typography color="text.secondary" sx={{ textAlign: "center" }}>
-              Accepted JNFs and INFs appear here once an admin floats them into this cycle.
-            </Typography>
+          <CardContent>
+            <StudentBlocksPanel cycleId={id} />
           </CardContent>
         </Card>
       )}

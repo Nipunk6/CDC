@@ -57,4 +57,52 @@ final class ProgrammeCatalogue
     {
         return in_array($branch, self::branchesFor($programme), true);
     }
+
+    /**
+     * Case/whitespace-insensitive lookup returning the canonical spelling, so an
+     * Excel import with "computer science & engineering" still lands on the catalogue name.
+     *
+     * @return array{programme: string, branch: string}|null
+     */
+    public static function resolve(string $programme, string $branch, ?array $catalogue = null): ?array
+    {
+        $norm = static fn (string $v): string => preg_replace('/\s+/', ' ', strtolower(trim($v))) ?? '';
+
+        foreach ($catalogue ?? self::all() as $name => $branches) {
+            if ($norm($name) !== $norm($programme)) {
+                continue;
+            }
+
+            foreach ($branches as $candidate) {
+                if ($norm($candidate) === $norm($branch)) {
+                    return ['programme' => $name, 'branch' => $candidate];
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * PHP port of getDisplayName() in frontend salarygrid.tsx, used to match a student's programme
+     * to the form's programmeSalaries / programmeStipends rows.
+     */
+    public static function displayName(string $programme): string
+    {
+        $name = preg_replace('/\s*\(\d+\s*Year\)/i', '', $programme) ?? $programme;
+        $name = preg_replace('/\s*-\s*(JEE Advanced|GATE|JAM|CAT|GATE\/NET)$/i', '', $name) ?? $name;
+
+        if ($name === 'B.Tech / B.Tech Double Major / B.Tech-M.Tech Dual Degree') {
+            return 'B.Tech / Double Major / Dual Degree';
+        }
+
+        return $name;
+    }
+
+    public static function sameProgramme(string $a, string $b): bool
+    {
+        return strcasecmp(self::displayName(trim($a)), self::displayName(trim($b))) === 0;
+    }
 }

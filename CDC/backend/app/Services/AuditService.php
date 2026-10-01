@@ -26,6 +26,8 @@ class AuditService
     {
         AuditLog::create([
             'user_id' => $actor?->id,
+            'actor_name' => $actor?->name,
+            'actor_email' => $actor?->email,
             'action' => $action,
             'subject_type' => $subject ? $subject::class : null,
             'subject_id' => $subject?->getKey(),

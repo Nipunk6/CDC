@@ -40,6 +40,7 @@ import { adminApi, adminDownload } from "@/lib/adminapi";
 import { JnfPreview, stripHtml } from "@/components/forms/shared/formpreview";
 import SelectionProcessBuilder from "@/components/forms/shared/selectionprocessbuilder";
 import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
+import FloatDialog from "@/components/admin/floatdialog";
 import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
 import type { Currency } from "@/components/forms/shared/currencyselector";
 
@@ -79,6 +80,8 @@ type FormData = {
   globalBacklogs?: boolean;
   genderFilter?: "all" | "male" | "female";
   slpRequirement?: string;
+  minTenthPercent?: string;
+  minTwelfthPercent?: string;
   currency?: string;
   programmeSalaries?: Array<{
     programme: string;
@@ -676,6 +679,10 @@ export default function AdminJnfDetailPage() {
                   />
                   <TextField fullWidth size="small" label="Gender Preference" value={editFormData.genderFilter ?? ""} onChange={(e) => updateEditField("genderFilter", e.target.value)} />
                   <TextField fullWidth size="small" label="SLP Requirement" value={editFormData.slpRequirement ?? ""} onChange={(e) => updateEditField("slpRequirement", e.target.value)} />
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField fullWidth size="small" type="number" label="Min 10th % (blank = none)" value={editFormData.minTenthPercent ?? ""} onChange={(e) => updateEditField("minTenthPercent", e.target.value)} />
+                    <TextField fullWidth size="small" type="number" label="Min 12th % (blank = none)" value={editFormData.minTwelfthPercent ?? ""} onChange={(e) => updateEditField("minTwelfthPercent", e.target.value)} />
+                  </Stack>
                   <Typography variant="subtitle2" mt={1}>Eligible Branches</Typography>
                   {(editFormData.eligibility ?? formData.eligibility ?? []).map((prog, pIdx) => (
                     <Box key={prog.programme} sx={{ mb: 2, pl: 1, borderLeft: "2px solid", borderColor: "primary.main" }}>
@@ -890,6 +897,8 @@ export default function AdminJnfDetailPage() {
                 globalBacklogs={formData.globalBacklogs ?? false}
                 genderFilter={formData.genderFilter || "all"}
                 slpRequirement={formData.slpRequirement || ""}
+                minTenthPercent={formData.minTenthPercent || ""}
+                minTwelfthPercent={formData.minTwelfthPercent || ""}
                 graduatingBatch={formData.graduatingBatch || jnf?.graduating_batch || ""}
                 salary={{
                   currency: (formData.currency as Currency) || "INR",
@@ -940,6 +949,12 @@ export default function AdminJnfDetailPage() {
             pl: { md: 1 },
           }}
         >
+          {/* Phase 2: float an accepted form to students (M5.3) */}
+          {jnf && (
+            <Box sx={{ mt: 2 }}>
+              <FloatDialog formType="jnf" formId={jnf.id} formStatus={jnf.status} />
+            </Box>
+          )}
           <Card sx={{ my: 2 }}>
             <Box sx={{ px: 2, py: 1.5, bgcolor: "primary.main", color: "white" }}>
               <Typography variant="subtitle1" fontWeight={600}>Admin Actions</Typography>

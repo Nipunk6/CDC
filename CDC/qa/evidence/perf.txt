@@ -1,0 +1,57 @@
+== P1 dry run (3000 rows)
+o":"27SC2996","field":"total_backlogs","reason":"Total backlogs cannot be fewer than ongoing backlogs."},{"row":3000,"roll_no":"27SC2999","field":"total_backlogs","reason":"Total backlogs cannot be fewer than ongoing backlogs."}]}
+HTTP 200 5.157675s
+== P1 real import
+":"27SC2996","field":"total_backlogs","reason":"Total backlogs cannot be fewer than ongoing backlogs."},{"row":3000,"roll_no":"27SC2999","field":"total_backlogs","reason":"Total backlogs cannot be fewer than ongoing backlogs."}]}
+HTTP 200 18.131742s
+scale cycle=5
+== P9 enrol 2756 rolls
+{"message":"2756 student(s) enrolled. 0 already enrolled. 0 row(s) could not be processed.","enrolled":2756,"already_enrolled":0,"errors":[]}
+HTTP 200 1.099593s
+== 30 normal floats (code:time): 201:0.057255s 201:0.036112s 201:0.034628s 201:0.034031s 201:0.036418s 201:0.034483s 201:0.035132s 201:0.036700s 201:0.028148s 201:0.032690s 201:0.030220s 201:0.030761s 201:0.035955s 201:0.036020s 201:0.031108s 201:0.033945s 201:0.034677s 201:0.029704s 201:0.028217s 201:0.029113s 201:0.032429s 201:0.030642s 201:0.032868s 201:0.033702s 201:0.036118s 201:0.028607s 201:0.034360s 201:0.031956s 201:0.033433s 201:0.029108s
+== P2 wide float, queued mode:
+HTTP 201 0.055117s
+P2 posting/eligible: 40 eligible=2756
+== P3 switch to sync + wide float:
+HTTP 200 0.014007s
+HTTP 201 1.218115s
+HTTP 200 0.010580s
+== P4 student postings (32 postings in cycle)
+HTTP 200 0.040878s
+HTTP 200 0.037938s
+HTTP 200 0.038155s
+HTTP 200 0.033423s
+== P4b student dashboard
+HTTP 200 0.037393s
+== P5 admin students index p1 / p58 / search
+HTTP 200 0.017176s
+HTTP 200 0.034606s
+HTTP 200 0.020909s
+== P8 analytics cycle 5
+HTTP 200 0.145854s
+HTTP 200 0.020988s
+== P6 pipeline posting 40 (500 applicants, 3 rounds)
+HTTP 200 0.082965s
+== applicants list posting 40
+HTTP 200 0.112371s
+/api/student/postings                         status=200 queries=20 time=77ms bytes=12856
+/api/student/dashboard                        status=200 queries=37 time=35ms bytes=2556
+/api/student/applications                     status=200 queries=21 time=11ms bytes=1423
+/api/student/calendar?month=2026-11           status=200 queries=17 time=21ms bytes=5324
+/api/student/postings                         status=200 queries=25 time=18ms bytes=4313
+/api/student/applications                     status=200 queries=24 time=11ms bytes=3153
+/api/admin/students?page=1                    status=200 queries=12 time=12ms bytes=18670
+/api/admin/postings/40/pipeline               status=200 queries=31 time=69ms bytes=284406
+/api/admin/postings/40/applications           status=200 queries=14 time=102ms bytes=448269
+/api/admin/postings/4/pipeline                status=200 queries=30 time=16ms bytes=6027
+/api/admin/dashboard/cycle/5                  status=200 queries=14 time=143ms bytes=2374
+/api/admin/events                             status=200 queries=14 time=29ms bytes=1143
+/api/admin/postings?placement_cycle_id=5      status=200 queries=15 time=18ms bytes=17314
+== P7 export posting 40 (500 applicants)
+HTTP 200 0.541485s size=86085
+rows 501 cols 33
+last header Resume Link
+link http://127.0.0.1:8000/api/resumes/signed/138?expires=1793428057&signature=dd3fa4839cc2fe07
+== P6 add 4th round
+HTTP 201 0.021620s
+HTTP 200 0.084876s

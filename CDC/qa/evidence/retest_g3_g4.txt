@@ -1,0 +1,35 @@
+## G3 migrate:fresh --seed (scratch DB iitism_placement_qa_retest — the dev DB keeps its QA fixtures)
+
+   INFO  Seeding database.  
+
+  Database\Seeders\AdminUserSeeder ................................... RUNNING  
+  Database\Seeders\AdminUserSeeder ............................... 259 ms DONE  
+
+  Database\Seeders\PolicyDocumentSeeder .............................. RUNNING  
+  Database\Seeders\PolicyDocumentSeeder ............................ 2 ms DONE  
+
+  Database\Seeders\PortalSettingSeeder ............................... RUNNING  
+  Database\Seeders\PortalSettingSeeder ............................. 1 ms DONE  
+
+exit=0
+
+## G4 Phase2DemoSeeder
+
+   INFO  Seeding database.  
+
+exit=0
+users                       124
+student_profiles            120
+placement_cycles            2
+cycle_enrollments           240
+resumes                     120
+job_postings                3
+posting_rounds              8
+applications                115
+application_round_results   98
+offers                      8
+placement_blocks            16
+events                      2
+email_logs                  0
+jobs                        0
+student_invite_tokens       0

@@ -1,0 +1,28 @@
+== /student/postings bytes=2224
+postings.0.accepts_applications=true
+postings.1.accepts_applications=true
+postings.2.accepts_applications=true
+postings.2.application.applied_at=2026-10-01T05:45:57.000000Z
+meta.total=3
+== /student/postings/4 bytes=12188
+posting.accepts_applications=true
+posting.form_data.eligibility.0.branches.2.maxTotalBacklogs=1
+posting.form_data.eligibility.0.branches.4.maxTotalBacklogs=1
+posting.form_data.companyProfile.employeeCount=
+posting.form_data.companyProfile.mncHqCountryCity=
+posting.application.applied_at=2026-10-01T05:45:57.000000Z
+== /student/applications bytes=1570
+applications.0.applied_at=2026-10-01T05:45:57.000000Z
+applications.0.posting.accepts_applications=true
+== /student/dashboard bytes=3085
+resumes.total=1
+unverified_applications=1
+applications.0.applied_at=2026-10-01T05:45:57.000000Z
+applications.0.posting.accepts_applications=true
+active_applications=1
+nudges.0.accepts_applications=true
+nudges_total=1
+== /student/calendar?month=2026-10 bytes=865
+== /student/events bytes=494
+== /student/profile bytes=740
+student.total_backlogs=0

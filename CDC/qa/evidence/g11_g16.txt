@@ -1,0 +1,17 @@
+## G11
+lrwxr-xr-x@ 1 admin  staff  60 Sep 27 11:15 /Users/admin/Desktop/CDC-main/CDC/backend/public/storage -> /Users/admin/Desktop/CDC-main/CDC/backend/storage/app/public
+## G12
+M  backend/package-lock.json
+ M backend/package.json
+## G13
+frontend@0.1.0 /Users/admin/Desktop/CDC-main/CDC/frontend
+`-- @mui/x-charts@7.29.1
+
+ls: /Users/admin/Desktop/CDC-main/CDC/backend/node_modules/@mui: No such file or directory
+## G14
+frontend@0.1.0 /Users/admin/Desktop/CDC-main/CDC/frontend
++-- @emotion/react@11.14.0
++-- @mui/material@6.5.0
++-- next@16.2.1
+`-- react@19.2.4
+

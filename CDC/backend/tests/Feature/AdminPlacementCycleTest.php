@@ -50,15 +50,9 @@ class AdminPlacementCycleTest extends TestCase
         return PlacementCycle::create($this->payload($overrides) + ['status' => 'open']);
     }
 
-    /** The M2 student directory does not exist yet, so insert a bare stub row. */
     private function stubStudentProfile(): StudentProfile
     {
-        $id = \DB::table('student_profiles')->insertGetId([
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return StudentProfile::findOrFail($id);
+        return StudentProfile::factory()->create();
     }
 
     public function test_admin_can_create_a_placement_cycle_and_it_is_audited(): void

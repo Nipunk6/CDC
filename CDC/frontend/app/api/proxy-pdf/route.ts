@@ -30,24 +30,35 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Invalid url parameter", { status: 400 });
   }
 
-  const allowedOrigins = new Set([request.nextUrl.origin, apiOrigin].filter(Boolean));
-  if (!allowedOrigins.has(target.origin)) {
-    return new NextResponse("URL origin not allowed", { status: 400 });
+  // Only PDFs this app itself serves may be proxied: policy documents and signed resume links (D59).
+  const allowedOnApi =
+    target.origin === apiOrigin &&
+    (target.pathname.startsWith("/storage/policy-documents/") || target.pathname.startsWith("/api/resumes/signed/"));
+  const allowedOnApp = target.origin === request.nextUrl.origin && target.pathname.toLowerCase().endsWith(".pdf");
+  if (!allowedOnApi && !allowedOnApp) {
+    return new NextResponse("URL not allowed", { status: 400 });
   }
 
   try {
-    const response = await fetch(target.toString());
+    const response = await fetch(target.toString(), { redirect: "error" });
     if (!response.ok) {
       return new NextResponse(`Failed to fetch PDF: ${response.statusText}`, { status: response.status });
     }
 
-    const data = await response.arrayBuffer();
-    const contentType = response.headers.get("content-type") || "application/pdf";
+    const upstreamType = (response.headers.get("content-type") ?? "").toLowerCase();
+    if (!upstreamType.startsWith("application/pdf")) {
+      return new NextResponse("Not a PDF", { status: 415 });
+    }
 
+    const data = await response.arrayBuffer();
+
+    // Always served as a PDF, never sniffed, so nothing proxied can run script on this origin.
     return new NextResponse(data, {
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": "application/pdf",
         "Content-Disposition": "inline",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {

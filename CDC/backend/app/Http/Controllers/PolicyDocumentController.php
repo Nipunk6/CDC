@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PolicyDocument;
 use App\Models\User;
+use App\Services\AuditService;
 use App\Services\FileUploadService;
 use App\Services\PortalNotificationService;
 use Illuminate\Http\JsonResponse;
@@ -11,9 +12,12 @@ use Illuminate\Http\Request;
 
 class PolicyDocumentController extends Controller
 {
+    private const TRACKED = ['title', 'type', 'url', 'is_visible_jnf', 'is_visible_inf'];
+
     public function __construct(
         private readonly FileUploadService $fileUploadService,
-        private readonly PortalNotificationService $notificationService
+        private readonly PortalNotificationService $notificationService,
+        private readonly AuditService $audit
     ) {
     }
 
@@ -55,6 +59,7 @@ class PolicyDocumentController extends Controller
             'is_visible_inf' => filter_var($request->input('is_visible_inf', true), FILTER_VALIDATE_BOOLEAN),
         ]);
 
+        $this->audit->log($request, 'policy.create', $document, null, $document->only(self::TRACKED));
         $this->notifyAdmins($request, 'created', $document->title);
 
         return response()->json([
@@ -77,6 +82,7 @@ class PolicyDocumentController extends Controller
             'is_visible_inf' => ['boolean'],
         ]);
 
+        $before = $policyDocument->only(self::TRACKED);
         $url = $policyDocument->url;
 
         if ($validated['type'] === 'link') {
@@ -94,6 +100,7 @@ class PolicyDocumentController extends Controller
             'is_visible_inf' => filter_var($request->input('is_visible_inf', true), FILTER_VALIDATE_BOOLEAN),
         ]);
 
+        $this->audit->log($request, 'policy.update', $policyDocument, $before, $policyDocument->only(self::TRACKED));
         $this->notifyAdmins($request, 'updated', $policyDocument->title);
 
         return response()->json([
@@ -109,6 +116,7 @@ class PolicyDocumentController extends Controller
     {
         $docTitle = $policyDocument->title;
         $policyDocument->delete();
+        $this->audit->log(request(), 'policy.delete', $policyDocument, $policyDocument->only(self::TRACKED), null);
 
         $this->notifyAdmins(request(), 'deleted', $docTitle);
 

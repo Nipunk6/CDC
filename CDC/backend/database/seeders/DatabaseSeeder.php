@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             // FormSeeder::class,
             PolicyDocumentSeeder::class,
             PortalSettingSeeder::class,
+            // Phase2DemoSeeder::class, // demo cycles, 120 students, drives, offers — see its docblock for demo logins
         ]);
     }
 }

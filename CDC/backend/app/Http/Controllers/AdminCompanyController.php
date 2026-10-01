@@ -3,12 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AdminCompanyController extends Controller
 {
+    public function __construct(private readonly AuditService $audit)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -86,7 +91,9 @@ class AdminCompanyController extends Controller
             'hr_phone' => ['nullable', 'string', 'max:30'],
         ]);
 
+        $before = $company->only(array_keys($validated));
         $company->update($validated);
+        $this->audit->log($request, 'company.update', $company, $before, $company->only(array_keys($validated)));
 
         return response()->json([
             'message' => 'Company updated successfully.',

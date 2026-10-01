@@ -1,0 +1,8 @@
+## Set-Cookie on credentials callback (values redacted)
+set-cookie: authjs.callback-url=http%3…dent; Path=/; HttpOnly; SameSite=Lax
+set-cookie: authjs.session-token=eyJhbG…i7i4; Path=/; Expires=Sat, 31 Oct 2026 09:04:41 GMT; HttpOnly; SameSite=Lax
+## GET /api/auth/session — keys
+top-level keys: ['accessToken', 'expires', 'user']
+user keys: ['companyId', 'email', 'id', 'isSuperAdmin', 'name', 'role', 'rollNo']
+accessToken present: True | looks like Sanctum id|token: True
+expires: 2026-10-31T09:04:41.529Z

@@ -5,6 +5,9 @@ export type { Currency } from "./currencyselector";
 export { default as EligibilityGrid, defaultProgrammes } from "./eligibilitygrid";
 export {
 	mergeCustomBranchesIntoProgrammes,
+	eligibilityNumbersValid,
+	isValidBacklogCap,
+	isValidPercent,
 } from "./eligibilitygrid";
 export type {
 	ProgrammeEligibility,
@@ -19,7 +22,7 @@ export type { ProgrammeSalary, SalaryComponents } from "./salarygrid";
 export { default as StipendGrid, defaultProgrammeStipends } from "./stipendgrid";
 export type { ProgrammeStipend } from "./stipendgrid";
 export { default as DeclarationChecklist } from "./declarationchecklist";
-export { JnfPreview, InfPreview } from "./formpreview";
+export { JnfPreview, InfPreview, stripHtml } from "./formpreview";
 export { default as RichTextEditor } from "./richtexteditor";
 export { default as SectorAutocomplete, SECTOR_OPTIONS } from "./sectorautocomplete";
 export { default as GraduatingBatchDialog } from "./graduatingbatchdialog";

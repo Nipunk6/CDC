@@ -1,0 +1,46 @@
+== 1. verify link
+verify HTTP 200
+{"verified":true,"email":"cdc-qa-audit-hr@iana.org"}
+== 1b. register (multipart + logo)
+{"message":"Company registered successfully.","token":"47|cKXKYd2aCO3wkapv5gHbsfvTQ7vhH5cB2k2rKQOP6fcbf111","company":{"name":"Gamma Reg QA","industry":"Software","sector":"Software","website":"https:\/\/iana.org","postal_address":null,"employee_count":null,"logo_path":"company-logos\/v18AUMejLs19Hb
+HTTP 201
+2 company login (registered company)                           | exp token   | got ok
+2 GET /company/dashboard                                       | exp 200     | got 200
+2 PUT /company/profile                                         | exp 200     | got 422
+2 POST /company/profile/logo (replace)                         | exp 200     | got 200
+4 duplicate JNF 3 -> new draft id                              | exp id      | got 38
+4 duplicate cleared batch/declarations                         | exp ''/false | got ""/false
+4 DELETE draft (duplicate)                                     | exp 200     | got 200
+4 company submits JNF                                          | exp id      | got 39
+4 request edit access (submitted)                              | exp 200     | got 200
+4 request edit access again                                    | exp 409     | got 409
+5 GET /admin/jnfs (default queue)                              | exp 200     | got 200
+5 GET /admin/jnfs?status=all                                   | exp 200     | got 200
+5 GET /admin/infs?status=accepted                              | exp 200     | got 200
+5 GET /admin/jnfs/{submitted}                                  | exp 200     | got 200
+5 reject without remarks                                       | exp 422     | got 422
+5 grant edit access (under_review + remarks)                   | exp 200     | got 200
+5 edit own latest remark                                       | exp 200     | got 200
+5 company resubmits (under_review -> submitted)                | exp 200     | got 200
+5 admin form-data edit (change title)                          | exp 200     | got 200
+5 FormEditedByAdminMail logged to company                      | exp >0      | got 0
+5 accept                                                       | exp 200     | got 200
+5 CSV download accepted                                        | exp 200     | got 200
+5 mark draft for review                                        | exp 200     | got 200
+5 marked draft stays 'draft' for company                       | exp draft   | got draft
+5 draft note                                                   | exp 200     | got 200
+5 unmark (draft)                                               | exp 200     | got 200
+6 GET /admin/companies                                         | exp 200     | got 200
+6 GET /admin/companies/{id}                                    | exp 200     | got 200
+6 POST programme-branches (custom)                             | exp 201     | got 201
+6 DELETE programme-branches custom                             | exp 200     | got 405
+6 create policy doc (link)                                     | exp id      | got 3
+6 DELETE policy doc                                            | exp 200     | got 200
+6 manage-admins as normal admin                                | exp 403     | got 403
+6 manage-admins as super                                       | exp 200     | got 200
+6 GET /admin/alumni-outreach                                   | exp 200     | got 200
+6 GET /auth/notifications (admin)                              | exp 200     | got 200
+7 forgot-password (company email)                              | exp 200     | got 200
+7 reset-password with emailed token                            | exp 200     | got 200
+7 login with new password                                      | exp 200     | got 200
+8 POST /alumni-outreach (public)                               | exp 201     | got 201

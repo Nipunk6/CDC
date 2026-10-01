@@ -44,6 +44,8 @@ import {
   FormSection,
   SkillsTagInput,
   EligibilityGrid,
+  eligibilityNumbersValid,
+  isValidPercent,
   SelectionProcessBuilder,
   SalaryGrid,
   DeclarationChecklist,
@@ -106,6 +108,8 @@ interface JnfFormData {
   globalBacklogs: boolean;
   genderFilter: "all" | "male" | "female";
   slpRequirement: string;
+  minTenthPercent: string;
+  minTwelfthPercent: string;
   graduatingBatch: string;
 
   // Salary
@@ -166,6 +170,8 @@ const initialFormData: JnfFormData = {
   globalBacklogs: false,
   genderFilter: "all",
   slpRequirement: "",
+  minTenthPercent: "",
+  minTwelfthPercent: "",
   graduatingBatch: "",
   currency: "INR",
   salarySameForAll: false,
@@ -531,7 +537,8 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
       case 2:
         return (
           formData.eligibility.some((p) => p.branches.some((b) => b.selected)) &&
-          !!formData.graduatingBatch
+          !!formData.graduatingBatch &&
+          eligibilityNumbersValid(formData.eligibility, formData.minTenthPercent, formData.minTwelfthPercent)
         );
       case 3:
         return formData.programmeSalaries.some((s) => s.ctcAnnual);
@@ -989,6 +996,30 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
                 batchReadOnly
               />
 
+              {/* Optional school-marks cutoffs (Phase 2) */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Minimum 10th % (optional)"
+                  value={formData.minTenthPercent ?? ""}
+                  onChange={(e) => updateFormData("minTenthPercent", e.target.value)}
+                  inputProps={{ min: 0, max: 100, step: 0.01 }}
+                  error={!isValidPercent(formData.minTenthPercent)}
+                  helperText={isValidPercent(formData.minTenthPercent) ? "Leave blank for no cutoff" : "Enter a value between 0 and 100 (up to 2 decimals)"}
+                />
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Minimum 12th % (optional)"
+                  value={formData.minTwelfthPercent ?? ""}
+                  onChange={(e) => updateFormData("minTwelfthPercent", e.target.value)}
+                  inputProps={{ min: 0, max: 100, step: 0.01 }}
+                  error={!isValidPercent(formData.minTwelfthPercent)}
+                  helperText={isValidPercent(formData.minTwelfthPercent) ? "Leave blank for no cutoff" : "Enter a value between 0 and 100 (up to 2 decimals)"}
+                />
+              </Stack>
+
               <TextField
                 fullWidth
                 multiline
@@ -1080,6 +1111,8 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
             globalBacklogs={formData.globalBacklogs}
             genderFilter={formData.genderFilter}
             slpRequirement={formData.slpRequirement}
+            minTenthPercent={formData.minTenthPercent}
+            minTwelfthPercent={formData.minTwelfthPercent}
             graduatingBatch={formData.graduatingBatch}
             salary={{
               currency: formData.currency,

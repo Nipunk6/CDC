@@ -1,0 +1,15 @@
+deadline set (UTC) = 2026-10-01T05:50:06Z ; IST = 11:20:06
+HTTP 200 0.034451s
+before deadline 11:18:51 IST, S14 apply:
+HTTP 201 0.029440s
+after deadline 11:20:12 IST, S15 apply:
+{"message":"The application deadline has passed."}
+HTTP 422 0.012476s
+after deadline, S14 withdraw app 120:
+{"message":"The application deadline has passed."}
+HTTP 422 0.014818s
+S14 edit:
+{"message":"The application deadline has passed."}
+HTTP 422 0.016687s
+HTTP 200 0.028638s
+restored

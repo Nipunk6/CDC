@@ -1,0 +1,14 @@
+## forgot-password
+known email   : 200 0.226667 {"message":"If the account exists, a password reset link has been sent."}
+known email2  : 200 0.234844 {"message":"If the account exists, a password reset link has been sent."}
+unknown email : 200 0.221969 {"message":"If the account exists, a password reset link has been sent."}
+known roll    : 200 0.252388 {"message":"If the account exists, a password reset link has been sent."}
+unknown roll  : 200 0.010311 {"message":"If the account exists, a password reset link has been sent."}
+known again (throttle): 429 0.217693 {"message":"Please wait before requesting another reset link."}
+## recruiter verification-link (A7)
+registered company email : 422 0.017384 {"message":"The email field must be a valid email address.","errors":{"email":["The email field must be a valid email address."]}}
+unregistered email       : 422 0.011131 {"message":"The email field must be a valid email address.","errors":{"email":["The email field must be a valid email address."]}}
+## verification-status (public)
+registered   : 422 0.011856 {"message":"The email field must be a valid email address.","errors":{"email":["The email field must be a valid email address."]}}
+just-requested: 422 0.010762 {"message":"The email field must be a valid email address.","errors":{"email":["The email field must be a valid email address."]}}
+never-seen   : 422 0.009206 {"message":"The email field must be a valid email address.","errors":{"email":["The email field must be a valid email address."]}}

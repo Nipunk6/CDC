@@ -106,6 +106,8 @@ interface JnfPreviewProps {
   globalBacklogs: boolean;
   genderFilter: string;
   slpRequirement: string;
+  minTenthPercent?: string;
+  minTwelfthPercent?: string;
   graduatingBatch: string;
   salary: {
     currency: Currency;
@@ -148,6 +150,16 @@ export const stripHtml = (html: string | undefined | null): string => {
   return cleaned.trim();
 };
 
+// Phase 2 numeric backlog caps, shown on the branch chip when set (M4).
+const backlogCapLabel = (b: { backlogsAllowed: boolean; maxOngoingBacklogs?: string; maxTotalBacklogs?: string }) => {
+  if (!b.backlogsAllowed || (!b.maxOngoingBacklogs && !b.maxTotalBacklogs)) return "";
+  const parts = [
+    b.maxOngoingBacklogs ? `≤${b.maxOngoingBacklogs} ongoing` : "",
+    b.maxTotalBacklogs ? `≤${b.maxTotalBacklogs} total` : "",
+  ].filter(Boolean);
+  return ` · backlogs ${parts.join(", ")}`;
+};
+
 export function JnfPreview({
   companyProfile,
   jobDetails,
@@ -156,6 +168,8 @@ export function JnfPreview({
   globalBacklogs,
   genderFilter,
   slpRequirement,
+  minTenthPercent,
+  minTwelfthPercent,
   graduatingBatch,
   salary,
   selectionProcess,
@@ -183,7 +197,7 @@ export function JnfPreview({
     return value;
   };
   const selectedBranches = eligibility.flatMap((p) =>
-    p.branches.filter((b) => b.selected).map((b) => `${b.branch} (${getDisplayName(p.programme)})`)
+    p.branches.filter((b) => b.selected).map((b) => `${b.branch} (${getDisplayName(p.programme)})${backlogCapLabel(b)}`)
   );
   const enabledSalaries = salary.programmeSalaries.filter((s) => s.enabled);
   const enabledRounds = selectionProcess.rounds.filter((r) => r.enabled);
@@ -384,6 +398,18 @@ export function JnfPreview({
             <Typography variant="caption" color="text.secondary">Gender Preference</Typography>
             <Typography variant="body2" sx={{ textTransform: "capitalize" }}>{genderFilter || "All"}</Typography>
           </Grid2>
+          {(minTenthPercent || minTwelfthPercent) && (
+            <>
+              <Grid2 size={{ xs: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Min 10th %</Typography>
+                <Typography variant="body2">{minTenthPercent || "No Cutoff"}</Typography>
+              </Grid2>
+              <Grid2 size={{ xs: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Min 12th %</Typography>
+                <Typography variant="body2">{minTwelfthPercent || "No Cutoff"}</Typography>
+              </Grid2>
+            </>
+          )}
           {slpRequirement && (
             <Grid2 size={{ xs: 12 }}>
               <Typography variant="caption" color="text.secondary">SLP (Skill-based Learning Program) Requirements</Typography>
@@ -661,6 +687,8 @@ interface InfPreviewProps {
   globalBacklogs: boolean;
   genderFilter: string;
   slpRequirement: string;
+  minTenthPercent?: string;
+  minTwelfthPercent?: string;
   graduatingBatch: string;
   stipend: {
     currency: Currency;
@@ -698,6 +726,8 @@ export function InfPreview({
   globalBacklogs,
   genderFilter,
   slpRequirement,
+  minTenthPercent,
+  minTwelfthPercent,
   graduatingBatch,
   stipend,
   selectionProcess,
@@ -717,7 +747,7 @@ export function InfPreview({
     return val;
   };
   const selectedBranches = eligibility.flatMap((p) =>
-    p.branches.filter((b) => b.selected).map((b) => `${b.branch} (${getDisplayName(p.programme)})`)
+    p.branches.filter((b) => b.selected).map((b) => `${b.branch} (${getDisplayName(p.programme)})${backlogCapLabel(b)}`)
   );
   const enabledStipends = stipend.programmeStipends.filter((s) => s.enabled);
   const enabledRounds = selectionProcess.rounds.filter((r) => r.enabled);
@@ -918,6 +948,18 @@ export function InfPreview({
             <Typography variant="caption" color="text.secondary">Gender Preference</Typography>
             <Typography variant="body2" sx={{ textTransform: "capitalize" }}>{genderFilter || "All"}</Typography>
           </Grid2>
+          {(minTenthPercent || minTwelfthPercent) && (
+            <>
+              <Grid2 size={{ xs: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Min 10th %</Typography>
+                <Typography variant="body2">{minTenthPercent || "No Cutoff"}</Typography>
+              </Grid2>
+              <Grid2 size={{ xs: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Min 12th %</Typography>
+                <Typography variant="body2">{minTwelfthPercent || "No Cutoff"}</Typography>
+              </Grid2>
+            </>
+          )}
           {slpRequirement && (
             <Grid2 size={{ xs: 12 }}>
               <Typography variant="caption" color="text.secondary">SLP (Skill-based Learning Program) Requirements</Typography>

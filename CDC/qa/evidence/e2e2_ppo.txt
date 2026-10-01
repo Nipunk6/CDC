@@ -1,0 +1,20 @@
+== T5.3 live: S01 (FT block in cycle 3) on INF posting 5 (cycle 4):
+{"eligible":true,"reasons":[]}
+S01 apply INF5: HTTP 201 0.028285s
+S12 apply INF5: HTTP 201 0.025053s
+S13 apply INF5: HTTP 201 0.021292s
+S15 apply INF5: HTTP 201 0.022749s
+HTTP 200 0.023147s
+rounds: 12 13 14
+HTTP 200 0.026074s
+Published: 3 selected, 0 waitlisted, 2 not selected. Students have been notified.
+HTTP 200 0.024971s
+Published: 3 selected, 0 waitlisted, 0 not selected. Students have been notified.
+HTTP 200 0.024809s
+[{"roll":"26QA0012","app":127,"type":"intern","stipend":60000,"block":{"scope":"internships_only"}},{"roll":"26QA0013","app":128,"type":"intern","stipend":60000,"block":{"scope":"internships_only"}},{"roll":"26QA0015","app":129,"type":"intern","stipend":60000,"block":{"scope":"internships_only"}}]
+3 offer(s) announced · 2 block(s) · 0 regret mail(s) · 0 other application(s) flagged as placed elsewhere.
+== new INF posting 8 (cycle 4), new JNF posting 9 (cycle 3)
+S12 INF8: {"eligible":false,"reasons":["Blocked from internships: accepted an Internship offer."]} | JNF9: {"eligible":true,"reasons":[]}
+S13 INF8: {"eligible":true,"reasons":[]} | JNF9: {"eligible":true,"reasons":[]}
+S15 INF8: {"eligible":false,"reasons":["Blocked: accepted a PPO."]} | JNF9: {"eligible":true,"reasons":[]}
+S01 INF8: {"eligible":true,"reasons":[]} | JNF9: {"eligible":false,"reasons":["Blocked: accepted a Full-Time offer."]}

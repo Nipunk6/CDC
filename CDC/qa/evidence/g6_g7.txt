@@ -1,0 +1,8 @@
+## G6 tsc
+tsc_exit=
+## G7 lint
+lint_exit=0
+✖ 83 problems (0 errors, 83 warnings)
+components/forms/shared/pdfviewer.tsx:2
+components/forms/shared/selectionprocessbuilder.tsx:1
+components/forms/shared/phoneinputpro.tsx:2

@@ -1,0 +1,14 @@
+## Final full suite after Part 10 (2026-10-01 13:42 IST)
+  ⨯ every api route enforces authentication role and tenant boundaries   1.05s  
+  ⨯ t0 4b extra blank status is a validation error not a server error    0.01s  
+  ⨯ t1 1c unrecognised pwd value is not silently coerced                 0.01s  
+  ⨯ t1 4a previous cycle data visible to student and admin               0.04s  
+  ⨯ t3 6c double submit race window is a clean 4xx not 500               0.01s  
+  ⨯ t4 2b admin upload xlsx reports every bad row                        0.05s  
+  ⨯ t5 8 x concurrent double publish loser gets clean 4xx not 500        0.03s  
+  ⨯ t6 13 in app notification for every student facing trigger           0.04s  
+  ⨯ t8 3b phase1 csv original columns keep their positions               0.02s  
+  Tests:    9 failed, 307 passed (5052 assertions)
+
+## original suite (--exclude-group=qa)
+  Tests:    116 passed (745 assertions)

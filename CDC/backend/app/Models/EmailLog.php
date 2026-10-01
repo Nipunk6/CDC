@@ -20,6 +20,7 @@ class EmailLog extends Model
         'recipient_email',
         'subject',
         'template',
+        'message_ref',
         'status',
         'error_message',
         'sent_at',

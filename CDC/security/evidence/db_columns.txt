@@ -1,0 +1,37 @@
+alumni_outreach_submissions [3 rows]: id, full_name, email, country_code, phone_number, phone, graduation_year, programme, department, current_organization, current_designation, city, country, linkedin_url, willing_to_mentor, willing_to_refer, message, general_comments, created_at, updated_at
+application_round_results [132 rows]: id, application_id, posting_round_id, attendance, result, is_addendum, published_at, decided_by, remark, created_at, updated_at
+applications [6183 rows]: id, job_posting_id, student_profile_id, resume_id, status, used_unverified_resume, placed_elsewhere_flag, answers, applied_at, withdrawn_at, created_at, updated_at
+audit_logs [2909 rows]: id, user_id, actor_name, actor_email, action, subject_type, subject_id, before, after, ip, created_at, updated_at
+branch_change_requests [0 rows]: id, student_profile_id, current_branch, requested_branch, requested_programme, reason, status, admin_remark, decided_by, decided_at, created_at, updated_at
+cache [75 rows]: key, value, expiration
+cache_locks [0 rows]: key, owner, expiration
+companies [6 rows]: id, name, industry, sector, logo_path, head_talent_contact, primary_contact, secondary_contact, website, postal_address, employee_count, hr_name, hr_designation, hr_email, hr_phone, hr_alt_phone, created_at, updated_at, category_org_type, date_of_establishment, annual_turnover, linkedin_url, industry_sector_tags, mnc_hq_country_city, nature_of_business, company_description
+cycle_enrollments [3026 rows]: id, placement_cycle_id, student_profile_id, status, enrolled_by, created_at, updated_at
+email_logs [28330 rows]: id, user_id, recipient_email, subject, template, message_ref, status, error_message, sent_at, created_at, updated_at
+events [2 rows]: id, title, event_type, company_id, starts_at, venue, meeting_link, description, audience_type, audience_filter, published_at, created_by, created_at, updated_at
+failed_jobs [0 rows]: id, uuid, connection, queue, payload, exception, failed_at
+form_status_histories [44 rows]: id, form_type, form_id, old_status, new_status, changed_by, remarks, created_at, updated_at
+infs [5 rows]: id, company_id, internship_title, internship_description, internship_location, stipend, internship_duration_weeks, vacancies, application_deadline, status, admin_remarks, edit_access_requested_at, edit_access_requested_reason, form_data, created_at, updated_at
+jnfs [43 rows]: id, company_id, job_title, job_description, job_location, ctc_min, ctc_max, vacancies, application_deadline, status, admin_remarks, edit_access_requested_at, edit_access_requested_reason, form_data, created_at, updated_at
+job_batches [0 rows]: id, name, total_jobs, pending_jobs, failed_jobs, failed_job_ids, options, cancelled_at, created_at, finished_at
+job_postings [42 rows]: id, postable_type, postable_id, placement_cycle_id, application_deadline, status, share_contact_details, offer_type, floated_by, floated_at, eligibility_snapshot, created_at, updated_at
+jobs [0 rows]: id, queue, payload, attempts, reserved_at, available_at, created_at
+migrations [46 rows]: id, migration, batch
+notifications [25701 rows]: id, user_id, title, message, type, read_at, created_at, updated_at
+offers [15 rows]: id, application_id, student_profile_id, company_id, job_posting_id, placement_cycle_id, offer_type, ctc_annual, stipend_monthly, currency, announced_by, announced_at, created_at, updated_at
+password_reset_tokens [2772 rows]: email, token, created_at
+personal_access_tokens [57 rows]: id, tokenable_type, tokenable_id, name, token, abilities, last_used_at, expires_at, created_at, updated_at
+placement_blocks [28 rows]: id, student_profile_id, placement_cycle_id, scope, reason, offer_id, remark, active, blocked_by, unblocked_by, unblocked_at, created_at, updated_at
+placement_cycles [5 rows]: id, name, type, starts_on, ends_on, status, allowed_programmes, description, created_by, created_at, updated_at
+policy_documents [2 rows]: id, title, type, url, is_visible_jnf, is_visible_inf, created_at, updated_at
+portal_settings [1 rows]: id, key, value, created_at, updated_at
+posting_questions [7 rows]: id, job_posting_id, question, qtype, options, required, sort_order, created_at, updated_at
+posting_rounds [126 rows]: id, job_posting_id, name, round_type, sort_order, scheduled_at, status, is_final, created_at, updated_at
+programme_branches [0 rows]: id, programme_name, branch_name, is_custom, is_active, created_by, created_at, updated_at
+recruiter_email_verifications [0 rows]: id, email, token_hash, expires_at, verified_at, created_at, updated_at
+resumes [2893 rows]: id, student_profile_id, slot, label, file_path, file_size, status, admin_remark, reviewed_by, reviewed_at, created_at, updated_at
+sessions [0 rows]: id, user_id, ip_address, user_agent, payload, last_activity
+shortlist_proposals [2 rows]: id, job_posting_id, posting_round_id, proposed_by, kind, payload, status, admin_remark, decided_by, decided_at, created_at, updated_at
+student_invite_tokens [0 rows]: email, token, created_at
+student_profiles [2892 rows]: id, user_id, roll_no, full_name, institute_email, personal_email, phone, programme, branch, graduating_batch, current_cgpa, ongoing_backlogs, total_backlogs, gender, date_of_birth, tenth_percent, twelfth_percent, category, pwd, home_state, photo_path, linkedin_url, github_url, created_at, updated_at
+users [2902 rows]: id, name, email, email_verified_at, password, remember_token, created_at, updated_at, role, is_super_admin, is_active, company_id

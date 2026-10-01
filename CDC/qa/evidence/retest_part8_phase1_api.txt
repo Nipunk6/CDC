@@ -1,0 +1,41 @@
+## Part 8 Phase 1 regression re-run (2026-10-01 13:32 IST) — live MySQL + MAIL_MAILER=log backend; script defects of the audit run fixed (profile payload, mail-subject grep, branch id path)
+2 company login (registered company)                           | exp token   | got ok
+2 GET /company/dashboard                                       | exp 200     | got 200
+2 PUT /company/profile                                         | exp 200     | got 200
+2 POST /company/profile/logo (replace)                         | exp 200     | got 200
+4 duplicate JNF 3 -> new draft id                              | exp id      | got 44
+4 duplicate cleared batch/declarations                         | exp ''/false | got ""/false
+4 DELETE draft (duplicate)                                     | exp 200     | got 200
+4 company submits JNF                                          | exp id      | got 45
+4 request edit access (submitted)                              | exp 200     | got 200
+4 request edit access again                                    | exp 409     | got 409
+5 GET /admin/jnfs (default queue)                              | exp 200     | got 200
+5 GET /admin/jnfs?status=all                                   | exp 200     | got 200
+5 GET /admin/infs?status=accepted                              | exp 200     | got 200
+5 GET /admin/jnfs/{submitted}                                  | exp 200     | got 200
+5 reject without remarks                                       | exp 422     | got 422
+5 grant edit access (under_review + remarks)                   | exp 200     | got 200
+5 edit own latest remark                                       | exp 200     | got 200
+5 company resubmits (under_review -> submitted)                | exp 200     | got 200
+5 admin form-data edit (change title)                          | exp 200     | got 200
+5 FormEditedByAdminMail logged to company                      | exp >0      | got 3
+5 accept                                                       | exp 200     | got 200
+5 CSV download accepted                                        | exp 200     | got 200
+5 mark draft for review                                        | exp 200     | got 200
+5 marked draft stays 'draft' for company                       | exp draft   | got draft
+5 draft note                                                   | exp 200     | got 200
+5 unmark (draft)                                               | exp 200     | got 200
+6 GET /admin/companies                                         | exp 200     | got 200
+6 GET /admin/companies/{id}                                    | exp 200     | got 200
+6 POST programme-branches (custom)                             | exp 201     | got 201
+6 DELETE programme-branches custom                             | exp 200     | got 200
+6 create policy doc (link)                                     | exp id      | got 5
+6 DELETE policy doc                                            | exp 200     | got 200
+6 manage-admins as normal admin                                | exp 403     | got 403
+6 manage-admins as super                                       | exp 200     | got 200
+6 GET /admin/alumni-outreach                                   | exp 200     | got 200
+6 GET /auth/notifications (admin)                              | exp 200     | got 200
+7 forgot-password (company email)                              | exp 200     | got 200
+7 reset-password with emailed token                            | exp 200     | got 200
+7 login with new password                                      | exp 200     | got 200
+8 POST /alumni-outreach (public)                               | exp 201     | got 201

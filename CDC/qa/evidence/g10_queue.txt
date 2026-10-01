@@ -1,0 +1,8 @@
+dispatched for 23JE0104 <23je0104@students.cdc-demo.test> jobs=1
+  2026-10-01 05:30:54 App\Jobs\SendStudentInvitation ................. RUNNING
+  2026-10-01 05:30:54 App\Jobs\SendStudentInvitation ........... 256.56ms DONE
+  2026-10-01 05:30:54 App\Mail\StudentInvitationMail ................. RUNNING
+  2026-10-01 05:30:54 App\Mail\StudentInvitationMail ............ 23.90ms DONE
+jobs_left=0 failed=0
+{"recipient_email":"23je0104@students.cdc-demo.test","template":"emails.student-invitation","status":"queued"}
+0

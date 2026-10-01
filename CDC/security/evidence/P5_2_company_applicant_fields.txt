@@ -1,0 +1,17 @@
+top-level keys: ['applicants', 'share_contact_details']
+applicant count: 4
+fields per applicant: ['application_id', 'roll_no', 'full_name', 'programme', 'branch', 'graduating_batch', 'current_cgpa', 'ongoing_backlogs', 'total_backlogs', 'tenth_percent', 'twelfth_percent', 'answers', 'resume_url', 'rounds', 'rounds.124', 'rounds.124.result', 'rounds.124.attendance', 'rounds.125', 'rounds.125.result', 'rounds.125.attendance', 'rounds.126', 'rounds.126.result', 'rounds.126.attendance']
+  personal_email           present: False
+  phone                    present: False
+  date_of_birth            present: False
+  category                 present: False
+  pwd                      present: False
+  gender                   present: False
+  used_unverified_resume   present: False
+  placed_elsewhere_flag    present: False
+  home_state               present: False
+  offer                    present: False
+  ctc_annual               present: False
+  institute_email          present: False
+  password                 present: False
+posting payload keys: ['applicant_count', 'application_deadline', 'deadline_passed', 'form_id', 'form_type', 'id', 'placement_cycle', 'questions', 'rounds', 'rounds_count', 'share_contact_details', 'status', 'title', 'type']

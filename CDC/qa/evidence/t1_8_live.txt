@@ -1,0 +1,8 @@
+== suspend 26QA0010 (id 130) while S10 token held
+{"message":"Student account suspended.","student":{"id":130,"roll_no":"26QA0010","full_name":"Jatin Suspended","institute_email":"26qa0010@students.qa.test","programme":"B.Tech (4 Year) \/ B.Tech Doub
+HTTP 200 0.022301s
+-- existing token, GET /student/profile:
+{"message":"Unauthenticated."}
+HTTP 401 0.006262s
+-- fresh login:
+{"message":"Account suspended. Contact CDC."} HTTP 403

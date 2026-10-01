@@ -45,9 +45,6 @@ const theme = createTheme({
       'Arial',
       'sans-serif',
     ].join(','),
-    allVariants: {
-      textAlign: 'justify',
-    },
     h1: {
       fontSize: '2.75rem',
       fontWeight: 700,
