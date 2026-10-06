@@ -7,13 +7,16 @@ use App\Mail\FormStatusChangedMail;
 use App\Models\FormStatusHistory;
 use App\Models\Inf;
 use App\Models\Jnf;
+use App\Models\JobPosting;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\PortalNotificationService;
+use App\Services\PostingEligibilityService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -21,7 +24,8 @@ class AdminFormReviewController extends Controller
 {
     public function __construct(
         private readonly PortalNotificationService $notificationService,
-        private readonly AuditService $audit
+        private readonly AuditService $audit,
+        private readonly PostingEligibilityService $postingEligibility
     )
     {
     }
@@ -1080,6 +1084,7 @@ class AdminFormReviewController extends Controller
 
         $validated = $request->validate([
             'form_data' => ['required', 'array'],
+            'notify_newly_eligible' => ['sometimes', 'nullable', 'boolean'],
         ]);
 
         $oldFormData = is_array($form->getAttribute('form_data')) ? $form->getAttribute('form_data') : [];
@@ -1087,7 +1092,26 @@ class AdminFormReviewController extends Controller
 
         $changedFields = $this->detectChangedFields($oldFormData, $newFormData, $formType);
 
-        if (empty($changedFields)) {
+        // D103: on a floated form, eligibility keys go through the drive's eligibility update (same validation, same
+        // posting.eligibility_update audit row), so the drive's snapshot and the form never disagree.
+        $posting = ($form instanceof Jnf || $form instanceof Inf)
+            ? $form->jobPosting()->with(['postable', 'placementCycle:id,name,type,status'])->first()
+            : null;
+        $eligibilityCriteria = null;
+
+        if ($posting && $posting->status !== 'cancelled') {
+            $current = $this->postingEligibility->current($posting);
+            $sent = array_intersect_key($newFormData, array_flip(JobPosting::SNAPSHOT_KEYS));
+
+            if ($this->postingEligibility->differs($current, array_replace($current, $sent))) {
+                if ($refusal = $this->postingEligibility->refusal($posting)) {
+                    return response()->json(['message' => $refusal], 422);
+                }
+                $eligibilityCriteria = $this->postingEligibility->proposed($posting, $sent);
+            }
+        }
+
+        if (empty($changedFields) && $eligibilityCriteria === null) {
             return response()->json(['message' => 'No changes detected.']);
         }
 
@@ -1164,9 +1188,22 @@ class AdminFormReviewController extends Controller
             }
         }
 
-        $form->save();
+        DB::transaction(function () use ($form, $posting, $eligibilityCriteria, $request): void {
+            $form->save();
 
-        $fieldListSummary = implode(', ', array_keys($changedFields));
+            if ($eligibilityCriteria !== null) {
+                $this->postingEligibility->apply(
+                    $posting,
+                    $eligibilityCriteria,
+                    $request->user(),
+                    $request->ip(),
+                    $request->boolean('notify_newly_eligible'),
+                    'form_editor'
+                );
+            }
+        });
+
+        $fieldListSummary = implode(', ', array_keys($changedFields) ?: ['Eligibility']);
         $remarks = 'Admin edited form fields: ' . $fieldListSummary;
         $this->audit->log($request, 'form.edit', $form, array_map(fn (array $c) => $c['old'], $changedFields), array_map(fn (array $c) => $c['new'], $changedFields));
 

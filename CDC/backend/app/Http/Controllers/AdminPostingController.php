@@ -14,6 +14,7 @@ use App\Models\PostingRound;
 use App\Services\AuditService;
 use App\Services\EligibilityService;
 use App\Services\MailDispatchService;
+use App\Services\PostingEligibilityService;
 use App\Support\Ist;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -255,6 +256,77 @@ class AdminPostingController extends Controller
 
         return response()->json([
             'message' => 'Posting updated.',
+            'posting' => $this->detail($jobPosting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status', 'floatedBy:id,name'])),
+        ]);
+    }
+
+    /**
+     * What an eligibility change would do (D103): counts of newly / no-longer eligible students and the current
+     * applicants who would no longer be eligible. Criteria come as `?criteria=<json>` (same keys as the PATCH) so a
+     * large branch matrix still fits in the URL; plain query keys work too. Writes nothing.
+     */
+    public function previewEligibilityChange(Request $request, JobPosting $jobPosting, PostingEligibilityService $editor): JsonResponse
+    {
+        if ($refusal = $editor->refusal($jobPosting)) {
+            return response()->json(['message' => $refusal], 422);
+        }
+
+        $input = $request->query();
+        if ($request->filled('criteria')) {
+            $input = json_decode((string) $request->query('criteria'), true);
+            if (! is_array($input)) {
+                return response()->json(['message' => 'The proposed criteria could not be read.', 'errors' => ['criteria' => ['Send the criteria as a JSON object.']]], 422);
+            }
+        }
+
+        $jobPosting->load('postable', 'placementCycle:id,name,type,status');
+        $criteria = $editor->proposed($jobPosting, $input);
+
+        return response()->json(['preview' => $editor->preview($jobPosting, $criteria)]);
+    }
+
+    /**
+     * Change a floated drive's eligibility (D103). Updates eligibility_snapshot and the form's form_data together,
+     * keeps every existing application, and by default mails E2 to students who became eligible and were never told.
+     */
+    public function updateEligibility(Request $request, JobPosting $jobPosting, PostingEligibilityService $editor): JsonResponse
+    {
+        if ($refusal = $editor->refusal($jobPosting)) {
+            return response()->json(['message' => $refusal], 422);
+        }
+
+        $request->validate([
+            'notify_newly_eligible' => ['sometimes', 'nullable', 'boolean'],
+            // Reopen applications (or move the deadline) so everyone eligible under the new criteria can apply.
+            'applications_open_until' => ['sometimes', 'nullable', 'bail', 'date', $this->futureDeadline()],
+        ]);
+        $jobPosting->load('postable', 'placementCycle:id,name,type,status');
+        $criteria = $editor->proposed($jobPosting, $request->all());
+        $notify = $request->has('notify_newly_eligible') ? $request->boolean('notify_newly_eligible') : true;
+
+        $openUntil = $request->filled('applications_open_until') ? Ist::parse((string) $request->input('applications_open_until')) : null;
+        if ($openUntil && ($refusal = $editor->reopenRefusal($jobPosting))) {
+            return response()->json(['message' => $refusal], 422);
+        }
+
+        $result = $editor->apply($jobPosting, $criteria, $request->user(), $request->ip(), $notify, 'posting', $openUntil);
+        $jobPosting->refresh();
+
+        $parts = [];
+        if ($result['changed']) {
+            $parts[] = sprintf('Eligibility updated. %d newly eligible, %d no longer eligible.', $result['newly_eligible'], $result['no_longer_eligible']);
+        }
+        if ($result['reopened']) {
+            $parts[] = 'Applications are open until '.$jobPosting->application_deadline->timezone('Asia/Kolkata')->format('d M Y, h:i A').' IST.';
+        }
+        if ($result['notified'] > 0) {
+            $parts[] = sprintf('%d newly eligible %s being emailed.', $result['notified'], $result['notified'] === 1 ? 'student is' : 'students are');
+        }
+        $message = $parts === [] ? 'Nothing changed: these are already the drive\'s criteria.' : implode(' ', $parts);
+
+        return response()->json([
+            'message' => $message,
+            'result' => $result,
             'posting' => $this->detail($jobPosting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status', 'floatedBy:id,name'])),
         ]);
     }

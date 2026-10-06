@@ -250,6 +250,7 @@ class SAAuditCoverageTest extends TestCase
                 'application_deadline' => now()->addDays(7)->toIso8601String(), 'questions' => [['question' => 'Why us?', 'qtype' => 'text']],
             ]],
             'PATCH api/admin/postings/{jobPosting}' => fn () => ['PATCH', "/api/admin/postings/{$w['open']->id}", ['application_deadline' => now()->addDays(12)->toIso8601String(), 'share_contact_details' => true]],
+            'PATCH api/admin/postings/{jobPosting}/eligibility' => fn () => ['PATCH', "/api/admin/postings/{$w['open']->id}/eligibility", ['minTenthPercent' => '60', 'notify_newly_eligible' => false]],
             'PATCH api/admin/postings/{jobPosting}/close' => fn () => ['PATCH', "/api/admin/postings/{$w['open']->id}/close", []],
             'PATCH api/admin/postings/{jobPosting}/reopen' => function () use ($w) {
                 JobPosting::whereKey($w['open']->id)->update(['status' => 'in_process']);

@@ -6,7 +6,9 @@ import { Alert, Button, Card, CardContent, Chip, LinearProgress, Stack, Tab, Tab
 import WorkIcon from "@mui/icons-material/Work";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import DownloadIcon from "@mui/icons-material/Download";
+import TuneIcon from "@mui/icons-material/Tune";
 import RemoveFromProcess from "@/components/admin/posting/removefromprocess";
+import EditEligibilityDialog from "@/components/admin/editeligibilitydialog";
 
 import PageHeader from "@/components/shared/pageheader";
 import OverviewTab from "@/components/admin/posting/overviewtab";
@@ -38,6 +40,7 @@ export default function AdminPostingDetailPage({ params }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [tab, setTab] = useState("overview");
+  const [editingEligibility, setEditingEligibility] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +74,11 @@ export default function AdminPostingDetailPage({ params }) {
         actions={
           <>
             <Chip color={statusColor(posting.status)} label={titleCase(posting.status)} sx={{ bgcolor: "white" }} variant="outlined" />
+            {["open", "in_process"].includes(posting.status) && (
+              <Button variant="contained" color="secondary" startIcon={<TuneIcon />} onClick={() => setEditingEligibility(true)}>
+                Edit eligibility
+              </Button>
+            )}
             <Button
               variant="contained"
               color="secondary"
@@ -94,6 +102,16 @@ export default function AdminPostingDetailPage({ params }) {
         <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
           {success}
         </Alert>
+      )}
+      {editingEligibility && (
+        <EditEligibilityDialog
+          posting={posting}
+          onClose={() => setEditingEligibility(false)}
+          onSaved={(message) => {
+            setSuccess(message);
+            void load();
+          }}
+        />
       )}
       <Card>
         <Tabs value={tab} onChange={(_e, value) => setTab(value)} variant="scrollable" allowScrollButtonsMobile>

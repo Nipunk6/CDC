@@ -4,9 +4,33 @@
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "CDC/frontend", "run", "dev", "--", "--hostname", "127.0.0.1", "--port", "3000"],
+      "runtimeArgs": [
+        "--prefix",
+        "CDC/frontend",
+        "run",
+        "dev",
+        "--",
+        "--hostname",
+        "127.0.0.1",
+        "--port",
+        "3000"
+      ],
       "port": 3000,
       "url": "http://127.0.0.1:3000"
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "MAIL_MAILER=log",
+        "php",
+        "CDC/backend/artisan",
+        "serve",
+        "--host=127.0.0.1",
+        "--port=8000"
+      ],
+      "port": 8000,
+      "url": "http://127.0.0.1:8000"
     }
   ]
 }

@@ -120,6 +120,8 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->prefix('admin')->gr
     Route::patch('/postings/{jobPosting}/cancel', [AdminPostingController::class, 'cancel']);
     Route::get('/postings/{jobPosting}/applications', [AdminPostingController::class, 'applications']);
     Route::get('/postings/{jobPosting}/eligible', [AdminPostingController::class, 'eligible']);
+    Route::get('/postings/{jobPosting}/eligibility/preview', [AdminPostingController::class, 'previewEligibilityChange']);
+    Route::patch('/postings/{jobPosting}/eligibility', [AdminPostingController::class, 'updateEligibility']);
     Route::get('/postings/{jobPosting}/export', [AdminPostingController::class, 'export']);
     Route::post('/postings/{jobPosting}/rounds', [AdminPostingController::class, 'storeRound']);
     Route::post('/postings/{jobPosting}/rounds/reorder', [AdminPostingController::class, 'reorderRounds']);

@@ -424,36 +424,40 @@ class S3EligibilityApplyTest extends TestCase
     }
 
     // ============================================================================================
-    // T3.1b — snapshot frozen at float
+    // T3.1b — snapshot follows an admin eligibility edit (owner decision 2026-10-06, D103; replaces "frozen at float")
     // ============================================================================================
 
-    public function test_T3_1b_snapshot_frozen_when_admin_raises_cutoff_after_float(): void
+    public function test_T3_1b_admin_cutoff_edit_after_float_updates_the_snapshot_and_keeps_existing_applications(): void
     {
         $jnf = $this->jnf();
         $posting = $this->floatOk($jnf);
+        $applied = $this->student(['current_cgpa' => 8.0]);
         $between = $this->student(['current_cgpa' => 8.0]); // 7.0 (float-time) <= 8.0 < 9.0 (edited)
+        $this->apply($applied, $posting)->assertCreated();
 
-        // Admin raises the per-branch cutoff 7.0 → 9.0 (globalCgpa also changed so Phase 1's change detector saves it).
+        // Admin raises the per-branch cutoff 7.0 → 9.0 through the form editor.
         $data = $jnf->fresh()->form_data;
         $data['eligibility'][0]['branches'][0]['cgpa'] = '9.0';
         $data['eligibility'][0]['branches'][1]['cgpa'] = '9.0';
         $data['globalCgpa'] = '9.0';
         Sanctum::actingAs($this->admin);
         $this->patchJson("/api/admin/jnfs/{$jnf->id}/form-data", ['form_data' => $data])->assertOk();
-        $this->assertSame('9.0', $jnf->fresh()->form_data['eligibility'][0]['branches'][0]['cgpa'], 'precondition: live form now says 9.0');
-        $this->assertSame('7.0', $posting->fresh()->eligibility_snapshot['eligibility'][0]['branches'][0]['cgpa'], 'snapshot must keep 7.0');
+        $this->assertSame('9.0', $jnf->fresh()->form_data['eligibility'][0]['branches'][0]['cgpa']);
+        $this->assertSame('9.0', $posting->fresh()->eligibility_snapshot['eligibility'][0]['branches'][0]['cgpa'], 'snapshot follows the edit');
 
-        // Behaviour recorded: eligibility keeps using the snapshot everywhere.
-        $this->assertTrue($this->eligibility()->check($between->fresh(), $posting->fresh())['eligible']);
-        $this->assertTrue($this->inQuery($between, $posting));
+        // The new rule applies everywhere, and check() and the SQL audience agree.
+        $this->assertFalse($this->eligibility()->check($between->fresh(), $posting->fresh())['eligible']);
+        $this->assertFalse($this->inQuery($between, $posting));
 
         $this->as($between);
         $item = collect($this->getJson('/api/student/postings')->json('postings'))->firstWhere('id', $posting->id);
-        $this->assertTrue($item['eligibility']['eligible']);
+        $this->assertFalse($item['eligibility']['eligible']);
         $detail = $this->getJson("/api/student/postings/{$posting->id}")->assertOk();
-        $this->assertTrue($detail->json('posting.eligibility.eligible'));
-        $this->assertSame('7.0', $detail->json('posting.form_data.eligibility.0.branches.0.cgpa'), 'criteria shown must equal criteria enforced (D66)');
-        $this->apply($between, $posting)->assertCreated();
+        $this->assertSame('9.0', $detail->json('posting.form_data.eligibility.0.branches.0.cgpa'), 'criteria shown must equal criteria enforced (D66)');
+        $this->apply($between, $posting)->assertStatus(422);
+
+        // The student who applied before the change keeps the application (D103).
+        $this->assertSame(1, Application::where('job_posting_id', $posting->id)->where('student_profile_id', $applied->id)->where('status', 'applied')->count());
     }
 
     public function test_T3_1b_admin_per_branch_cgpa_edit_is_actually_saved(): void
