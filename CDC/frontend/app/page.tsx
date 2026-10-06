@@ -58,6 +58,7 @@ export default function Home() {
   const theme = useTheme();
 
   const navLinks = [
+    { label: "Student Login", href: "/auth/login/student", variant: "outlined" as const },
     { label: "Recruiter Login", href: "/auth/login/recruiter", variant: "outlined" as const },
     { label: "Alumni", href: "/alumni", variant: "outlined" as const },
     { label: "Admin Login", href: "/auth/login/admin", variant: "outlined" as const },
@@ -180,8 +181,23 @@ export default function Home() {
             <Stack
               direction="row"
               spacing={1}
-              sx={{ display: { xs: "none", md: "flex" } }}
+              sx={{ display: { xs: "none", lg: "flex" }, "& .MuiButton-root": { whiteSpace: "nowrap" } }}
             >
+              <Button
+                component={Link}
+                href="/auth/login/student"
+                variant="outlined"
+                sx={{
+                  color: "white",
+                  borderColor: "rgba(255,255,255,0.4)",
+                  "&:hover": {
+                    borderColor: "#D4A843",
+                    bgcolor: "rgba(255,255,255,0.08)",
+                  },
+                }}
+              >
+                Student Login
+              </Button>
               <Button
                 component={Link}
                 href="/auth/login/recruiter"
@@ -246,7 +262,7 @@ export default function Home() {
             <IconButton
               color="inherit"
               onClick={() => setMobileMenuOpen(true)}
-              sx={{ display: { xs: "flex", md: "none" } }}
+              sx={{ display: { xs: "flex", lg: "none" } }}
             >
               <MenuIcon />
             </IconButton>
@@ -982,6 +998,7 @@ export default function Home() {
               <Stack spacing={0.5} mt={1}>
                 {[
                   { label: "Register as Recruiter", href: "/company/register" },
+                  { label: "Student Login", href: "/auth/login/student" },
                   { label: "Recruiter Login", href: "/auth/login/recruiter" },
                   { label: "Admin Login", href: "/auth/login/admin" },
                   { label: "Alumni Connect", href: "/alumni" },

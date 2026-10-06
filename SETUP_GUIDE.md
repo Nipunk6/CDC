@@ -290,7 +290,7 @@ also can we have an calander thing wtith all deadlines and event in admin and st
 - Answer: yes responsive and good design also required for mobile
 
 ---
-
+    
 ## Section 12 — Rollout & priorities
 
 **12.1 🔴 Deadline / milestone:** when does the student side need to go live for the current season, and is there a pilot batch?
