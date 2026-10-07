@@ -37,12 +37,14 @@ import DownloadIcon from "@mui/icons-material/Download";
 import PageHeader from "@/components/shared/pageheader";
 import { companyApi } from "@/lib/companyapi";
 import { companyDownload } from "@/lib/companydownload";
-import { formatDateTime, statusColor, titleCase } from "@/lib/format";
+import { formatDateTime, postingStatusLabel, statusColor, titleCase } from "@/lib/format";
 
-const kindLabels = { shortlist: "Shortlist", waitlist: "Waitlist", addendum: "Addendum", replacement_request: "Replacement request" };
+const kindLabels = { shortlist: "Shortlist", waitlist: "On Hold", addendum: "Addendum", replacement_request: "Replacement request" };
 // A completed drive still takes these (QA F-010).
 const COMPLETED_KINDS = ["replacement_request", "addendum"];
 const resultColors = { selected: "success", rejected: "error", waitlisted: "info", pending: "default" };
+const companyResultLabel = (result, isFinal) =>
+  ({ selected: isFinal ? "Selected" : "Shortlisted", rejected: "Not selected", waitlisted: "On Hold", pending: "Pending" })[result] ?? titleCase(result);
 
 export default function CompanyPostingDetailPage({ params }) {
   const { id } = use(params);
@@ -70,7 +72,7 @@ export default function CompanyPostingDetailPage({ params }) {
       setProposals(pr.proposals ?? []);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load this drive.");
+      setError(e instanceof Error ? e.message : "Failed to load this job profile.");
     }
   }, [id]);
 
@@ -115,11 +117,11 @@ export default function CompanyPostingDetailPage({ params }) {
         title={posting.title}
         subtitle={`${posting.placement_cycle?.name ?? ""} · applications close ${formatDateTime(posting.application_deadline)}`}
         backHref="/company/postings"
-        backLabel="All Drives"
+        backLabel="All Job Profiles"
         actions={
           <>
             <Button variant="contained" color="secondary" startIcon={<DownloadIcon />} onClick={exportApplicants}>
-              Export
+              Download Applicants
             </Button>
             <Button
               variant="contained"
@@ -154,19 +156,19 @@ export default function CompanyPostingDetailPage({ params }) {
       <Card sx={{ mb: 2 }}>
         <CardContent>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Chip color={statusColor(posting.status)} label={titleCase(posting.status)} />
+            <Chip color={statusColor(posting.status)} label={postingStatusLabel(posting)} />
             <Chip variant="outlined" label={`${posting.applicant_count} applicant(s)`} />
             {(posting.rounds ?? []).map((r) => (
               <Chip
                 key={r.id}
                 variant="outlined"
                 color={statusColor(r.status)}
-                label={`${r.name}: ${r.status === "completed" ? `${r.published_selected} selected${r.published_waitlisted ? `, ${r.published_waitlisted} waitlisted` : ""}` : titleCase(r.status)}`}
+                label={`${r.name}: ${r.status === "completed" ? `${r.published_selected} ${r.is_final ? "selected" : "shortlisted"}${r.published_waitlisted ? `, ${r.published_waitlisted} on hold` : ""}` : titleCase(r.status)}`}
               />
             ))}
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-            You see results only after the CDC publishes them. {share ? "Contact details are shared for this drive." : "Contact details are not shared for this drive."}
+            You see results only after the CDC publishes them. {share ? "Contact details are shared for this job profile." : "Contact details are not shared for this job profile."}
           </Typography>
         </CardContent>
       </Card>
@@ -182,12 +184,12 @@ export default function CompanyPostingDetailPage({ params }) {
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Roll no</TableCell>
+                    <TableCell>Roll Number</TableCell>
                     <TableCell>Name</TableCell>
                     <TableCell>Branch</TableCell>
                     <TableCell>CGPA</TableCell>
                     <TableCell>Backlogs</TableCell>
-                    <TableCell>10th / 12th</TableCell>
+                    <TableCell>Class X / XII Percentage</TableCell>
                     {share && <TableCell>Contact</TableCell>}
                     <TableCell>Resume</TableCell>
                     {(posting.rounds ?? []).map((r) => (
@@ -235,7 +237,7 @@ export default function CompanyPostingDetailPage({ params }) {
                         return (
                           <TableCell key={r.id}>
                             {cell ? (
-                              <Chip size="small" color={resultColors[cell.result]} label={cell.result === "waitlisted" ? "Waitlist" : titleCase(cell.result)} />
+                              <Chip size="small" color={resultColors[cell.result]} label={companyResultLabel(cell.result, r.is_final)} />
                             ) : (
                               "—"
                             )}
@@ -285,7 +287,7 @@ export default function CompanyPostingDetailPage({ params }) {
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
             {dialogError && <Alert severity="error">{dialogError}</Alert>}
-            <Alert severity="info">The CDC reviews every proposal. Students are informed only when the CDC publishes the round.</Alert>
+            <Alert severity="info">The CDC reviews every proposal. Students are informed only when the CDC publishes the stage.</Alert>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <FormControl fullWidth size="small">
                 <InputLabel id="p-kind">Type</InputLabel>
@@ -300,8 +302,8 @@ export default function CompanyPostingDetailPage({ params }) {
                 </Select>
               </FormControl>
               <FormControl fullWidth size="small">
-                <InputLabel id="p-round">Round</InputLabel>
-                <Select labelId="p-round" label="Round" value={dialog?.roundId ?? ""} onChange={(e) => setDialog((d) => ({ ...d, roundId: e.target.value }))}>
+                <InputLabel id="p-round">Stage</InputLabel>
+                <Select labelId="p-round" label="Stage" value={dialog?.roundId ?? ""} onChange={(e) => setDialog((d) => ({ ...d, roundId: e.target.value }))}>
                   {(posting.rounds ?? []).map((r) => (
                     <MenuItem key={r.id} value={String(r.id)}>
                       {r.name}
@@ -322,7 +324,7 @@ export default function CompanyPostingDetailPage({ params }) {
             />
             {dialog?.kind === "waitlist" && (
               <Typography variant="caption" color="text.secondary">
-                List everyone who should be on the waitlist (there is no order). Anyone currently waitlisted but not listed here is taken off it.
+                List everyone who should be on hold at this stage (there is no order). Anyone currently on hold but not listed here is taken off hold.
               </Typography>
             )}
           </Stack>

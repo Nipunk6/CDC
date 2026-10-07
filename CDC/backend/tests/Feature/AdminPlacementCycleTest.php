@@ -171,7 +171,7 @@ class AdminPlacementCycleTest extends TestCase
 
         $this->patchJson("/api/admin/placement-cycles/{$cycle->id}/close")
             ->assertStatus(422)
-            ->assertJsonPath('message', 'This placement cycle is already closed.');
+            ->assertJsonPath('message', 'This placement is already closed.');
     }
 
     public function test_company_user_cannot_touch_placement_cycles(): void
@@ -285,7 +285,7 @@ class AdminPlacementCycleTest extends TestCase
 
         $this->deleteJson("/api/admin/placement-cycles/{$cycle->id}/enroll/{$student->id}")
             ->assertNotFound()
-            ->assertJsonPath('message', 'This student is not enrolled in this cycle.');
+            ->assertJsonPath('message', 'This student is not enrolled in this placement.');
 
         CycleEnrollment::create([
             'placement_cycle_id' => $cycle->id,
@@ -294,7 +294,7 @@ class AdminPlacementCycleTest extends TestCase
 
         $this->deleteJson("/api/admin/placement-cycles/{$cycle->id}/enroll/{$student->id}")
             ->assertOk()
-            ->assertJsonPath('message', 'Student removed from this placement cycle.');
+            ->assertJsonPath('message', 'Student removed from this placement.');
 
         $this->assertDatabaseCount('cycle_enrollments', 0);
 

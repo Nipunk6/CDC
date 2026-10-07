@@ -17,6 +17,8 @@ class EmailLog extends Model
      */
     protected $fillable = [
         'user_id',
+        'job_posting_id',
+        'kind',
         'recipient_email',
         'subject',
         'template',

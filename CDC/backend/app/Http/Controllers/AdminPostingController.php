@@ -37,6 +37,7 @@ class AdminPostingController extends Controller
         $validated = $request->validate([
             'cycle_id' => ['nullable', 'integer', 'exists:placement_cycles,id'],
             'status' => ['nullable', 'in:open,in_process,completed,cancelled'],
+            'search' => ['nullable', 'string', 'max:100'],
         ]);
 
         $query = JobPosting::query()
@@ -54,9 +55,17 @@ class AdminPostingController extends Controller
         if (! empty($validated['status'])) {
             $query->where('status', $validated['status']);
         }
+        $query->with('rounds:id,job_posting_id,status');
+
+        $postings = $query->get();
+        // Search by company or profile (S6.13); titles live in form_data, so this filters the loaded list.
+        $term = mb_strtolower(trim((string) ($validated['search'] ?? '')));
+        if ($term !== '') {
+            $postings = $postings->filter(fn (JobPosting $p) => str_contains(mb_strtolower(($p->company()?->name ?? '').' '.$p->title()), $term));
+        }
 
         return response()->json([
-            'postings' => $query->get()->map(fn (JobPosting $p) => $this->summary($p)),
+            'postings' => $postings->values()->map(fn (JobPosting $p) => $this->summary($p)),
         ]);
     }
 
@@ -83,6 +92,9 @@ class AdminPostingController extends Controller
                 'application_deadline' => $posting->application_deadline,
                 'placement_cycle' => $posting->placementCycle,
                 'offer_label' => Offer::LABELS[$posting->offerType()] ?? $posting->offerType(),
+                'is_scheduled' => $posting->isScheduled(),
+                'scheduled_open_at' => $posting->scheduled_open_at,
+                'deadline_passed' => $posting->deadlinePassed(),
             ] : null,
         ]);
     }
@@ -93,6 +105,8 @@ class AdminPostingController extends Controller
             'form_type' => ['required', 'in:jnf,inf'],
             'form_id' => ['required', 'integer'],
             'cycle_id' => ['required', 'integer', 'exists:placement_cycles,id'],
+            'allowed_student_categories' => ['nullable', 'array', 'max:50'],
+            'allowed_student_categories.*' => ['integer'],
         ]);
 
         $form = $this->findForm($validated['form_type'], (int) $validated['form_id']);
@@ -102,16 +116,22 @@ class AdminPostingController extends Controller
 
         $draft = new JobPosting([
             'placement_cycle_id' => (int) $validated['cycle_id'],
-            'eligibility_snapshot' => $this->snapshot($form),
+            'eligibility_snapshot' => $this->snapshot($form) + array_filter([
+                'allowedStudentCategories' => \App\Services\EligibilityService::categoryIds(['allowedStudentCategories' => $validated['allowed_student_categories'] ?? []]),
+            ]),
         ]);
         $draft->setRelation('postable', $form);
         $draft->postable_type = $form::class;
 
         $enrolled = PlacementCycle::query()->findOrFail($validated['cycle_id'])->enrollments()->where('status', 'active')->count();
 
+        $formRounds = is_array($form->form_data['selectionRounds'] ?? null) ? $form->form_data['selectionRounds'] : [];
+
         return response()->json([
             'eligible_count' => $this->eligibility->eligibleStudentsQuery($draft)->count(),
             'enrolled_count' => $enrolled,
+            // "Steps to publish" (S6.10): the stages the job profile will start with.
+            'stages' => collect($formRounds)->filter(fn ($r) => is_array($r) && ($r['enabled'] ?? false))->count(),
         ]);
     }
 
@@ -127,10 +147,16 @@ class AdminPostingController extends Controller
             'application_deadline' => ['required', 'bail', 'date', $this->futureDeadline()],
             'share_contact_details' => ['nullable', 'boolean'],
             'offer_type' => ['nullable', 'string', 'in:'.implode(',', JobPosting::OFFER_CATEGORIES[$request->input('form_type') === 'inf' ? 'inf' : 'jnf'])],
+            // "Schedule For Later" (S6.2): open applications at this IST time instead of now.
+            'scheduled_open_at' => ['nullable', 'bail', 'date', $this->futureTime('The opening time must be in the future.')],
+            'visit_date' => ['nullable', 'date_format:Y-m-d'],
+            // Allowed Student Categories (S8.4): at least one is required to be eligible; empty = no restriction.
+            'allowed_student_categories' => ['nullable', 'array', 'max:50'],
+            'allowed_student_categories.*' => ['integer', 'exists:student_categories,id'],
         ] + $this->questionRules(), [
             'offer_type.in' => $request->input('form_type') === 'inf'
-                ? 'An INF is floated as "Internship" or "Intern + performance-based PPO".'
-                : 'A JNF is floated as "Full-Time" or "Intern + Full-Time".',
+                ? 'An INF is opened for applications as "Internship" or "Intern + performance-based PPO".'
+                : 'A JNF is opened for applications as "Full-Time" or "Intern + Full-Time".',
         ]);
 
         $form = $this->findForm($validated['form_type'], (int) $validated['form_id']);
@@ -138,31 +164,41 @@ class AdminPostingController extends Controller
             return response()->json(['message' => 'Form not found.'], 404);
         }
 
+        $scheduledAt = Ist::parseOrNull($validated['scheduled_open_at'] ?? null);
+        if ($scheduledAt && Ist::parse($validated['application_deadline'])->lte($scheduledAt)) {
+            return response()->json(['message' => 'The application deadline must be after the opening time.', 'errors' => ['application_deadline' => ['The application deadline must be after the opening time.']]], 422);
+        }
+
         if ((string) $form->status !== 'accepted') {
-            return response()->json(['message' => 'Only accepted forms can be floated to students.'], 422);
+            return response()->json(['message' => 'Only accepted forms can be opened for applications.'], 422);
         }
 
         if ($form->isFloated()) {
-            return response()->json(['message' => 'This form has already been floated.'], 422);
+            return response()->json(['message' => 'This form has already been opened for applications.'], 422);
         }
 
         $cycle = PlacementCycle::query()->findOrFail($validated['placement_cycle_id']);
 
         if (! $cycle->isOpen()) {
-            return response()->json(['message' => 'The selected placement cycle is closed.'], 422);
+            return response()->json(['message' => 'The selected placement is closed.'], 422);
+        }
+
+        // A Draft placement (S8.3) is hidden from students, so nothing can be opened for applications into it yet.
+        if ($cycle->is_draft) {
+            return response()->json(['message' => 'The selected placement is a draft. Publish the placement before opening job profiles for applications in it.'], 422);
         }
 
         $expected = $validated['form_type'] === 'inf' ? 'internship' : 'fulltime';
         if ($cycle->type !== $expected) {
             return response()->json([
                 'message' => $expected === 'internship'
-                    ? 'An INF can only be floated into an internship cycle.'
-                    : 'A JNF can only be floated into a full-time cycle.',
+                    ? 'An INF can only be opened for applications in an internship placement.'
+                    : 'A JNF can only be opened for applications in a full-time placement.',
             ], 422);
         }
 
         try {
-            $posting = DB::transaction(function () use ($form, $cycle, $validated, $request): JobPosting {
+            $posting = DB::transaction(function () use ($form, $cycle, $validated, $request, $scheduledAt): JobPosting {
                 $posting = JobPosting::create([
                     'postable_type' => $form::class,
                     'postable_id' => $form->id,
@@ -172,8 +208,12 @@ class AdminPostingController extends Controller
                     'share_contact_details' => (bool) ($validated['share_contact_details'] ?? false),
                     'offer_type' => $validated['offer_type'] ?? JobPosting::OFFER_CATEGORIES[$validated['form_type']][0],
                     'floated_by' => $request->user()->id,
-                    'floated_at' => now(),
-                    'eligibility_snapshot' => $this->snapshot($form),
+                    'floated_at' => $scheduledAt ?? now(),
+                    'eligibility_snapshot' => $this->snapshot($form) + array_filter([
+                        'allowedStudentCategories' => \App\Services\EligibilityService::categoryIds(['allowedStudentCategories' => $validated['allowed_student_categories'] ?? []]),
+                    ]),
+                    'scheduled_open_at' => $scheduledAt,
+                    'visit_date' => $validated['visit_date'] ?? null,
                 ]);
 
                 $this->copyRounds($posting, $form);
@@ -183,7 +223,7 @@ class AdminPostingController extends Controller
             });
         } catch (QueryException $exception) {
             // unique(postable_type, postable_id): someone floated it a moment ago.
-            return response()->json(['message' => 'This form has already been floated.'], 422);
+            return response()->json(['message' => 'This form has already been opened for applications.'], 422);
         }
 
         $posting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status']);
@@ -196,12 +236,22 @@ class AdminPostingController extends Controller
             'offer_type' => $posting->offerType(),
             'rounds' => $posting->rounds->pluck('name')->all(),
             'questions' => $posting->questions->count(),
+            'allowed_student_categories' => \App\Services\EligibilityService::categoryIds($posting->eligibility_snapshot ?? []),
+            'scheduled_open_at' => $posting->scheduled_open_at?->toIso8601String(),
+            'visit_date' => $posting->visit_date?->toDateString(),
         ]);
+
+        if ($posting->isScheduled()) {
+            return response()->json([
+                'message' => 'Job profile scheduled. It opens for applications on '.$posting->scheduled_open_at->timezone('Asia/Kolkata')->format('d M Y, h:i A').' IST, and eligible students are emailed then.',
+                'posting' => $this->detail($posting),
+            ], 201);
+        }
 
         $this->dispatchFloatMails($posting);
 
         return response()->json([
-            'message' => 'Posting floated. Eligible students are being notified.',
+            'message' => 'Job profile opened for applications. Eligible students are being notified.',
             'posting' => $this->detail($posting),
         ], 201);
     }
@@ -222,10 +272,22 @@ class AdminPostingController extends Controller
             'application_deadline' => ['sometimes', 'bail', 'date', $this->futureDeadline()],
             'share_contact_details' => ['sometimes', 'boolean'],
             'offer_type' => ['sometimes', 'string', 'in:'.implode(',', JobPosting::OFFER_CATEGORIES[$jobPosting->formType()])],
+            'visit_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'scheduled_open_at' => ['sometimes', 'bail', 'date', $this->futureTime('The opening time must be in the future.')],
         ] + $this->questionRules());
 
+        if (array_key_exists('scheduled_open_at', $validated)) {
+            if (! $jobPosting->isScheduled()) {
+                return response()->json(['message' => 'This job profile is already open, so its opening time cannot be changed.'], 422);
+            }
+            $deadline = array_key_exists('application_deadline', $validated) ? Ist::parse($validated['application_deadline']) : $jobPosting->application_deadline;
+            if ($deadline->lte(Ist::parse($validated['scheduled_open_at']))) {
+                return response()->json(['message' => 'The application deadline must be after the opening time.'], 422);
+            }
+        }
+
         if (in_array($jobPosting->status, ['completed', 'cancelled'], true)) {
-            return response()->json(['message' => 'This posting is '.$jobPosting->status.' and can no longer be edited.'], 422);
+            return response()->json(['message' => 'This job profile is '.$jobPosting->status.' and can no longer be edited.'], 422);
         }
 
         if (array_key_exists('questions', $validated) && $jobPosting->deadlinePassed()) {
@@ -244,6 +306,13 @@ class AdminPostingController extends Controller
             if (array_key_exists('offer_type', $validated)) {
                 $jobPosting->offer_type = $validated['offer_type'];
             }
+            if (array_key_exists('visit_date', $validated)) {
+                $jobPosting->visit_date = $validated['visit_date'];
+            }
+            if (array_key_exists('scheduled_open_at', $validated)) {
+                $jobPosting->scheduled_open_at = Ist::parse($validated['scheduled_open_at']);
+                $jobPosting->floated_at = $jobPosting->scheduled_open_at;
+            }
             $jobPosting->save();
 
             if (array_key_exists('questions', $validated)) {
@@ -255,7 +324,7 @@ class AdminPostingController extends Controller
         $this->audit->log($request, 'posting.update', $jobPosting, $before, $this->auditState($jobPosting));
 
         return response()->json([
-            'message' => 'Posting updated.',
+            'message' => 'Job profile updated.',
             'posting' => $this->detail($jobPosting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status', 'floatedBy:id,name'])),
         ]);
     }
@@ -322,7 +391,7 @@ class AdminPostingController extends Controller
         if ($result['notified'] > 0) {
             $parts[] = sprintf('%d newly eligible %s being emailed.', $result['notified'], $result['notified'] === 1 ? 'student is' : 'students are');
         }
-        $message = $parts === [] ? 'Nothing changed: these are already the drive\'s criteria.' : implode(' ', $parts);
+        $message = $parts === [] ? 'Nothing changed: these are already the job profile\'s criteria.' : implode(' ', $parts);
 
         return response()->json([
             'message' => $message,
@@ -336,32 +405,71 @@ class AdminPostingController extends Controller
      */
     public function close(Request $request, JobPosting $jobPosting): JsonResponse
     {
-        return $this->transition($request, $jobPosting, 'in_process', ['open'], 'posting.close', 'Applications closed. The posting is now in process.');
+        return $this->transition($request, $jobPosting, 'in_process', ['open'], 'posting.close', 'Applications closed. The job profile is now in process.');
+    }
+
+    /**
+     * Open a scheduled job profile right away (S6.2): clears the schedule and sends E2 now.
+     */
+    public function openNow(Request $request, JobPosting $jobPosting): JsonResponse
+    {
+        if (! $jobPosting->isScheduled()) {
+            return response()->json(['message' => 'This job profile is not scheduled to open later.'], 422);
+        }
+        if ($jobPosting->status !== 'open') {
+            return response()->json(['message' => 'Only a job profile waiting to open can be opened now.'], 422);
+        }
+
+        $before = ['scheduled_open_at' => $jobPosting->scheduled_open_at->toIso8601String()];
+        $jobPosting->update(['scheduled_open_at' => null, 'floated_at' => now()]);
+        $this->audit->log($request, 'posting.open_now', $jobPosting, $before, ['scheduled_open_at' => null]);
+        $this->dispatchFloatMails($jobPosting);
+
+        return response()->json([
+            'message' => 'Job profile opened for applications. Eligible students are being notified.',
+            'posting' => $this->detail($jobPosting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status', 'floatedBy:id,name'])),
+        ]);
     }
 
     public function cancel(Request $request, JobPosting $jobPosting): JsonResponse
     {
-        return $this->transition($request, $jobPosting, 'cancelled', ['open', 'in_process'], 'posting.cancel', 'Posting cancelled.');
+        return $this->transition($request, $jobPosting, 'cancelled', ['open', 'in_process'], 'posting.cancel', 'Job profile cancelled.');
     }
 
     public function reopen(Request $request, JobPosting $jobPosting): JsonResponse
     {
         if ($this->hasAnyResults($jobPosting)) {
-            return response()->json(['message' => 'Results have already been entered for this posting, so it cannot be reopened.'], 422);
+            return response()->json(['message' => 'Results have already been entered for this job profile, so it cannot be reopened.'], 422);
         }
 
         if ($jobPosting->deadlinePassed()) {
-            return response()->json(['message' => 'Extend the application deadline before reopening the posting.'], 422);
+            return response()->json(['message' => 'Extend the application deadline before reopening the job profile.'], 422);
         }
 
-        return $this->transition($request, $jobPosting, 'open', ['in_process'], 'posting.reopen', 'Posting reopened for applications.');
+        return $this->transition($request, $jobPosting, 'open', ['in_process'], 'posting.reopen', 'Job profile reopened for applications.');
     }
 
-    public function export(Request $request, JobPosting $jobPosting, \App\Services\ExportService $exports): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function export(Request $request, JobPosting $jobPosting, \App\Services\ExportService $exports, \App\Services\TemplateExports $templates): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $this->audit->log($request, 'posting.export', $jobPosting, null, ['applications' => $jobPosting->applications()->count()]);
+        $request->validate(['template' => ['nullable', 'integer']]);
+        $template = \App\Services\TemplateExports::find($request->query('template'));
+        $this->audit->log($request, 'posting.export', $jobPosting, null, ['applications' => $jobPosting->applications()->count(), 'template_id' => $template?->id]);
 
-        return $exports->applicantsWorkbook($jobPosting, 'admin');
+        // "Excel - Custom Template" (S3) or today's Default Template.
+        return $template ? $templates->applicants($jobPosting, $template) : $exports->applicantsWorkbook($jobPosting, 'admin');
+    }
+
+    /**
+     * "Download Eligible List" (Superset parity S3.6, admin only): every currently eligible student with Applied /
+     * Not applied, in the default layout or a custom template.
+     */
+    public function exportEligible(Request $request, JobPosting $jobPosting, \App\Services\TemplateExports $templates): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $request->validate(['template' => ['nullable', 'integer']]);
+        $template = \App\Services\TemplateExports::find($request->query('template'));
+        $this->audit->log($request, 'posting.eligible_export', $jobPosting, null, ['template_id' => $template?->id]);
+
+        return $templates->eligible($jobPosting, $template);
     }
 
     /**
@@ -416,7 +524,7 @@ class AdminPostingController extends Controller
         };
         $search = trim((string) ($validated['search'] ?? ''));
         if ($search !== '') {
-            $query->where(fn ($q) => $q->where('roll_no', 'like', "%{$search}%")->orWhere('full_name', 'like', "%{$search}%"));
+            \App\Support\Like::whereContains($query, ['roll_no', 'full_name'], $search); // literal % and _ (fix L28)
         }
 
         $page = $query->orderBy('roll_no')->paginate(50, ['id', 'roll_no', 'full_name', 'programme', 'branch', 'current_cgpa', 'institute_email']);
@@ -440,6 +548,7 @@ class AdminPostingController extends Controller
                 'name' => $validated['name'],
                 'round_type' => $validated['round_type'],
                 'scheduled_at' => Ist::parseOrNull($validated['scheduled_at'] ?? null),
+                'venue' => $validated['venue'] ?? null,
                 'sort_order' => ((int) $jobPosting->rounds()->max('sort_order')) + 1,
                 'status' => 'pending',
                 'is_final' => false,
@@ -451,9 +560,9 @@ class AdminPostingController extends Controller
             return $round;
         });
 
-        $this->audit->log($request, 'round.create', $jobPosting, null, $round->fresh()->only(['id', 'name', 'round_type', 'sort_order', 'scheduled_at', 'is_final']));
+        $this->audit->log($request, 'round.create', $jobPosting, null, $round->fresh()->only(['id', 'name', 'round_type', 'sort_order', 'scheduled_at', 'venue', 'is_final']));
 
-        return response()->json(['message' => 'Round added.', 'rounds' => $jobPosting->rounds()->get()], 201);
+        return response()->json(['message' => 'Stage added.', 'rounds' => $jobPosting->rounds()->get()], 201);
     }
 
     public function updateRound(Request $request, JobPosting $jobPosting, PostingRound $postingRound): JsonResponse
@@ -465,24 +574,24 @@ class AdminPostingController extends Controller
             $this->roundRules()
         ) + ['status' => ['sometimes', 'in:pending,ongoing,completed']]);
 
-        $before = $postingRound->only(['name', 'round_type', 'scheduled_at', 'status', 'is_final']);
+        $before = $postingRound->only(['name', 'round_type', 'scheduled_at', 'venue', 'status', 'is_final']);
 
         DB::transaction(function () use ($jobPosting, $postingRound, $validated): void {
             if (array_key_exists('scheduled_at', $validated)) {
                 $validated['scheduled_at'] = Ist::parseOrNull($validated['scheduled_at']);
             }
-            $postingRound->fill(array_intersect_key($validated, array_flip(['name', 'round_type', 'scheduled_at', 'status'])));
+            $postingRound->fill(array_intersect_key($validated, array_flip(['name', 'round_type', 'scheduled_at', 'venue', 'status'])));
             $postingRound->save();
 
             if (filter_var($validated['is_final'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-                abort_if($jobPosting->rounds()->get()->last()?->id !== $postingRound->id, 422, 'Only the last round can be the final round. Reorder the rounds first.');
+                abort_if($jobPosting->rounds()->get()->last()?->id !== $postingRound->id, 422, 'Only the last stage can be the final stage. Reorder the stages first.');
                 $this->makeFinal($jobPosting, $postingRound);
             }
         });
 
-        $this->audit->log($request, 'round.update', $postingRound, $before, $postingRound->fresh()->only(['name', 'round_type', 'scheduled_at', 'status', 'is_final']));
+        $this->audit->log($request, 'round.update', $postingRound, $before, $postingRound->fresh()->only(['name', 'round_type', 'scheduled_at', 'venue', 'status', 'is_final']));
 
-        return response()->json(['message' => 'Round updated.', 'rounds' => $jobPosting->rounds()->get()]);
+        return response()->json(['message' => 'Stage updated.', 'rounds' => $jobPosting->rounds()->get()]);
     }
 
     public function destroyRound(Request $request, JobPosting $jobPosting, PostingRound $postingRound): JsonResponse
@@ -490,15 +599,15 @@ class AdminPostingController extends Controller
         $this->assertRoundOf($jobPosting, $postingRound);
 
         if ($this->roundHasResults($postingRound)) {
-            return response()->json(['message' => 'This round already has results and cannot be removed.'], 422);
+            return response()->json(['message' => 'This stage already has results and cannot be removed.'], 422);
         }
 
         if ($postingRound->proposals()->where('status', 'pending')->exists()) {
-            return response()->json(['message' => 'This round has pending company proposals. Decide them first.'], 422);
+            return response()->json(['message' => 'This stage has pending company proposals. Decide them first.'], 422);
         }
 
         if ($jobPosting->rounds()->count() <= 1) {
-            return response()->json(['message' => 'A posting needs at least one round.'], 422);
+            return response()->json(['message' => 'A job profile needs at least one stage.'], 422);
         }
 
         $before = $postingRound->only(['id', 'name', 'round_type', 'sort_order', 'is_final']);
@@ -514,7 +623,7 @@ class AdminPostingController extends Controller
 
         $this->audit->log($request, 'round.delete', $jobPosting, $before, null);
 
-        return response()->json(['message' => 'Round removed.', 'rounds' => $jobPosting->rounds()->get()]);
+        return response()->json(['message' => 'Stage removed.', 'rounds' => $jobPosting->rounds()->get()]);
     }
 
     public function reorderRounds(Request $request, JobPosting $jobPosting): JsonResponse
@@ -525,14 +634,14 @@ class AdminPostingController extends Controller
         ]);
 
         if ($this->hasAnyResults($jobPosting, publishedOnly: true)) {
-            return response()->json(['message' => 'Rounds cannot be reordered after results have been published.'], 422);
+            return response()->json(['message' => 'Stages cannot be reordered after results have been published.'], 422);
         }
 
         $ids = $jobPosting->rounds()->pluck('id')->all();
         $ordered = array_map('intval', $validated['ordered_round_ids']);
 
         if (count($ordered) !== count($ids) || array_diff($ids, $ordered) !== []) {
-            return response()->json(['message' => 'Send every round of this posting exactly once.'], 422);
+            return response()->json(['message' => 'Send every stage of this job profile exactly once.'], 422);
         }
 
         $before = $ids;
@@ -547,7 +656,7 @@ class AdminPostingController extends Controller
 
         $this->audit->log($request, 'round.reorder', $jobPosting, ['order' => $before], ['order' => $ordered]);
 
-        return response()->json(['message' => 'Rounds reordered.', 'rounds' => $jobPosting->rounds()->get()]);
+        return response()->json(['message' => 'Stages reordered.', 'rounds' => $jobPosting->rounds()->get()]);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -555,7 +664,7 @@ class AdminPostingController extends Controller
     private function transition(Request $request, JobPosting $posting, string $to, array $from, string $action, string $message): JsonResponse
     {
         if (! in_array($posting->status, $from, true)) {
-            return response()->json(['message' => sprintf('A %s posting cannot be moved to %s.', str_replace('_', ' ', $posting->status), str_replace('_', ' ', $to))], 422);
+            return response()->json(['message' => sprintf('A %s job profile cannot be moved to %s.', str_replace('_', ' ', $posting->status), str_replace('_', ' ', $to))], 422);
         }
 
         $before = ['status' => $posting->status];
@@ -589,7 +698,8 @@ class AdminPostingController extends Controller
     {
         $data = is_array($form->form_data) ? $form->form_data : [];
 
-        return array_intersect_key($data, array_flip(JobPosting::SNAPSHOT_KEYS));
+        // Admin-only keys (fix M2) are never copied from the form: the CDC sets them through its own input.
+        return JobPosting::withoutAdminOnlyKeys(array_intersect_key($data, array_flip(JobPosting::SNAPSHOT_KEYS)));
     }
 
     private function copyRounds(JobPosting $posting, Model $form): void
@@ -607,7 +717,7 @@ class AdminPostingController extends Controller
         foreach ($rounds as $index => $round) {
             $type = array_key_exists($round['type'] ?? '', JobPosting::ROUND_LABELS) ? $round['type'] : 'other';
             $name = $type === 'other'
-                ? (trim((string) ($round['description'] ?? '')) ?: 'Custom Round')
+                ? (trim((string) ($round['description'] ?? '')) ?: 'Custom Stage')
                 : JobPosting::ROUND_LABELS[$type];
 
             $scheduled = null;
@@ -641,6 +751,7 @@ class AdminPostingController extends Controller
         foreach (array_values($questions) as $index => $question) {
             $attributes = [
                 'question' => trim((string) $question['question']),
+                'help_text' => trim((string) ($question['help_text'] ?? '')) ?: null,
                 'qtype' => $question['qtype'],
                 'options' => $question['qtype'] === 'text'
                     ? null
@@ -671,6 +782,7 @@ class AdminPostingController extends Controller
             'questions' => ['sometimes', 'array', 'max:20'],
             'questions.*.id' => ['nullable', 'integer'],
             'questions.*.question' => ['required', 'string', 'max:1000'],
+            'questions.*.help_text' => ['nullable', 'string', 'max:500'],
             'questions.*.qtype' => ['required', 'in:text,mcq_single,mcq_multi'],
             'questions.*.options' => ['nullable', 'array', 'max:20'],
             'questions.*.options.*' => ['nullable', 'string', 'max:255'],
@@ -697,6 +809,16 @@ class AdminPostingController extends Controller
         };
     }
 
+    /** A date-time (IST unless it carries an offset) that is still in the future. */
+    private function futureTime(string $message): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($message): void {
+            if (Ist::parse((string) $value)->isPast()) {
+                $fail($message);
+            }
+        };
+    }
+
     /** @return array<string, array<int, string>> */
     private function roundRules(): array
     {
@@ -704,6 +826,7 @@ class AdminPostingController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'round_type' => ['required', 'in:'.implode(',', array_keys(JobPosting::ROUND_LABELS))],
             'scheduled_at' => ['nullable', 'date'],
+            'venue' => ['nullable', 'string', 'max:255'],
             'is_final' => ['nullable', 'boolean'],
         ];
     }
@@ -720,7 +843,7 @@ class AdminPostingController extends Controller
 
     private function assertRoundOf(JobPosting $posting, PostingRound $round): void
     {
-        abort_if($round->job_posting_id !== $posting->id, 404, 'Round not found.');
+        abort_if($round->job_posting_id !== $posting->id, 404, 'Stage not found.');
     }
 
     private function hasAnyResults(JobPosting $posting, bool $publishedOnly = false): bool
@@ -743,7 +866,9 @@ class AdminPostingController extends Controller
             'application_deadline' => $posting->application_deadline?->toIso8601String(),
             'share_contact_details' => $posting->share_contact_details,
             'offer_type' => $posting->offerType(),
-            'questions' => $posting->questions()->get(['id', 'question', 'qtype', 'options', 'required'])->toArray(),
+            'visit_date' => $posting->visit_date?->toDateString(),
+            'scheduled_open_at' => $posting->scheduled_open_at?->toIso8601String(),
+            'questions' => $posting->questions()->get(['id', 'question', 'help_text', 'qtype', 'options', 'required'])->toArray(),
         ];
     }
 
@@ -767,6 +892,12 @@ class AdminPostingController extends Controller
             'offer_type' => $posting->offerType(),
             'offer_label' => Offer::LABELS[$posting->offerType()] ?? $posting->offerType(),
             'floated_at' => $posting->floated_at,
+            'visit_date' => $posting->visit_date?->toDateString(),
+            'scheduled_open_at' => $posting->scheduled_open_at,
+            'is_scheduled' => $posting->isScheduled(),
+            'any_stage_published' => $posting->relationLoaded('rounds')
+                ? $posting->rounds->contains(fn ($r) => $r->status === 'completed')
+                : $posting->rounds()->where('status', 'completed')->exists(),
             'applied_count' => (int) ($posting->applied_count ?? $posting->applications()->where('status', 'applied')->count()),
             'withdrawn_count' => (int) ($posting->withdrawn_count ?? $posting->applications()->where('status', 'withdrawn')->count()),
         ];

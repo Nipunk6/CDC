@@ -147,7 +147,7 @@ final class BlockingPolicy
     public function describe(string $scope): string
     {
         return $scope === 'all'
-            ? 'As per CDC policy you are now blocked from all further placement and internship opportunities in the placement cycles you are registered for.'
+            ? 'As per CDC policy you are now blocked from all further placement and internship opportunities in the placements you are registered for.'
             : 'As per CDC policy you are now blocked from further internship opportunities; full-time opportunities remain open to you.';
     }
 }

@@ -369,7 +369,10 @@ class S1StudentAccountsTest extends TestCase
         file_put_contents($path, $response->streamedContent());
         $spreadsheet = IOFactory::load($path);
         $header = array_values(array_filter($spreadsheet->getActiveSheet()->toArray()[0], fn ($v) => $v !== null && $v !== ''));
-        $this->assertSame(self::SPEC_COLUMNS, $header);
+        // Superset parity S4.6: the optional academic extras follow the spec columns at the end; S5.6: the headers
+        // are human-readable (with hints) but keep that order.
+        $this->assertSame(array_merge(self::SPEC_COLUMNS, StudentAccountService::IMPORT_EXTRA_COLUMNS), array_keys(StudentAccountService::IMPORT_HEADERS));
+        $this->assertSame(array_values(StudentAccountService::IMPORT_HEADERS), $header);
 
         // Round trip: fill the downloaded template with one student and import it.
         $sheet = $spreadsheet->getActiveSheet();

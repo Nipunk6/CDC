@@ -29,6 +29,19 @@ class SpreadsheetImportService
      */
     public function rows(UploadedFile $file, int $maxRows = self::MAX_ROWS): array
     {
+        return $this->read($file, $maxRows)['rows'];
+    }
+
+    /**
+     * Like rows(), but also returns the non-empty rows past `$maxRows` (keyed the same way) so the caller can report
+     * them instead of dropping them silently (Superset parity S5.7).
+     *
+     * @return array{rows: array<int, list<string>>, overflow: array<int, list<string>>}
+     *
+     * @throws \RuntimeException when the file cannot be parsed
+     */
+    public function read(UploadedFile $file, int $maxRows = self::MAX_ROWS): array
+    {
         $reader = IOFactory::createReader($this->readerType($file));
         $reader->setReadDataOnly(true);
 
@@ -42,6 +55,7 @@ class SpreadsheetImportService
         $spreadsheet->disconnectWorksheets();
 
         $rows = [];
+        $overflow = [];
 
         foreach ($sheet as $index => $cells) {
             $cells = array_map(
@@ -54,14 +68,16 @@ class SpreadsheetImportService
                 continue;
             }
 
-            $rows[$index + 1] = array_values($cells);
-
             if (count($rows) >= $maxRows) {
-                break;
+                $overflow[$index + 1] = array_values($cells);
+
+                continue;
             }
+
+            $rows[$index + 1] = array_values($cells);
         }
 
-        return $rows;
+        return ['rows' => $rows, 'overflow' => $overflow];
     }
 
     /**

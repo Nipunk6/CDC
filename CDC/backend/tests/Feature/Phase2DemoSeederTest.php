@@ -48,7 +48,9 @@ class Phase2DemoSeederTest extends TestCase
         // Running it again changes nothing.
         $this->seed(Phase2DemoSeeder::class);
         $this->assertSame(120, StudentProfile::count());
-        $this->assertSame(2, \App\Models\PlacementCycle::count());
+        // FT, Internship and the S8.3 Draft placement.
+        $this->assertSame(3, \App\Models\PlacementCycle::count());
+        $this->assertSame(1, \App\Models\PlacementCycle::where('is_draft', true)->count());
 
         Mail::assertNothingSent();
         Mail::assertNothingQueued();

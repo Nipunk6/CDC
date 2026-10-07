@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
@@ -29,6 +28,10 @@ import MenuIcon from "@mui/icons-material/Menu";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import NotificationsIcon from "@mui/icons-material/NotificationsNone";
 import { adminApi } from "@/lib/adminapi";
+import StudentSearch from "@/components/admin/studentsearch";
+import AccountMenu from "@/components/admin/accountmenu";
+import BrandLogo from "@/components/shared/brandlogo";
+import { useBranding } from "@/lib/branding";
 
 const handleSignOut = async () => {
   try {
@@ -42,11 +45,11 @@ const handleSignOut = async () => {
 type NavItem = { label: string; href: string; group: string; primary?: boolean };
 
 // `primary` pages sit in the top row from 1024px; everything is in the grouped menu drawer (QA F-024, decision 7).
-const NAV_GROUPS = ["Placement", "Company forms", "Administration"];
+const NAV_GROUPS = ["Placement", "Engagement", "Company forms", "Reports", "Administration"];
 const baseNavItems: NavItem[] = [
   { label: "Dashboard", href: "/admin", group: "Placement", primary: true },
-  { label: "Cycles", href: "/admin/placement-cycles", group: "Placement", primary: true },
-  { label: "Postings", href: "/admin/postings", group: "Placement", primary: true },
+  { label: "Placements", href: "/admin/placement-cycles", group: "Placement", primary: true },
+  { label: "Job Profiles", href: "/admin/postings", group: "Placement", primary: true },
   { label: "Students", href: "/admin/students", group: "Placement", primary: true },
   { label: "Proposals", href: "/admin/proposals", group: "Placement" },
   { label: "Resumes", href: "/admin/resumes", group: "Placement" },
@@ -54,13 +57,17 @@ const baseNavItems: NavItem[] = [
   { label: "Events", href: "/admin/events", group: "Placement" },
   { label: "Calendar", href: "/admin/calendar", group: "Placement" },
   { label: "Analytics", href: "/admin/analytics", group: "Placement" },
+  { label: "Student Categories", href: "/admin/student-categories", group: "Placement" },
+  { label: "Notices", href: "/admin/notices", group: "Engagement" },
+  { label: "Surveys", href: "/admin/surveys", group: "Engagement" },
   { label: "JNF Reviews", href: "/admin/jnfs", group: "Company forms", primary: true },
   { label: "INF Reviews", href: "/admin/infs", group: "Company forms", primary: true },
   { label: "Companies", href: "/admin/companies", group: "Company forms" },
   { label: "Policy Documents", href: "/admin/policy-documents", group: "Company forms" },
   { label: "Alumni Outreach", href: "/admin/alumni-outreach", group: "Company forms" },
+  { label: "Reports", href: "/admin/reports", group: "Reports" },
+  { label: "Excel Templates", href: "/admin/excel-templates", group: "Reports" },
   { label: "Notifications", href: "/admin/notifications", group: "Administration" },
-  { label: "Branch Manager", href: "/admin/programme-branches", group: "Administration" },
   { label: "Audit Log", href: "/admin/audit-logs", group: "Administration" },
   { label: "Settings", href: "/admin/settings", group: "Administration" },
 ];
@@ -82,11 +89,12 @@ export default function AdminShell({
   const { data: session } = useSession();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const branding = useBranding();
 
   const navItems = useMemo(() => {
     const items = [...baseNavItems];
     if (session?.user?.isSuperAdmin) {
-      items.push({ label: "Manage Admins", href: "/admin/manage-admins", group: "Administration" });
+      items.push({ label: "Users", href: "/admin/users", group: "Administration" });
     }
     return items;
   }, [session?.user?.isSuperAdmin]);
@@ -182,7 +190,7 @@ export default function AdminShell({
                 onClick={handleSignOut}
                 sx={{ borderRadius: 1, color: "secondary.main" }}
               >
-                <ListItemText primary="Sign Out" primaryTypographyProps={{ fontWeight: 600 }} />
+                <ListItemText primary="Logout" primaryTypographyProps={{ fontWeight: 600 }} />
               </ListItemButton>
             </ListItem>
           </List>
@@ -223,11 +231,7 @@ export default function AdminShell({
                   justifyContent: "center",
                 }}
               >
-                <img
-                  src="/images/centenary-badge.png"
-                  alt="Centenary Badge"
-                  style={{ objectFit: "contain", width: 32, height: 32 }}
-                />
+                <BrandLogo branding={branding} />
               </Box>
               <Typography
                 component={Link}
@@ -240,8 +244,12 @@ export default function AdminShell({
                   fontSize: { xs: "1rem", sm: "1.25rem" }
                 }}
               >
-                <Box component="span" sx={{ display: { xs: "none", sm: "inline" }, [TIGHT]: { display: "none" } }}>
-                  IIT ISM CDC - Admin Portal
+                <Box
+                  component="span"
+                  title={branding?.display_name ?? undefined}
+                  sx={{ display: { xs: "none", sm: "inline-block" }, [TIGHT]: { display: "none" }, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" }}
+                >
+                  {branding?.display_name ?? "IIT ISM CDC - Admin Portal"}
                 </Box>
                 <Box component="span" sx={{ display: { xs: "inline", sm: "none" }, [TIGHT]: { display: "inline" } }}>
                   CDC Admin
@@ -278,21 +286,16 @@ export default function AdminShell({
                 </Button>
               </Stack>
 
+              <StudentSearch />
+
               <IconButton component={Link} href="/admin/notifications" color="inherit" aria-label="Notifications">
                 <Badge color="error" badgeContent={unreadNotifications} max={99} invisible={unreadNotifications === 0}>
                   <NotificationsIcon />
                 </Badge>
               </IconButton>
 
-              <Button
-                color="secondary"
-                variant="contained"
-                size="small"
-                onClick={handleSignOut}
-                sx={{ display: "none", [ROW]: { display: "inline-flex" }, whiteSpace: "nowrap" }}
-              >
-                Sign Out
-              </Button>
+              {/* Account / Settings / Logout (S8.1) replaces the Logout button; the drawer keeps Logout too. */}
+              <AccountMenu onLogout={handleSignOut} />
             </Stack>
           </Container>
         </Toolbar>

@@ -42,6 +42,24 @@ class StudentProfile extends Model
         'photo_path',
         'linkedin_url',
         'github_url',
+        // S4.6 academic extras (CDC-entered only; never in SELF_EDITABLE)
+        'current_semester',
+        'course_start_date',
+        'course_end_date',
+        'lateral_entry',
+        'tenth_board',
+        'tenth_passing_year',
+        'twelfth_board',
+        'twelfth_passing_year',
+        'previous_degree',
+        'previous_degree_score',
+        'previous_degree_score_type',
+    ];
+
+    /** S4.6: the CDC-entered academic extras, in display/import order. */
+    public const ACADEMIC_EXTRAS = [
+        'current_semester', 'course_start_date', 'course_end_date', 'lateral_entry', 'tenth_board', 'tenth_passing_year',
+        'twelfth_board', 'twelfth_passing_year', 'previous_degree', 'previous_degree_score', 'previous_degree_score_type',
     ];
 
     /**
@@ -76,6 +94,13 @@ class StudentProfile extends Model
             'tenth_percent' => 'decimal:2',
             'twelfth_percent' => 'decimal:2',
             'pwd' => 'boolean',
+            'current_semester' => 'integer',
+            'course_start_date' => 'date:Y-m-d',
+            'course_end_date' => 'date:Y-m-d',
+            'lateral_entry' => 'boolean',
+            'tenth_passing_year' => 'integer',
+            'twelfth_passing_year' => 'integer',
+            'previous_degree_score' => 'decimal:2',
         ];
     }
 
@@ -114,8 +139,20 @@ class StudentProfile extends Model
         return $this->hasMany(PlacementBlock::class);
     }
 
+    /** CDC-assigned Student Categories (S8.4). */
+    public function studentCategories(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(StudentCategory::class, 'student_category_student')->withPivot('assigned_by')->withTimestamps();
+    }
+
     public function branchChangeRequests(): HasMany
     {
         return $this->hasMany(BranchChangeRequest::class);
+    }
+
+    /** Admin-only internal notes (S4.5): never load this into a student or company payload. */
+    public function adminNotes(): HasMany
+    {
+        return $this->hasMany(StudentNote::class);
     }
 }

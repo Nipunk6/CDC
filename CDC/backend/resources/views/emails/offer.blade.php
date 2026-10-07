@@ -8,7 +8,7 @@
     <table role="presentation" cellpadding="6" style="border-collapse:collapse;margin:12px 0;">
         <tr><td style="color:#6b7280;">Offer type</td><td><strong>{{ $offerLabel }}</strong></td></tr>
         @if ($compensation)
-            <tr><td style="color:#6b7280;">Compensation</td><td><strong>{{ $compensation }}</strong></td></tr>
+            <tr><td style="color:#6b7280;">CTC Offered</td><td><strong>{{ $compensation }}</strong></td></tr>
         @endif
     </table>
     @if ($blockNote)

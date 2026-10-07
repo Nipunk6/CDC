@@ -32,6 +32,12 @@ class User extends Authenticatable
         'is_super_admin',
         'is_active',
         'company_id',
+        'first_name',
+        'middle_name',
+        'last_name',
+        'designation',
+        'mobile',
+        'alias',
     ];
 
     /**
@@ -56,7 +62,25 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
             'is_active' => 'boolean',
+            'invited_at' => 'datetime',
+            'last_invited_at' => 'datetime',
+            'invite_count' => 'integer',
+            'activated_at' => 'datetime',
+            'invite_revoked_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Invitation status of a student account (S5): `accepted` once a password was set, `revoked` when the CDC
+     * cancelled the link before that, otherwise `sent`.
+     */
+    public function invitationStatus(): string
+    {
+        if ($this->activated_at !== null) {
+            return 'accepted';
+        }
+
+        return $this->invite_revoked_at !== null ? 'revoked' : 'sent';
     }
 
     public function company(): BelongsTo

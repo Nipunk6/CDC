@@ -554,7 +554,8 @@ class S9DashboardsTest extends TestCase
 
     public function test_T9_4_season_report_is_not_built(): void
     {
-        $routes = collect(app('router')->getRoutes()->getRoutes())->map->uri()->filter(fn ($u) => str_contains(strtolower($u), 'season') || str_contains(strtolower($u), 'report'));
+        $routes = collect(app('router')->getRoutes()->getRoutes())->map->uri()->filter(fn ($u) => str_contains(strtolower($u), 'season'));
+        // Placement reports and student reports exist since Superset parity S4/S8 (D111); only a season report stays out.
         $this->assertCount(0, $routes, 'season report is out of scope (spec Q9.4): '.$routes->implode(', '));
 
         $hits = [];

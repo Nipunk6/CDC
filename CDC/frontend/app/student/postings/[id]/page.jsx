@@ -21,7 +21,9 @@ import ApplyPanel from "@/components/student/applypanel";
 import RoundTrail from "@/components/student/roundtrail";
 import PostingPreview from "@/components/shared/postingpreview";
 import { compensationText } from "@/components/student/postingcard";
-import { studentApi } from "@/lib/studentapi";
+import { studentApi, studentBlobUrl } from "@/lib/studentapi";
+import { formatDate } from "@/lib/format";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 
 export default function StudentPostingDetailPage({ params }) {
   const { id } = use(params);
@@ -50,6 +52,11 @@ export default function StudentPostingDetailPage({ params }) {
 
   return (
     <Stack spacing={3}>
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
       <Box>
         <Button component={Link} href="/student/postings" startIcon={<ArrowBackIcon />} sx={{ mb: 1 }}>
           Job Profiles
@@ -74,6 +81,7 @@ export default function StudentPostingDetailPage({ params }) {
                   <Chip size="small" sx={{ bgcolor: "white" }} label={posting.offer_label ?? (posting.type === "fulltime" ? "Full Time" : "Internship")} />
                   {compensationText(posting.compensation) && <Chip size="small" sx={{ bgcolor: "white" }} label={compensationText(posting.compensation)} />}
                   {posting.location && <Chip size="small" sx={{ bgcolor: "white" }} label={posting.location} />}
+                  {posting.visit_date && <Chip size="small" sx={{ bgcolor: "white" }} label={`Date of visit: ${formatDate(posting.visit_date)}`} />}
                 </Stack>
               </Box>
             </Stack>
@@ -98,6 +106,36 @@ export default function StudentPostingDetailPage({ params }) {
                     Your progress
                   </Typography>
                   <RoundTrail trail={posting.trail} status={posting.application.status} />
+                </CardContent>
+              </Card>
+            )}
+            {posting.documents?.length > 0 && (
+              <Card>
+                <CardContent>
+                  <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                    Attached Documents
+                  </Typography>
+                  <Stack spacing={1}>
+                    {posting.documents.map((doc) => (
+                      <Button
+                        key={doc.id}
+                        variant="outlined"
+                        startIcon={<PictureAsPdfIcon />}
+                        sx={{ justifyContent: "flex-start", textTransform: "none" }}
+                        onClick={async () => {
+                          try {
+                            const url = await studentBlobUrl(`/student/postings/${posting.id}/documents/${doc.id}`);
+                            window.open(url, "_blank", "noopener");
+                            setTimeout(() => URL.revokeObjectURL(url), 60000);
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Could not open the document.");
+                          }
+                        }}
+                      >
+                        {doc.title}
+                      </Button>
+                    ))}
+                  </Stack>
                 </CardContent>
               </Card>
             )}

@@ -22,6 +22,7 @@ class PlacementCycle extends Model
         'starts_on',
         'ends_on',
         'status',
+        'is_draft',
         'allowed_programmes',
         'description',
         'created_by',
@@ -38,6 +39,7 @@ class PlacementCycle extends Model
             'starts_on' => 'date',
             'ends_on' => 'date',
             'allowed_programmes' => 'array',
+            'is_draft' => 'boolean',
         ];
     }
 
@@ -49,6 +51,16 @@ class PlacementCycle extends Model
     public function enrollments(): HasMany
     {
         return $this->hasMany(CycleEnrollment::class);
+    }
+
+    /**
+     * Placements students may see (S8.3): a Draft placement is hidden from them everywhere until it is published.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<PlacementCycle>  $query
+     */
+    public function scopeVisibleToStudents(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        $query->where('is_draft', false);
     }
 
     public function isOpen(): bool

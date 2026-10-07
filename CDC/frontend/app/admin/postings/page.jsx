@@ -6,6 +6,7 @@ import {
   Alert,
   Avatar,
   Box,
+  Button,
   Card,
   CardActionArea,
   CardContent,
@@ -17,18 +18,22 @@ import {
   Paper,
   Select,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import WorkIcon from "@mui/icons-material/Work";
+import AddIcon from "@mui/icons-material/Add";
 
 import PageHeader from "@/components/shared/pageheader";
 import { adminApi } from "@/lib/adminapi";
-import { formatDateTime, statusColor, titleCase } from "@/lib/format";
+import { formatDate, formatDateTime, postingStatusLabel, statusColor } from "@/lib/format";
 
 export default function AdminPostingsPage() {
   const [cycles, setCycles] = useState([]);
   const [cycleId, setCycleId] = useState("");
   const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
+  const [term, setTerm] = useState("");
   const [postings, setPostings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,34 +44,51 @@ export default function AdminPostingsPage() {
       .catch(() => setCycles([]));
   }, []);
 
-  const load = useCallback(async (cycle, currentStatus) => {
+  useEffect(() => {
+    const timer = setTimeout(() => setTerm(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const load = useCallback(async (cycle, currentStatus, currentTerm) => {
     setLoading(true);
     try {
       const query = new URLSearchParams();
       if (cycle) query.set("cycle_id", cycle);
       if (currentStatus) query.set("status", currentStatus);
+      if (currentTerm) query.set("search", currentTerm);
       const response = await adminApi(`/admin/postings?${query.toString()}`);
       setPostings(response.postings ?? []);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load postings.");
+      setError(e instanceof Error ? e.message : "Failed to load job profiles.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load(cycleId, status);
-  }, [load, cycleId, status]);
+    void load(cycleId, status, term);
+  }, [load, cycleId, status, term]);
 
   return (
     <>
       <PageHeader
         icon={<WorkIcon />}
-        title="Job Postings"
-        subtitle={`${postings.length} posting(s) floated to students. Float new ones from an accepted JNF/INF.`}
+        title="Job Profiles"
+        subtitle={loading ? "Loading job profiles…" : `${postings.length} job profile(s) opened for applications. Open new ones from an accepted JNF/INF.`}
         backHref="/admin"
         backLabel="Back to Dashboard"
+        actions={
+          <Button
+            component={Link}
+            href={cycleId ? `/admin/postings/new?cycle=${cycleId}` : "/admin/postings/new"}
+            variant="contained"
+            startIcon={<AddIcon />}
+            sx={{ bgcolor: "common.white", color: "primary.main", "&:hover": { bgcolor: "grey.100" } }}
+          >
+            Add New Job
+          </Button>
+        }
       />
 
       {error && (
@@ -77,10 +99,11 @@ export default function AdminPostingsPage() {
 
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <TextField size="small" label="Search company or profile" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: { sm: 260 } }} />
           <FormControl size="small" sx={{ minWidth: 240 }}>
-            <InputLabel id="p-cycle">Placement cycle</InputLabel>
-            <Select labelId="p-cycle" label="Placement cycle" value={cycleId} onChange={(e) => setCycleId(e.target.value)}>
-              <MenuItem value="">All cycles</MenuItem>
+            <InputLabel id="p-cycle">Placement</InputLabel>
+            <Select labelId="p-cycle" label="Placement" value={cycleId} onChange={(e) => setCycleId(e.target.value)}>
+              <MenuItem value="">All placements</MenuItem>
               {cycles.map((cycle) => (
                 <MenuItem key={cycle.id} value={String(cycle.id)}>
                   {cycle.name}
@@ -94,7 +117,7 @@ export default function AdminPostingsPage() {
               <MenuItem value="">All</MenuItem>
               {["open", "in_process", "completed", "cancelled"].map((s) => (
                 <MenuItem key={s} value={s}>
-                  {titleCase(s)}
+                  {postingStatusLabel(s)}
                 </MenuItem>
               ))}
             </Select>
@@ -106,7 +129,7 @@ export default function AdminPostingsPage() {
       {!loading && postings.length === 0 && (
         <Paper sx={{ p: 5, textAlign: "center" }}>
           <Typography color="text.secondary">
-            No postings yet. Open an accepted JNF or INF and use <strong>Float to Students</strong>.
+            No job profiles yet. Open an accepted JNF or INF and use <strong>Open Profile for Applications</strong>.
           </Typography>
         </Paper>
       )}
@@ -127,7 +150,7 @@ export default function AdminPostingsPage() {
                       </Typography>
                       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
                         <Chip size="small" variant="outlined" color={posting.type === "fulltime" ? "primary" : "secondary"} label={`${posting.form_type.toUpperCase()} · ${posting.type === "fulltime" ? "Full Time" : "Internship"}`} />
-                        <Chip size="small" variant="outlined" color={statusColor(posting.status)} label={titleCase(posting.status)} />
+                        <Chip size="small" variant="outlined" color={statusColor(posting.status)} label={postingStatusLabel(posting)} />
                         <Chip size="small" variant="outlined" label={posting.placement_cycle?.name} />
                       </Stack>
                     </Box>
@@ -138,7 +161,15 @@ export default function AdminPostingsPage() {
                         {posting.applied_count}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Applied
+                        Applicants
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Date of Visit
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        {posting.visit_date ? formatDate(posting.visit_date) : "—"}
                       </Typography>
                     </Box>
                     <Box>

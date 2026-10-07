@@ -55,8 +55,8 @@ class S3EligibilityApplyTest extends TestCase
         'FEMALE' => [true, []],
         'OTHERBRANCH' => [false, ['/branch is not eligible/i']],
         'WRONGBATCH' => [false, ['/2027.*batch|batch.*2027/i']],
-        'LOW10TH' => [false, ['/10th.*55(\.0+)?\D.*60/']],
-        'LOW12TH' => [false, ['/12th.*55(\.0+)?\D.*60/']],
+        'LOW10TH' => [false, ['/Class X percentage.*55(\.0+)?\D.*60/']],
+        'LOW12TH' => [false, ['/Class XII percentage.*55(\.0+)?\D.*60/']],
         'NOTENROLLED' => [false, ['/not enrolled/i']],
         'SUSPENDED' => [false, ['/suspended/i']],
         'DEBARRED' => [false, ['/debarred/i']],
@@ -397,7 +397,7 @@ class S3EligibilityApplyTest extends TestCase
         // Non-accepted forms.
         foreach (['draft', 'submitted', 'under_review', 'rejected'] as $status) {
             $this->float($this->jnf(null, null, $status, "Form {$status}"))->assertStatus(422)
-                ->assertJsonPath('message', 'Only accepted forms can be floated to students.');
+                ->assertJsonPath('message', 'Only accepted forms can be opened for applications.');
         }
 
         // Closed cycle.
@@ -419,7 +419,7 @@ class S3EligibilityApplyTest extends TestCase
         $this->getJson("/api/student/postings/{$posting->id}")->assertOk();
 
         // Floating twice.
-        $this->float($jnf)->assertStatus(422)->assertJsonPath('message', 'This form has already been floated.');
+        $this->float($jnf)->assertStatus(422)->assertJsonPath('message', 'This form has already been opened for applications.');
         $this->assertSame(1, JobPosting::count());
     }
 

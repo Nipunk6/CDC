@@ -49,6 +49,8 @@ interface DeclarationChecklistProps {
     resultsViaCdc: boolean;
   };
   onDeclarationsChange: (declarations: DeclarationChecklistProps["declarations"]) => void;
+  api?: <T>(path: string, init?: RequestInit) => Promise<T>;
+  apiPrefix?: string;
 }
 
 const declarationTexts = {
@@ -65,6 +67,8 @@ export default function DeclarationChecklist({
   draftId,
   declarations,
   onDeclarationsChange,
+  api = companyApi,
+  apiPrefix = "/company",
 }: DeclarationChecklistProps) {
   const [documents, setDocuments] = useState<PolicyDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +109,7 @@ export default function DeclarationChecklist({
   useEffect(() => {
     const fetchDocs = async () => {
       try {
-        const data = await companyApi<PolicyDocument[]>(`/company/policy-documents?form_type=${formType}`);
+        const data = await api<PolicyDocument[]>(`${apiPrefix}/policy-documents?form_type=${formType}`);
         setDocuments(data);
       } catch (err) {
         console.error("Failed to load policy documents:", err);
@@ -114,7 +118,7 @@ export default function DeclarationChecklist({
       }
     };
     void fetchDocs();
-  }, [formType]);
+  }, [formType, api, apiPrefix]);
 
   const toggleDeclaration = (key: keyof typeof declarations) => {
     onDeclarationsChange({ ...declarations, [key]: !declarations[key] });

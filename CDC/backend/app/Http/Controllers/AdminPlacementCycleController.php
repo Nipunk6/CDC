@@ -9,7 +9,7 @@ use App\Services\AuditService;
 use App\Services\BlockingPolicy;
 use App\Services\SpreadsheetImportService;
 use App\Support\ProgrammeCatalogue;
-use Illuminate\Database\Eloquent\Builder;
+use App\Support\StudentDirectoryFilters;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -68,19 +68,21 @@ class AdminPlacementCycleController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate($this->rules());
+        // "Save as draft" (S8.3): a draft placement is hidden from students until it is published.
+        $validated = $request->validate($this->rules() + ['is_draft' => ['sometimes', 'boolean']]);
 
         $cycle = PlacementCycle::create($validated + [
             'status' => 'open',
+            'is_draft' => false,
             'created_by' => $request->user()?->id,
         ]);
 
         $this->audit->log($request, 'cycle.create', $cycle, null, $cycle->only([
-            'name', 'type', 'starts_on', 'ends_on', 'status', 'allowed_programmes', 'description',
+            'name', 'type', 'starts_on', 'ends_on', 'status', 'is_draft', 'allowed_programmes', 'description',
         ]));
 
         return response()->json([
-            'message' => 'Placement cycle created successfully.',
+            'message' => 'Placement created successfully.',
             'placement_cycle' => $this->cyclePayload($cycle->loadCount('enrollments')),
         ], 201);
     }
@@ -100,7 +102,24 @@ class AdminPlacementCycleController extends Controller
         $this->audit->log($request, 'cycle.update', $placementCycle, $before, $placementCycle->only($tracked));
 
         return response()->json([
-            'message' => 'Placement cycle updated successfully.',
+            'message' => 'Placement updated successfully.',
+            'placement_cycle' => $this->cyclePayload($placementCycle->fresh()->loadCount('enrollments')),
+        ]);
+    }
+
+    /** "Publish placement" (S8.3): a draft becomes visible to its enrolled students and can take job profiles. */
+    public function publish(Request $request, PlacementCycle $placementCycle): JsonResponse
+    {
+        if (! $placementCycle->is_draft) {
+            return response()->json(['message' => 'This placement is already published.'], 422);
+        }
+
+        $placementCycle->update(['is_draft' => false]);
+
+        $this->audit->log($request, 'cycle.publish', $placementCycle, ['is_draft' => true], ['is_draft' => false]);
+
+        return response()->json([
+            'message' => 'Placement published. Its enrolled students can now see it.',
             'placement_cycle' => $this->cyclePayload($placementCycle->fresh()->loadCount('enrollments')),
         ]);
     }
@@ -109,7 +128,7 @@ class AdminPlacementCycleController extends Controller
     {
         if (! $placementCycle->isOpen()) {
             return response()->json([
-                'message' => 'This placement cycle is already closed.',
+                'message' => 'This placement is already closed.',
             ], 422);
         }
 
@@ -118,26 +137,40 @@ class AdminPlacementCycleController extends Controller
         $this->audit->log($request, 'cycle.close', $placementCycle, ['status' => 'open'], ['status' => 'closed']);
 
         return response()->json([
-            'message' => 'Placement cycle closed.',
+            'message' => 'Placement closed.',
             'placement_cycle' => $this->cyclePayload($placementCycle->fresh()->loadCount('enrollments')),
         ]);
     }
 
-    public function exportStudents(Request $request, PlacementCycle $placementCycle, \App\Services\ExportService $exports): \Symfony\Component\HttpFoundation\StreamedResponse
+    /**
+     * "Download as Excel" of the enrolled list (S4.4, M5): the same filters as enrollments(), with the default columns
+     * or `?template=<id>`. Without filters every enrolment is exported, exactly as before.
+     */
+    public function exportStudents(Request $request, PlacementCycle $placementCycle, \App\Services\ExportService $exports, \App\Services\TemplateExports $templates): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $this->audit->log($request, 'cycle.export', $placementCycle, null, ['enrolled' => $placementCycle->enrollments()->count()]);
+        $validated = $request->validate(StudentDirectoryFilters::enrollmentRules() + ['template' => ['nullable', 'integer']]);
+        $template = \App\Services\TemplateExports::find($validated['template'] ?? null);
+        $filters = StudentDirectoryFilters::active($validated);
+        $narrow = $filters === [] ? null : fn ($enrollments) => StudentDirectoryFilters::applyToEnrollments($enrollments, $filters, $placementCycle->id);
 
-        return $exports->studentsWorkbook($placementCycle);
+        $this->audit->log($request, 'cycle.export', $placementCycle, null, [
+            'enrolled' => $placementCycle->enrollments()->count(),
+            'count' => $placementCycle->enrollments()->when($narrow !== null, fn ($query) => $narrow($query))->count(),
+            'filters' => $filters,
+            'template_id' => $template?->id,
+        ]);
+
+        return $template ? $templates->cycleStudents($placementCycle, $template, $narrow) : $exports->studentsWorkbook($placementCycle, $narrow);
     }
 
     /**
-     * Paginated list of the students enrolled in this cycle.
+     * Paginated list of the students enrolled in this cycle, with the student list's Apply Filters (S4.1).
+     * `status` here is the enrolment status; Placement and Blocked Status look at this placement unless
+     * `cycle_id` names another.
      */
     public function enrollments(Request $request, PlacementCycle $placementCycle): JsonResponse
     {
-        $validated = $request->validate([
-            'search' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', 'in:active,suspended'],
+        $validated = $request->validate(StudentDirectoryFilters::enrollmentRules() + [
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
@@ -145,20 +178,8 @@ class AdminPlacementCycleController extends Controller
             ->with('studentProfile')
             ->orderBy('id');
 
-        if (! empty($validated['status'])) {
-            $query->where('status', $validated['status']);
-        }
-
-        $search = trim((string) ($validated['search'] ?? ''));
-
-        if ($search !== '') {
-            $query->whereHas('studentProfile', function (Builder $student) use ($search): void {
-                $student->where('roll_no', 'like', "%{$search}%")
-                    ->orWhere('full_name', 'like', "%{$search}%")
-                    ->orWhere('branch', 'like', "%{$search}%")
-                    ->orWhere('programme', 'like', "%{$search}%");
-            });
-        }
+        // Shared with exportStudents(), so "Download as Excel" holds exactly the students listed here.
+        StudentDirectoryFilters::applyToEnrollments($query, $validated, $placementCycle->id);
 
         $page = $query->paginate(self::PER_PAGE);
 
@@ -170,6 +191,34 @@ class AdminPlacementCycleController extends Controller
                 'per_page' => $page->perPage(),
                 'total' => $page->total(),
             ],
+        ]);
+    }
+
+    /**
+     * Suspend or reactivate one enrolment (S4.8, D88(c)). A suspended enrolment makes the student ineligible for
+     * every job profile of this placement (EligibilityService rule 1); their history here is kept.
+     */
+    public function updateEnrollment(Request $request, PlacementCycle $placementCycle, CycleEnrollment $enrollment): JsonResponse
+    {
+        abort_if((int) $enrollment->placement_cycle_id !== (int) $placementCycle->id, 404);
+
+        $validated = $request->validate(['status' => ['required', 'in:active,suspended']]);
+
+        $before = $enrollment->only(['student_profile_id', 'status']);
+        if ($before['status'] === $validated['status']) {
+            return response()->json([
+                'message' => $validated['status'] === 'active' ? 'This student is already enrolled.' : 'This enrolment is already suspended.',
+                'enrollment' => $enrollment->load('studentProfile'),
+            ]);
+        }
+
+        $enrollment->update(['status' => $validated['status']]);
+
+        $this->audit->log($request, 'cycle.enrollment_status', $enrollment, $before, $enrollment->only(['student_profile_id', 'status']));
+
+        return response()->json([
+            'message' => $validated['status'] === 'active' ? 'Enrolment reactivated.' : 'Enrolment suspended. The student cannot apply to this placement\'s job profiles.',
+            'enrollment' => $enrollment->load('studentProfile'),
         ]);
     }
 
@@ -297,7 +346,7 @@ class AdminPlacementCycleController extends Controller
             ->first();
 
         if (! $enrollment) {
-            return response()->json(['message' => 'This student is not enrolled in this cycle.'], 404);
+            return response()->json(['message' => 'This student is not enrolled in this placement.'], 404);
         }
 
         // Keep placement history consistent: someone with an offer or applications here stays enrolled (suspend instead).
@@ -305,7 +354,7 @@ class AdminPlacementCycleController extends Controller
             || \App\Models\Application::query()->where('student_profile_id', $studentProfile->id)
                 ->whereHas('jobPosting', fn ($q) => $q->where('placement_cycle_id', $placementCycle->id))->exists();
         if ($hasActivity) {
-            return response()->json(['message' => 'This student has applications or offers in this cycle and cannot be removed.'], 422);
+            return response()->json(['message' => 'This student has applications or offers in this placement and cannot be removed.'], 422);
         }
 
         $before = $enrollment->only(['placement_cycle_id', 'student_profile_id', 'status']);
@@ -313,7 +362,7 @@ class AdminPlacementCycleController extends Controller
 
         $this->audit->log($request, 'cycle.unenroll', $placementCycle, $before, null);
 
-        return response()->json(['message' => 'Student removed from this placement cycle.']);
+        return response()->json(['message' => 'Student removed from this placement.']);
     }
 
     /**
@@ -372,6 +421,7 @@ class AdminPlacementCycleController extends Controller
             'starts_on' => $cycle->starts_on?->toDateString(),
             'ends_on' => $cycle->ends_on?->toDateString(),
             'status' => $cycle->status,
+            'is_draft' => (bool) $cycle->is_draft,
             'allowed_programmes' => $cycle->allowed_programmes ?? [],
             'enrolled_students_count' => (int) ($cycle->enrollments_count ?? 0),
             'postings_count' => $this->relatedCount('job_postings', $cycle->id),

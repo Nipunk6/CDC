@@ -680,8 +680,8 @@ export default function AdminJnfDetailPage() {
                   <TextField fullWidth size="small" label="Gender Preference" value={editFormData.genderFilter ?? ""} onChange={(e) => updateEditField("genderFilter", e.target.value)} />
                   <TextField fullWidth size="small" label="SLP Requirement" value={editFormData.slpRequirement ?? ""} onChange={(e) => updateEditField("slpRequirement", e.target.value)} />
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                    <TextField fullWidth size="small" type="number" label="Min 10th % (blank = none)" value={editFormData.minTenthPercent ?? ""} onChange={(e) => updateEditField("minTenthPercent", e.target.value)} />
-                    <TextField fullWidth size="small" type="number" label="Min 12th % (blank = none)" value={editFormData.minTwelfthPercent ?? ""} onChange={(e) => updateEditField("minTwelfthPercent", e.target.value)} />
+                    <TextField fullWidth size="small" type="number" label="Min Class X Percentage (blank = none)" value={editFormData.minTenthPercent ?? ""} onChange={(e) => updateEditField("minTenthPercent", e.target.value)} />
+                    <TextField fullWidth size="small" type="number" label="Min Class XII Percentage (blank = none)" value={editFormData.minTwelfthPercent ?? ""} onChange={(e) => updateEditField("minTwelfthPercent", e.target.value)} />
                   </Stack>
                   <Typography variant="subtitle2" mt={1}>Eligible Branches</Typography>
                   {(editFormData.eligibility ?? formData.eligibility ?? []).map((prog, pIdx) => (

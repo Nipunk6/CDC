@@ -64,7 +64,7 @@ class SendPostingFloatedMails implements ShouldQueue
 
         $sent = [];
         try {
-            $query->chunkById($mail->batchSize(), function ($students) use ($mail, $notifications, $mailable, $company, $title, $typeLabel, $deadline, &$sent): void {
+            $query->chunkById($mail->batchSize(), function ($students) use ($mail, $notifications, $mailable, $company, $title, $typeLabel, $deadline, $posting, &$sent): void {
                 /** @var StudentProfile $student */
                 foreach ($students as $student) {
                     $notifications->createInAppNotification(
@@ -75,7 +75,7 @@ class SendPostingFloatedMails implements ShouldQueue
                     );
                 }
 
-                $mail->sendBulk($students->pluck('user'), $mailable, $mailable->envelope()->subject, 'emails.posting-floated');
+                $mail->sendBulk($students->pluck('user'), $mailable, $mailable->envelope()->subject, 'emails.posting-floated', ['job_posting_id' => $posting->id, 'kind' => 'opening']);
                 array_push($sent, ...$students->pluck('id')->map(fn ($id) => (int) $id)->all());
             }, 'student_profiles.id', 'id');
         } finally {

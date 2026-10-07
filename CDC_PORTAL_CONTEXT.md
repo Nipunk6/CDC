@@ -8,7 +8,7 @@ This file gathers everything needed to continue work on the IIT (ISM) Dhanbad CD
 - current status, open items and the owner's working rules;
 - the style the owner wants for documents written for the professor.
 
-Last updated: 2026-10-06 (eligibility editing after floating added).
+Last updated: 2026-10-07 (Superset parity round and its verification fixes, D105–D125).
 
 ---
 
@@ -220,6 +220,13 @@ These come from the owner's answered questionnaire, saved in the repo as `SETUP_
 - When eligibility changes, the CDC can reopen applications (or move the deadline) until a chosen time, so everyone eligible under the new criteria can apply. This is the default when applications were already closed. It is not possible once any results have been entered or when the cycle is closed (D104).
 - "Email newly eligible students" is on by default: the usual new-opening mail goes only to students who were not eligible before and are now, while applications are open. When applications are reopened, it goes to every eligible student who was never told about the drive. Applicants and anyone already told are never mailed again.
 - The job board, drive page, hidden-branch rule, calendar, dashboard nudge, admin Eligible tab and counts all follow the new criteria automatically.
+
+### Superset parity verification fixes (2026-10-07, D119–D125)
+- **Reconcile Ineligible Students** (owner decision B2-11): on each stage's shortlist page the CDC can re-check that stage's students against the job profile's current eligibility, blocks and debarments, see the reasons (also as Excel), and mark the chosen ones as rejected in that stage with the regret mail. It is the only place where "applicants keep their applications when eligibility changes" is overridden, and only when the CDC runs it. Offer holders and students already decided in the stage are never touched.
+- **Allowed Student Categories** are set only by the CDC (open dialog, Edit eligibility); a company's form can never add or change them.
+- **Surveys:** saving a survey keeps each question's identity, so a student who has the form open never loses answers; if a survey changed while a student was answering, the student is asked to reload instead of having answers dropped. With "Allow multiple submission" off, a second simultaneous first response is refused.
+- **Notices and surveys for students** are listed 20 per page and always include every item addressed to that student, however many other notices exist; the unread count covers all of them.
+- **Offer edits:** a block the CDC lifted by hand never comes back when an offer's type is changed, unless the CDC explicitly chooses to bring it back.
 
 ---
 
@@ -524,13 +531,18 @@ The requirement analysis report (`Requirement_Analysis_Report.docx`) went throug
 
 - **CDC:** Career Development Centre.
 - **JNF / INF:** Job / Internship Notification Form.
-- **Cycle:** a placement season.
-- **Drive, posting or float:** an accepted JNF or INF published to students.
-- **Round:** a selection stage.
-- **Shortlist:** students who cleared a round.
-- **Waitlist:** students held in reserve, unordered.
-- **Addendum:** students added after a round was published.
+UI wording follows Superset since D105 (labels only; code, routes and database names keep the old words, shown in brackets).
+- **Placement** (code: cycle, `placement_cycles`): a placement season.
+- **Job Profile** (code: drive, posting, `job_postings`): an accepted JNF or INF published to students. **Open for Applications** (code: float) is the act of publishing it. Its status shows as Accepting Applications, Closed For Applications, In Process, Completed or Cancelled.
+- **Stage** (code: round, `posting_rounds`): a selection step.
+- **Shortlisted:** students who cleared a non-final stage; the final stage says Selected.
+- **On Hold** (code: waitlist, `waitlisted`): students held in reserve at a stage, unordered.
+- **Progress Grid** (code: pipeline): the all-stages grid on a job profile.
+- **Shortlist for Offer** (code: results console): where final selections and offers are announced.
+- **Enrolled** (code: enrolment status `active`): a student taking part in a placement.
+- **Addendum:** students added after a stage was published.
 - **Re-add:** bringing back a rejected student, admin only.
+- **Users:** the admin accounts page (formerly Manage Admins). **Social Category:** GEN/OBC/SC/ST/EWS, kept distinct from Superset's Student Categories.
 - **PPO:** Pre-Placement Offer.
 - **CTC:** annual compensation.
 - **Block:** a placement restriction after an offer.

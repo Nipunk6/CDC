@@ -20,7 +20,7 @@ class StudentPostingController extends Controller
     }
 
     /**
-     * Every non-cancelled posting in the student's active cycles that is open to their branch, with their own
+     * Every non-cancelled posting in the student's cycles that is open to their branch, with their own
      * eligibility (spec Q3.2; branch rule: owner decision 2026-10-01).
      */
     public function index(Request $request): JsonResponse
@@ -94,7 +94,7 @@ class StudentPostingController extends Controller
         $application = $student->applications()->where('job_posting_id', $jobPosting->id)->first();
 
         if (! $this->visibleQuery($student)->whereKey($jobPosting->id)->exists() || ! $this->shownTo($student, $jobPosting, $application !== null)) {
-            return response()->json(['message' => 'Posting not found.'], 404);
+            return response()->json(['message' => 'Job profile not found.'], 404);
         }
 
         $jobPosting->load(['postable.company:id,name,logo_path,sector,website', 'placementCycle:id,name,type,status', 'rounds', 'questions']);
@@ -105,7 +105,8 @@ class StudentPostingController extends Controller
                 'form_data' => PostingPresenter::formData($jobPosting),
                 'company_website' => $jobPosting->company()?->website,
                 'rounds' => $jobPosting->rounds->map->only(['id', 'name', 'round_type', 'sort_order', 'scheduled_at', 'status', 'is_final'])->values(),
-                'questions' => $jobPosting->questions->map->only(['id', 'question', 'qtype', 'options', 'required'])->values(),
+                'questions' => $jobPosting->questions->map->only(['id', 'question', 'help_text', 'qtype', 'options', 'required'])->values(),
+                'documents' => $jobPosting->documents()->get(['id', 'title', 'file_size'])->map->only(['id', 'title', 'file_size'])->values(),
                 'eligibility' => $this->eligibility->check($student, $jobPosting),
                 'application' => PostingPresenter::application($application),
                 'trail' => PostingPresenter::trail($jobPosting, $application),
@@ -113,14 +114,32 @@ class StudentPostingController extends Controller
         ]);
     }
 
-    /** Postings floated into cycles the student is actively enrolled in (cancelled ones hidden). */
+    /**
+     * Attached Documents (S6.4): a student who can see the job profile can download its PDFs.
+     */
+    public function document(Request $request, JobPosting $jobPosting, \App\Models\PostingDocument $postingDocument): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $student = $this->student($request);
+        abort_if($postingDocument->job_posting_id !== $jobPosting->id, 404, 'Document not found.');
+        $hasApplication = $student->applications()->where('job_posting_id', $jobPosting->id)->exists();
+        abort_if(! $this->visibleQuery($student)->whereKey($jobPosting->id)->exists() || ! $this->shownTo($student, $jobPosting, $hasApplication), 404, 'Job profile not found.');
+
+        return $postingDocument->stream();
+    }
+
+    /**
+     * Postings floated into cycles the student is enrolled in (cancelled ones hidden). A suspended enrolment (S4.8)
+     * keeps that placement's job profiles listed, but EligibilityService marks them ineligible with the reason, so
+     * the student sees why Apply is unavailable.
+     */
     private function visibleQuery(StudentProfile $student): Builder
     {
-        $cycleIds = $student->cycleEnrollments()->where('status', 'active')->pluck('placement_cycle_id');
+        $cycleIds = $student->cycleEnrollments()->whereIn('status', ['active', 'suspended'])->pluck('placement_cycle_id');
 
         return JobPosting::query()
             ->whereIn('placement_cycle_id', $cycleIds)
-            ->where('status', '!=', 'cancelled');
+            ->where('status', '!=', 'cancelled')
+            ->released();
     }
 
     /** A drive that leaves the student's branch out stays hidden — unless they already applied (branch rules can change later). */

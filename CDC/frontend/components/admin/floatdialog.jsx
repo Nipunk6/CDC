@@ -26,11 +26,14 @@ import {
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 
 import QuestionBuilder, { cleanQuestions } from "@/components/admin/questionbuilder";
 import BlockingRules from "@/components/shared/blockingrules";
+import StudentCategoryPicker from "@/components/admin/studentcategorypicker";
 import { adminApi } from "@/lib/adminapi";
-import { formatDateTime, fromLocalInput, statusColor, titleCase, toLocalInput } from "@/lib/format";
+import { formatDateTime, fromLocalInput, statusColor, postingStatusLabel, toLocalInput } from "@/lib/format";
 import { OFFER_CATEGORIES, selectionConsequence } from "@/lib/offerpolicy";
 
 // 23:59 IST a week from now.
@@ -53,6 +56,10 @@ export default function FloatDialog({ formType, formId, formStatus }) {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [scheduleLater, setScheduleLater] = useState(false);
+  const [openAt, setOpenAt] = useState("");
+  const [visitDate, setVisitDate] = useState("");
+  const [categories, setCategories] = useState([]);
 
   const wantedCycleType = formType === "inf" ? "internship" : "fulltime";
 
@@ -73,9 +80,12 @@ export default function FloatDialog({ formType, formId, formStatus }) {
     if (!open) return;
     adminApi("/admin/placement-cycles")
       .then((response) => {
-        const usable = (response.placement_cycles ?? []).filter((c) => c.status === "open" && c.type === wantedCycleType);
+        const usable = (response.placement_cycles ?? []).filter((c) => c.status === "open" && !c.is_draft && c.type === wantedCycleType); // drafts take no job profiles (S8.3)
         setCycles(usable);
-        if (usable.length === 1) setCycleId(String(usable[0].id));
+        // "Add New Job" (S6.1) lands here with ?cycle=<id>: pre-select that placement.
+        const remembered = new URLSearchParams(window.location.search).get("cycle");
+        if (remembered && usable.some((c) => String(c.id) === remembered)) setCycleId(remembered);
+        else if (usable.length === 1) setCycleId(String(usable[0].id));
       })
       .catch((e) => setError(e.message));
   }, [open, wantedCycleType]);
@@ -86,25 +96,30 @@ export default function FloatDialog({ formType, formId, formStatus }) {
       return;
     }
     let cancelled = false;
-    adminApi(`/admin/postings/preview-eligibility?form_type=${formType}&form_id=${formId}&cycle_id=${cycleId}`)
+    const categoryQuery = categories.map((c) => `&allowed_student_categories[]=${c}`).join("");
+    adminApi(`/admin/postings/preview-eligibility?form_type=${formType}&form_id=${formId}&cycle_id=${cycleId}${categoryQuery}`)
       .then((response) => !cancelled && setPreview(response))
       .catch(() => !cancelled && setPreview(null));
     return () => {
       cancelled = true;
     };
-  }, [open, cycleId, formType, formId]);
+  }, [open, cycleId, formType, formId, categories]);
 
   if (formStatus !== "accepted" || posting === undefined) return null;
 
   const submit = async () => {
     setError(null);
     if (!cycleId) {
-      setError("Choose a placement cycle.");
+      setError("Choose a placement.");
       return;
     }
     const cleaned = cleanQuestions(questions);
     if (typeof cleaned === "string") {
       setError(cleaned);
+      return;
+    }
+    if (scheduleLater && (!openAt || Number.isNaN(new Date(openAt).getTime()))) {
+      setError("Choose when applications should open.");
       return;
     }
     setSaving(true);
@@ -119,12 +134,15 @@ export default function FloatDialog({ formType, formId, formStatus }) {
           application_deadline: fromLocalInput(deadline),
           share_contact_details: shareContacts,
           questions: cleaned,
+          ...(scheduleLater && openAt ? { scheduled_open_at: fromLocalInput(openAt) } : {}),
+          ...(visitDate ? { visit_date: visitDate } : {}),
+          ...(categories.length ? { allowed_student_categories: categories } : {}),
         }),
       });
       setOpen(false);
       await loadPosting();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not float this form.");
+      setError(e instanceof Error ? e.message : "Could not open this form for applications.");
     } finally {
       setSaving(false);
     }
@@ -137,16 +155,21 @@ export default function FloatDialog({ formType, formId, formStatus }) {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ sm: "center" }}>
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                <Typography fontWeight={700}>Floated to students</Typography>
-                <Chip size="small" variant="outlined" color={statusColor(posting.status)} label={titleCase(posting.status)} />
+                <Typography fontWeight={700}>Open For Applications</Typography>
+                <Chip size="small" variant="outlined" color={statusColor(posting.status)} label={postingStatusLabel(posting.status)} />
                 {posting.offer_label && <Chip size="small" variant="outlined" label={posting.offer_label} />}
               </Stack>
               <Typography variant="body2" color="text.secondary">
                 {posting.placement_cycle?.name} · apply by {formatDateTime(posting.application_deadline)}
               </Typography>
+              {posting.is_scheduled && (
+                <Typography variant="body2" color="warning.main">
+                  Scheduled to open on {formatDateTime(posting.scheduled_open_at)}
+                </Typography>
+              )}
             </Box>
             <Button component={Link} href={`/admin/postings/${posting.id}`} variant="contained" endIcon={<OpenInNewIcon />}>
-              Open Posting
+              Open Job Profile
             </Button>
           </Stack>
         ) : (
@@ -154,7 +177,7 @@ export default function FloatDialog({ formType, formId, formStatus }) {
             <Box>
               <Typography fontWeight={700}>Not visible to students yet</Typography>
               <Typography variant="body2" color="text.secondary">
-                Float this accepted {formType.toUpperCase()} into {wantedCycleType === "fulltime" ? "a full-time" : "an internship"} cycle to open applications.
+                Open this accepted {formType.toUpperCase()} for applications in {wantedCycleType === "fulltime" ? "a full-time" : "an internship"} placement.
               </Typography>
             </Box>
             <Button
@@ -166,27 +189,27 @@ export default function FloatDialog({ formType, formId, formStatus }) {
                 setOpen(true);
               }}
             >
-              Float to Students
+              Open Profile for Applications
             </Button>
           </Stack>
         )}
       </CardContent>
 
       <Dialog open={open} onClose={() => !saving && setOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Float to students</DialogTitle>
+        <DialogTitle>Open for Applications</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2.5}>
             {error && <Alert severity="error">{error}</Alert>}
             {cycles.length === 0 && (
               <Alert severity="warning">
-                There is no open {wantedCycleType === "fulltime" ? "full-time" : "internship"} placement cycle.{" "}
+                There is no open {wantedCycleType === "fulltime" ? "full-time" : "internship"} placement.{" "}
                 <Link href="/admin/placement-cycles">Create one first.</Link>
               </Alert>
             )}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <FormControl fullWidth>
-                <InputLabel id="float-cycle">Placement cycle</InputLabel>
-                <Select labelId="float-cycle" label="Placement cycle" value={cycleId} onChange={(e) => setCycleId(e.target.value)}>
+                <InputLabel id="float-cycle">Placement</InputLabel>
+                <Select labelId="float-cycle" label="Placement" value={cycleId} onChange={(e) => setCycleId(e.target.value)}>
                   {cycles.map((cycle) => (
                     <MenuItem key={cycle.id} value={String(cycle.id)}>
                       {cycle.name} ({cycle.enrolled_students_count} enrolled)
@@ -216,11 +239,12 @@ export default function FloatDialog({ formType, formId, formStatus }) {
                 Shown to students. {selectionConsequence(offerType)}
               </Typography>
             </FormControl>
+            <StudentCategoryPicker value={categories} onChange={setCategories} />
             <BlockingRules />
             {preview && (
               <Alert severity={preview.eligible_count > 0 ? "info" : "warning"}>
                 <strong>{preview.eligible_count}</strong> of {preview.enrolled_count} enrolled students are eligible and will be emailed
-                when you float this posting.
+                when you open this job profile for applications.
               </Alert>
             )}
             <FormControlLabel
@@ -229,16 +253,70 @@ export default function FloatDialog({ formType, formId, formStatus }) {
             />
             <Box>
               <Typography variant="subtitle1" fontWeight={700}>
-                Application questions
+                Additional Questions
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 Optional. Students answer these when they apply; you can edit them until the deadline.
               </Typography>
               <QuestionBuilder value={questions} onChange={setQuestions} />
             </Box>
+            <Box>
+              <FormControlLabel
+                control={<Switch checked={scheduleLater} onChange={(e) => setScheduleLater(e.target.checked)} />}
+                label="Schedule For Later"
+              />
+              {scheduleLater && (
+                <TextField
+                  fullWidth
+                  type="datetime-local"
+                  label="Open applications at (IST)"
+                  helperText="The job profile stays hidden from students until then; eligible students are emailed when it opens."
+                  value={openAt}
+                  onChange={(e) => setOpenAt(e.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  sx={{ mt: 1 }}
+                />
+              )}
+            </Box>
+            <TextField
+              type="date"
+              label="Date of Visit / Process (optional)"
+              value={visitDate}
+              onChange={(e) => setVisitDate(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{ maxWidth: { sm: 320 } }}
+            />
+            <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "action.hover" }}>
+              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                Steps to publish
+              </Typography>
+              {[
+                { done: true, label: `${formType.toUpperCase()} accepted` },
+                { done: Boolean(cycleId), label: "Open placement chosen" },
+                { done: Boolean(deadline) && new Date(fromLocalInput(deadline)).getTime() > Date.now(), label: "Application deadline set (in the future)" },
+                {
+                  done: (preview?.stages ?? 0) > 0,
+                  label: preview
+                    ? preview.stages > 0
+                      ? `${preview.stages} stage(s) from the form`
+                      : "No stages on the form: one \"Selection\" stage will be created (add more on the Stages tab)"
+                    : "Stages present",
+                },
+                { done: confirmed, label: `Additional Questions reviewed (${questions.length} added)` },
+              ].map((step) => (
+                <Stack key={step.label} direction="row" spacing={1} alignItems="center">
+                  {step.done ? <CheckCircleIcon fontSize="small" color="success" /> : <RadioButtonUncheckedIcon fontSize="small" color="disabled" />}
+                  <Typography variant="body2">{step.label}</Typography>
+                </Stack>
+              ))}
+            </Box>
             <FormControlLabel
               control={<Checkbox checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />}
-              label="I understand eligible students are notified immediately."
+              label={
+                scheduleLater
+                  ? "I have reviewed the questions. Eligible students are notified when the job profile opens."
+                  : "I have reviewed the questions and understand eligible students are notified immediately."
+              }
             />
           </Stack>
         </DialogContent>
@@ -247,7 +325,7 @@ export default function FloatDialog({ formType, formId, formStatus }) {
             Cancel
           </Button>
           <Button variant="contained" startIcon={<SendIcon />} onClick={submit} disabled={saving || !cycleId || !confirmed}>
-            {saving ? "Floating..." : "Float Posting"}
+            {saving ? "Opening..." : scheduleLater ? "Schedule" : "Open for Applications"}
           </Button>
         </DialogActions>
       </Dialog>

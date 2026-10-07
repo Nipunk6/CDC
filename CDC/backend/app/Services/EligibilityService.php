@@ -43,9 +43,9 @@ final class EligibilityService
             : $student->cycleEnrollments()->where('placement_cycle_id', $posting->placement_cycle_id)->first();
 
         if (! $enrollment) {
-            $reasons[] = 'You are not enrolled in this placement cycle.';
+            $reasons[] = 'You are not enrolled in this placement.';
         } elseif ($enrollment->status !== 'active') {
-            $reasons[] = 'Your enrolment in this placement cycle is suspended.';
+            $reasons[] = 'Your enrolment in this placement is suspended.';
         }
 
         // 2. Account active.
@@ -112,24 +112,46 @@ final class EligibilityService
         // 9. Graduating batch (D68: form-level batch, else the programme row's batches; PhD exempt; blank = any).
         $batches = $this->batchesFor($rules, $programme, (string) $student->programme);
         if ($batches !== [] && ! in_array((string) $student->graduating_batch, $batches, true)) {
-            $reasons[] = sprintf('Open to the %s graduating batch only.', implode(' / ', $batches));
+            $reasons[] = sprintf('Open to the %s passout batch only.', implode(' / ', $batches));
         }
 
         // 10. School marks.
-        foreach (['minTenthPercent' => ['tenth_percent', '10th'], 'minTwelfthPercent' => ['twelfth_percent', '12th']] as $key => [$column, $label]) {
+        foreach (['minTenthPercent' => ['tenth_percent', 'Class X'], 'minTwelfthPercent' => ['twelfth_percent', 'Class XII']] as $key => [$column, $label]) {
             $min = $this->number($rules[$key] ?? null);
             if ($min === null) {
                 continue;
             }
             $value = $student->{$column};
             if ($value === null) {
-                $reasons[] = sprintf('%s %% not on record (cutoff %s).', $label, $this->fmt($min));
+                $reasons[] = sprintf('%s percentage not on record (cutoff %s).', $label, $this->fmt($min));
             } elseif ($this->lessThan((float) $value, $min)) {
-                $reasons[] = sprintf('%s %% below cutoff (%s < %s)', $label, $this->fmt((float) $value), $this->fmt($min));
+                $reasons[] = sprintf('%s percentage below cutoff (%s < %s)', $label, $this->fmt((float) $value), $this->fmt($min));
+            }
+        }
+
+        // 11. Student Categories (S8.4): at least one of the allowed categories.
+        $categoryIds = self::categoryIds($rules);
+        if ($categoryIds !== [] && $this->tableExists('student_category_student')) {
+            $mine = $student->studentCategories()->pluck('student_categories.id')->map(fn ($id) => (int) $id)->all();
+            if (array_intersect($categoryIds, $mine) === []) {
+                $titles = \App\Models\StudentCategory::query()->whereIn('id', $categoryIds)->orderBy('title')->pluck('title')->all();
+                $reasons[] = 'Requires student category: '.(implode(' or ', $titles) ?: 'a category set by the CDC').'.';
             }
         }
 
         return ['eligible' => $reasons === [], 'reasons' => $reasons];
+    }
+
+    /**
+     * Allowed Student Category ids of a rule set (S8.4); empty means no restriction.
+     *
+     * @return list<int>
+     */
+    public static function categoryIds(array $rules): array
+    {
+        $ids = $rules['allowedStudentCategories'] ?? [];
+
+        return is_array($ids) ? array_values(array_unique(array_filter(array_map('intval', $ids), fn ($id) => $id > 0))) : [];
     }
 
     /**
@@ -178,6 +200,11 @@ final class EligibilityService
         $gender = $this->genderFilter($rules);
         if ($gender !== null) {
             $query->where('gender', $gender);
+        }
+
+        $categoryIds = self::categoryIds($rules);
+        if ($categoryIds !== [] && $this->tableExists('student_category_student')) {
+            $query->whereHas('studentCategories', fn (Builder $c) => $c->whereIn('student_categories.id', $categoryIds));
         }
 
         foreach (['minTenthPercent' => 'tenth_percent', 'minTwelfthPercent' => 'twelfth_percent'] as $key => $column) {
@@ -265,7 +292,7 @@ final class EligibilityService
     public static function blockMessage(string $reason, string $scope, ?string $offerType, ?string $remark): string
     {
         if ($reason === 'debarred') {
-            return 'You are debarred from this placement cycle.'.($remark ? " ({$remark})" : '');
+            return 'You are debarred from this placement.'.($remark ? " ({$remark})" : '');
         }
 
         if ($reason === 'offer') {

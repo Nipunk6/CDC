@@ -36,7 +36,8 @@ class StakeholderNotifier
                 $user,
                 new PortalNoticeMail($subject, "Hello {$user->name},", $headline, $lines, $url, 'Open in Company Portal'),
                 $subject,
-                'emails.portal-notice'
+                'emails.portal-notice',
+                ['job_posting_id' => $posting->id, 'kind' => 'company_notice']
             );
         }
 
@@ -45,8 +46,9 @@ class StakeholderNotifier
 
     /**
      * @param  list<string>  $lines
+     * @param  array{job_posting_id?: int|null, kind?: string|null}  $context  email_logs context (Communication Log, fix L19)
      */
-    public function notifyAdmins(string $subject, string $headline, array $lines = [], ?string $path = null): void
+    public function notifyAdmins(string $subject, string $headline, array $lines = [], ?string $path = null, array $context = []): void
     {
         $url = $path ? rtrim((string) config('app.frontend_url'), '/').$path : null;
 
@@ -56,7 +58,8 @@ class StakeholderNotifier
                 $admin,
                 new PortalNoticeMail($subject, "Hello {$admin->name},", $headline, $lines, $url, 'Review in Admin Portal'),
                 $subject,
-                'emails.portal-notice'
+                'emails.portal-notice',
+                $context
             );
         }
     }

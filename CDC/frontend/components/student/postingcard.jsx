@@ -6,7 +6,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import PlaceIcon from "@mui/icons-material/PlaceOutlined";
 
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { postingStatusLabel, formatDate, formatDateTime, formatMoney } from "@/lib/format";
 
 export const countdown = (deadline) => {
   const ms = new Date(deadline).getTime() - Date.now();
@@ -62,7 +62,7 @@ export default function PostingCard({ posting }) {
                   <Chip
                     size="small"
                     variant="outlined"
-                    label={posting.status === "completed" ? "Completed" : posting.status === "in_process" ? "In process" : "Applications closed"}
+                    label={postingStatusLabel(posting)}
                   />
                 )}
                 {applied ? (
@@ -89,6 +89,7 @@ export default function PostingCard({ posting }) {
               </Stack>
               <Typography variant="caption" color="text.secondary">
                 Apply by {formatDateTime(posting.application_deadline)}
+                {posting.visit_date ? ` · Visit ${formatDate(posting.visit_date)}` : ""}
               </Typography>
             </Box>
           </Stack>

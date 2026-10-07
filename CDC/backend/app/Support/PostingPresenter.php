@@ -56,8 +56,13 @@ final class PostingPresenter
             'status' => $posting->status,
             'application_deadline' => $posting->application_deadline,
             'deadline_passed' => $posting->deadlinePassed(),
+            // For the shared status label (fix L17); students never see counts, only this yes/no.
+            'any_stage_published' => $posting->relationLoaded('rounds')
+                ? $posting->rounds->contains(fn ($r) => $r->status === 'completed')
+                : $posting->rounds()->where('status', 'completed')->exists(),
             'accepts_applications' => $posting->acceptsApplications(),
             'floated_at' => $posting->floated_at,
+            'visit_date' => $posting->visit_date?->toDateString(),
             'compensation' => $posting->compensationFor($programme),
         ];
     }
@@ -122,6 +127,7 @@ final class PostingPresenter
                 'round_type' => $round->round_type,
                 'sort_order' => $round->sort_order,
                 'scheduled_at' => $round->scheduled_at,
+                'venue' => $round->venue,
                 'is_final' => $round->is_final,
                 'published' => $result !== null,
                 'attendance' => $result?->attendance,

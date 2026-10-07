@@ -53,7 +53,7 @@ export default function AddAdminModal({ open, onClose, onSuccess }: AddAdminModa
       reset();
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create admin");
+      setError(err instanceof Error ? err.message : "Failed to create user");
     }
   };
 
@@ -66,10 +66,10 @@ export default function AddAdminModal({ open, onClose, onSuccess }: AddAdminModa
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <DialogTitle>Add New Admin</DialogTitle>
+        <DialogTitle>Add User</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 3 }}>
-            Enter the details for the new administrator. An email will be sent to them with a link to set their password.
+            Enter the details for the new user. An email will be sent to them with a link to set their password.
           </DialogContentText>
 
           {error && (
@@ -87,7 +87,7 @@ export default function AddAdminModal({ open, onClose, onSuccess }: AddAdminModa
               helperText={errors.name?.message}
             />
             <TextField
-              label="Email Address"
+              label="Email ID"
               type="email"
               fullWidth
               {...register("email")}
@@ -101,7 +101,7 @@ export default function AddAdminModal({ open, onClose, onSuccess }: AddAdminModa
             Cancel
           </Button>
           <Button type="submit" variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? "Adding..." : "Add Admin"}
+            {isSubmitting ? "Adding..." : "Add User"}
           </Button>
         </DialogActions>
       </form>

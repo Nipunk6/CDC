@@ -45,7 +45,7 @@ export default function StudentApplicationsPage() {
         <Typography variant="h4" color="primary.main" fontWeight={700}>
           My Applications
         </Typography>
-        <Typography color="text.secondary">Results appear here once the CDC publishes each round.</Typography>
+        <Typography color="text.secondary">Results appear here once the CDC publishes each stage.</Typography>
       </Box>
 
       {unverified && (

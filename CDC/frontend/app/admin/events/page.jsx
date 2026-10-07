@@ -167,7 +167,7 @@ export default function AdminEventsPage() {
     }
     if (event.audience_type === "posting_applicants") {
       const posting = postings.find((p) => p.id === event.audience_filter?.job_posting_id);
-      return `Applicants of ${posting ? `${posting.company?.name} — ${posting.title}` : "a posting"}`;
+      return `Applicants of ${posting ? `${posting.company?.name} — ${posting.title}` : "a job profile"}`;
     }
     return "All students";
   };
@@ -296,7 +296,7 @@ export default function AdminEventsPage() {
                 <RadioGroup row value={dialog.audience_type} onChange={(e) => setDialog((d) => ({ ...d, audience_type: e.target.value }))}>
                   <FormControlLabel value="all" control={<Radio />} label="All students" />
                   <FormControlLabel value="branches" control={<Radio />} label="Programmes / branches" />
-                  <FormControlLabel value="posting_applicants" control={<Radio />} label="Applicants of a posting" />
+                  <FormControlLabel value="posting_applicants" control={<Radio />} label="Applicants of a job profile" />
                 </RadioGroup>
               </FormControl>
               {dialog.audience_type === "branches" && (
@@ -312,8 +312,8 @@ export default function AdminEventsPage() {
               )}
               {dialog.audience_type === "posting_applicants" && (
                 <FormControl fullWidth>
-                  <InputLabel id="ev-posting">Posting</InputLabel>
-                  <Select labelId="ev-posting" label="Posting" value={dialog.job_posting_id} onChange={(e) => setDialog((d) => ({ ...d, job_posting_id: e.target.value }))}>
+                  <InputLabel id="ev-posting">Job Profile</InputLabel>
+                  <Select labelId="ev-posting" label="Job Profile" value={dialog.job_posting_id} onChange={(e) => setDialog((d) => ({ ...d, job_posting_id: e.target.value }))}>
                     {postings.map((p) => (
                       <MenuItem key={p.id} value={String(p.id)}>
                         {p.company?.name} — {p.title}

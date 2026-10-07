@@ -275,7 +275,7 @@ class PostingEligibilityEditTest extends TestCase
         $posting = $this->floated();
 
         $this->edit($posting, ['eligibility' => $this->matrix([$this->branch(self::CSE, true, '6.5'), $this->branch(self::MINING)]), 'minTenthPercent' => '70'])->assertOk();
-        $this->assertEquals($posting->fresh()->eligibility_snapshot, $this->formKeys($posting));
+        $this->assertEquals(JobPosting::withoutAdminOnlyKeys($posting->fresh()->eligibility_snapshot), $this->formKeys($posting)); // admin-only keys stay in the snapshot (fix M2)
         $this->assertSame('70', $posting->fresh()->eligibility_snapshot['minTenthPercent']);
 
         // The admin form editor routes eligibility keys through the same update.
@@ -287,7 +287,7 @@ class PostingEligibilityEditTest extends TestCase
 
         $posting = $posting->fresh();
         $this->assertSame('8.25', $posting->eligibility_snapshot['eligibility'][0]['branches'][0]['cgpa']);
-        $this->assertEquals($posting->eligibility_snapshot, $this->formKeys($posting));
+        $this->assertEquals(JobPosting::withoutAdminOnlyKeys($posting->eligibility_snapshot), $this->formKeys($posting)); // fix M2
         $this->assertSame('Senior Software Engineer', $posting->postable->form_data['jobTitle']);
 
         $rows = AuditLog::where('action', 'posting.eligibility_update')->orderBy('id')->get();
@@ -299,7 +299,7 @@ class PostingEligibilityEditTest extends TestCase
         $data['minTenthPercent'] = '101';
         $this->patchJson("/api/admin/jnfs/{$form->id}/form-data", ['form_data' => $data])->assertStatus(422);
         $this->assertSame('70', $posting->fresh()->eligibility_snapshot['minTenthPercent']);
-        $this->assertEquals($posting->fresh()->eligibility_snapshot, $this->formKeys($posting));
+        $this->assertEquals(JobPosting::withoutAdminOnlyKeys($posting->fresh()->eligibility_snapshot), $this->formKeys($posting)); // admin-only keys stay in the snapshot (fix M2)
     }
 
     public function test_preview_counts_newly_and_no_longer_eligible_and_lists_affected_applicants_without_writing(): void
@@ -375,7 +375,7 @@ class PostingEligibilityEditTest extends TestCase
             $posting = $this->floated();
             $posting->update(['status' => $status]);
 
-            $this->edit($posting, $payload)->assertStatus(422)->assertJsonPath('message', "This drive is {$status}, so its eligibility can no longer be changed.");
+            $this->edit($posting, $payload)->assertStatus(422)->assertJsonPath('message', "This job profile is {$status}, so its eligibility can no longer be changed.");
             $this->preview($posting, $payload)->assertStatus(422);
             $this->assertSame('', $posting->fresh()->eligibility_snapshot['minTenthPercent']);
         }
@@ -461,7 +461,7 @@ class PostingEligibilityEditTest extends TestCase
         $this->preview($posting, $payload)->assertOk()->assertJsonPath('preview.can_reopen', false);
         $this->edit($posting, $payload + ['applications_open_until' => now()->addDays(2)->toIso8601String()])
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Results have already been entered for this drive, so applications cannot be reopened.');
+            ->assertJsonPath('message', 'Results have already been entered for this job profile, so applications cannot be reopened.');
 
         $this->assertSame('', $posting->fresh()->eligibility_snapshot['minTenthPercent']);
         $this->assertSame('in_process', $posting->fresh()->status);

@@ -8,6 +8,10 @@ import {
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   FormControlLabel,
   Grid2 as Grid,
@@ -21,8 +25,11 @@ import {
 } from "@mui/material";
 
 import { adminApi } from "@/lib/adminapi";
-import { formatDateTime, formatMoney, fromLocalInput, titleCase, toLocalInput } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, fromLocalInput, postingStatusLabel, toLocalInput } from "@/lib/format";
+import LinkIcon from "@mui/icons-material/Link";
+import ForwardToInboxIcon from "@mui/icons-material/ForwardToInbox";
 import { OFFER_CATEGORIES, selectionConsequence } from "@/lib/offerpolicy";
+import ProcessStatusCard from "@/components/admin/posting/processstatuscard";
 
 const Stat = ({ label, value, color }) => (
   <Card variant="outlined" sx={{ height: "100%" }}>
@@ -41,6 +48,11 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
   const [deadline, setDeadline] = useState(toLocalInput(posting.application_deadline));
   const [share, setShare] = useState(Boolean(posting.share_contact_details));
   const [offerType, setOfferType] = useState(posting.offer_type);
+  const [visitDate, setVisitDate] = useState(posting.visit_date ?? "");
+  const [openAt, setOpenAt] = useState(toLocalInput(posting.scheduled_open_at));
+  const [sendOpen, setSendOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -48,7 +60,9 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
     setDeadline(toLocalInput(posting.application_deadline));
     setShare(Boolean(posting.share_contact_details));
     setOfferType(posting.offer_type);
-  }, [posting.application_deadline, posting.share_contact_details, posting.offer_type]);
+    setVisitDate(posting.visit_date ?? "");
+    setOpenAt(toLocalInput(posting.scheduled_open_at));
+  }, [posting.application_deadline, posting.share_contact_details, posting.offer_type, posting.visit_date, posting.scheduled_open_at]);
 
   const call = async (path, init, success) => {
     setBusy(true);
@@ -67,6 +81,8 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
   const save = () => {
     const body = { share_contact_details: share };
     if (offerType !== posting.offer_type) body.offer_type = offerType;
+    if (visitDate !== (posting.visit_date ?? "")) body.visit_date = visitDate || null;
+    if (posting.is_scheduled && openAt && openAt !== toLocalInput(posting.scheduled_open_at)) body.scheduled_open_at = fromLocalInput(openAt);
     if (deadline !== toLocalInput(posting.application_deadline)) {
       if (!deadline || Number.isNaN(new Date(deadline).getTime())) {
         setError("Enter a valid application deadline.");
@@ -84,20 +100,27 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
   return (
     <Stack spacing={3}>
       {error && <Alert severity="error">{error}</Alert>}
+      <ProcessStatusCard posting={posting} />
       <Grid container spacing={2}>
-        <Grid size={{ xs: 6, md: 2.4 }}>
-          <Stat label="Eligible students" value={s.eligible} />
+        <Grid size={{ xs: 12, md: 3 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary">
+                Application Progress
+              </Typography>
+              <Typography variant="h6" fontWeight={700} color="primary.main">
+                {s.applied ?? 0} applied out of {s.eligible ?? 0} eligible
+              </Typography>
+            </CardContent>
+          </Card>
         </Grid>
-        <Grid size={{ xs: 6, md: 2.4 }}>
-          <Stat label="Applied" value={s.applied} color="primary.main" />
-        </Grid>
-        <Grid size={{ xs: 6, md: 2.4 }}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Stat label="Withdrawn" value={s.withdrawn} />
         </Grid>
-        <Grid size={{ xs: 6, md: 2.4 }}>
+        <Grid size={{ xs: 6, md: 3 }}>
           <Stat label="Unverified resume" value={s.unverified_resume} color="warning.main" />
         </Grid>
-        <Grid size={{ xs: 12, md: 2.4 }}>
+        <Grid size={{ xs: 12, md: 3 }}>
           <Stat label="Placed elsewhere" value={s.placed_elsewhere} color="error.main" />
         </Grid>
       </Grid>
@@ -117,7 +140,7 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
                   </Link>
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Cycle:</strong>{" "}
+                  <strong>Placement:</strong>{" "}
                   <Link href={`/admin/placement-cycles/${posting.placement_cycle?.id}`}>{posting.placement_cycle?.name}</Link>
                 </Typography>
                 <Typography variant="body2">
@@ -127,7 +150,7 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
                   <strong>Offer category:</strong> {posting.offer_label}
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Compensation:</strong>{" "}
+                  <strong>CTC Offered:</strong>{" "}
                   {comp.ctc_annual ? `${formatMoney(comp.ctc_annual, comp.currency)} p.a.` : ""}
                   {comp.stipend_monthly ? `${formatMoney(comp.stipend_monthly, comp.currency)} / month` : ""}
                   {!comp.ctc_annual && !comp.stipend_monthly ? "—" : ""}
@@ -135,10 +158,14 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
                   {comp.ppo ? " · PPO possible" : ""}
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Floated:</strong> {formatDateTime(posting.floated_at)} by {posting.floated_by?.name ?? "—"}
+                  <strong>Opened for applications:</strong> {formatDateTime(posting.floated_at)} by {posting.floated_by?.name ?? "—"}
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Status:</strong> {titleCase(posting.status)}
+                  <strong>Date of Visit / Process:</strong> {posting.visit_date ? formatDate(posting.visit_date) : "—"}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Status:</strong> {postingStatusLabel(posting)}
+                  {posting.is_scheduled ? ` · opens ${formatDateTime(posting.scheduled_open_at)}` : ""}
                 </Typography>
               </Stack>
             </CardContent>
@@ -172,6 +199,37 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
                     {selectionConsequence(offerType)}
                   </Typography>
                 </FormControl>
+                {posting.is_scheduled && (
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+                    <TextField
+                      type="datetime-local"
+                      label="Open applications at (IST)"
+                      value={openAt}
+                      disabled={busy}
+                      onChange={(e) => setOpenAt(e.target.value)}
+                      slotProps={{ inputLabel: { shrink: true } }}
+                      sx={{ flex: 1 }}
+                    />
+                    <Button
+                      variant="outlined"
+                      disabled={busy}
+                      onClick={() =>
+                        window.confirm("Open applications now? Eligible students are emailed straight away.") &&
+                        call(`/admin/postings/${posting.id}/open-now`, { method: "POST" })
+                      }
+                    >
+                      Open now
+                    </Button>
+                  </Stack>
+                )}
+                <TextField
+                  type="date"
+                  label="Date of Visit / Process"
+                  value={visitDate}
+                  disabled={!editable || busy}
+                  onChange={(e) => setVisitDate(e.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
                 <FormControlLabel
                   control={<Switch checked={share} disabled={!editable || busy} onChange={(e) => setShare(e.target.checked)} />}
                   label="Share applicants' phone and personal email with the company"
@@ -190,10 +248,73 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+            Share
+          </Typography>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<LinkIcon />}
+              onClick={async () => {
+                // The student link is login-gated and carries no personal data.
+                try {
+                  await navigator.clipboard.writeText(`${window.location.origin}/student/postings/${posting.id}`);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch {
+                  setError("Could not copy the link. Copy it from the address bar of the student job page instead.");
+                }
+              }}
+            >
+              {copied ? "Link copied" : "Copy Link"}
+            </Button>
+            <Button variant="outlined" startIcon={<ForwardToInboxIcon />} disabled={busy || posting.status === "cancelled"} onClick={() => setSendOpen(true)}>
+              Send Applicant List to company
+            </Button>
+          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Copy Link gives the student job page (students must sign in). Sending the list emails the company a 7-day download link to the same
+            company-safe Excel they can download from their portal at any time.
+          </Typography>
+        </CardContent>
+      </Card>
+
+      <Dialog open={sendOpen} onClose={() => !busy && setSendOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Send Applicant List to company</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="body2">
+              Every active portal user of {posting.company?.name ?? "the company"} gets an email with a download link (valid 7 days) to the
+              applicant list: {s.applied ?? 0} live applicant(s), company-safe columns only
+              {posting.share_contact_details ? ", with contact details" : ", without contact details"}.
+            </Typography>
+            <TextField label="Note to the company (optional)" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} inputProps={{ maxLength: 1000 }} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSendOpen(false)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={busy}
+            onClick={async () => {
+              await call(`/admin/postings/${posting.id}/send-applicant-list`, { method: "POST", body: JSON.stringify({ note: note || null }) });
+              setSendOpen(false);
+              setNote("");
+            }}
+          >
+            Send
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="subtitle1" fontWeight={700} gutterBottom>
             Lifecycle
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Open → Close applications (in process) → results published (completed). Cancelling hides the posting from students.
+            Accepting Applications → Close applications (in process) → results published (completed). Cancelling hides the job profile from students.
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             {posting.status === "open" && (
@@ -219,11 +340,11 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
                 color="error"
                 disabled={busy}
                 onClick={() =>
-                  window.confirm("Cancel this posting? It disappears from the student job board.") &&
+                  window.confirm("Cancel this job profile? It disappears from the student job board.") &&
                   call(`/admin/postings/${posting.id}/cancel`, { method: "PATCH" })
                 }
               >
-                Cancel posting
+                Cancel job profile
               </Button>
             )}
           </Stack>

@@ -10,6 +10,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Divider,
   Grid2 as Grid,
   LinearProgress,
   Stack,
@@ -29,29 +30,34 @@ import BlockIcon from "@mui/icons-material/Block";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import MailIcon from "@mui/icons-material/Mail";
 
+import StudentCategoryChips from "@/components/admin/student/studentcategorychips";
 import PageHeader from "@/components/shared/pageheader";
 import StudentFormDialog from "@/components/admin/studentformdialog";
 import StudentBlocksPanel from "@/components/admin/studentblockspanel";
+import StudentPlacements from "@/components/admin/student/studentplacements";
+import StudentResumes from "@/components/admin/student/studentresumes";
+import StudentNotes from "@/components/admin/student/studentnotes";
 import { adminApi } from "@/lib/adminapi";
 import { adminBlobUrl } from "@/lib/adminupload";
+import { academicExtraFields, formatAcademicExtra } from "@/lib/academicextras";
 import { dash, formatDate, formatDateTime, formatMoney, statusColor, titleCase } from "@/lib/format";
 
 const profileFields = [
   ["Roll number", "roll_no"],
   ["Institute email", "institute_email"],
   ["Personal email", "personal_email"],
-  ["Phone", "phone"],
+  ["Contact No.", "phone"],
   ["Programme", "programme"],
   ["Branch", "branch"],
-  ["Graduating batch", "graduating_batch"],
+  ["Passout Batch", "graduating_batch"],
   ["CGPA", "current_cgpa"],
   ["Ongoing backlogs", "ongoing_backlogs"],
   ["Total backlogs", "total_backlogs"],
   ["Gender", "gender"],
   ["Date of birth", "date_of_birth"],
-  ["10th %", "tenth_percent"],
-  ["12th %", "twelfth_percent"],
-  ["Category", "category"],
+  ["Class X Percentage", "tenth_percent"],
+  ["Class XII Percentage", "twelfth_percent"],
+  ["Social Category", "category"],
   ["PwD", "pwd"],
   ["Home state", "home_state"],
   ["LinkedIn", "linkedin_url"],
@@ -60,6 +66,32 @@ const profileFields = [
 
 const show = (value) => (typeof value === "boolean" ? (value ? "Yes" : "No") : dash(value));
 
+const fieldGrid = (fields, render) => (
+  <Grid container spacing={2}>
+    {fields.map(([label, key]) => (
+      <Grid key={key} size={{ xs: 12, sm: 6, md: 4 }}>
+        <Typography variant="caption" color="text.secondary">
+          {label}
+        </Typography>
+        <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+          {render(key)}
+        </Typography>
+      </Grid>
+    ))}
+  </Grid>
+);
+
+const Stat = ({ label, value }) => (
+  <Box sx={{ textAlign: "center", minWidth: 72 }}>
+    <Typography variant="h5" fontWeight={700}>
+      {value}
+    </Typography>
+    <Typography variant="caption" color="text.secondary">
+      {label}
+    </Typography>
+  </Box>
+);
+
 export default function AdminStudentDetailPage({ params }) {
   const { id } = use(params);
   const [student, setStudent] = useState(null);
@@ -67,7 +99,7 @@ export default function AdminStudentDetailPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState("overview");
   const [editOpen, setEditOpen] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(null);
 
@@ -118,8 +150,21 @@ export default function AdminStudentDetailPage({ params }) {
     try {
       const response = await adminApi(`/admin/students/${id}/resend-invitation`, { method: "POST" });
       setSuccess(response.message);
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to resend the invitation.");
+    }
+  };
+
+  // S5.4: cancels the set-password link; refused by the server once the student has activated their account.
+  const revokeInvite = async () => {
+    if (!window.confirm(`Revoke the invitation of ${student.roll_no}? Their set-password link stops working until you resend it.`)) return;
+    try {
+      const response = await adminApi(`/admin/students/${id}/revoke-invitation`, { method: "POST" });
+      setSuccess(response.message);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to revoke the invitation.");
     }
   };
 
@@ -128,6 +173,7 @@ export default function AdminStudentDetailPage({ params }) {
 
   const applications = student.applications ?? [];
   const offers = student.offers ?? [];
+  const summary = student.summary ?? {};
 
   return (
     <>
@@ -142,9 +188,16 @@ export default function AdminStudentDetailPage({ params }) {
             <Button variant="contained" color="secondary" startIcon={<EditIcon />} onClick={() => setEditOpen(true)}>
               Edit
             </Button>
-            <Button variant="contained" color="secondary" startIcon={<MailIcon />} onClick={resendInvite}>
-              Resend Invite
-            </Button>
+            {student.invitation_status !== "accepted" && (
+              <Button variant="contained" color="secondary" startIcon={<MailIcon />} onClick={resendInvite}>
+                Resend Invite
+              </Button>
+            )}
+            {student.invitation_status === "sent" && (
+              <Button variant="contained" color="secondary" startIcon={<BlockIcon />} onClick={revokeInvite}>
+                Revoke Invite
+              </Button>
+            )}
             <Button
               variant="contained"
               color={student.is_active ? "error" : "success"}
@@ -172,84 +225,79 @@ export default function AdminStudentDetailPage({ params }) {
           This account is suspended. The student cannot log in.
         </Alert>
       )}
+      {student.invitation_status === "sent" && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Invitation sent{student.last_invited_at ? ` on ${formatDateTime(student.last_invited_at)}` : ""}. The student has not set a password yet.
+        </Alert>
+      )}
+      {student.invitation_status === "revoked" && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Invitation revoked. The set-password link no longer works; use Resend Invite to send a new one.
+        </Alert>
+      )}
+
+      {/* Summary card (Superset parity S4.5): photo, batch, CGPA, Applications and Offers. */}
+      <Card sx={{ mb: 2 }}>
+        <CardContent>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between">
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
+              <Avatar src={photoUrl ?? undefined} sx={{ width: 72, height: 72, fontSize: 28 }}>
+                {student.full_name?.[0]}
+              </Avatar>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ wordBreak: "break-word" }}>
+                  {student.full_name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {student.graduating_batch} Passout Batch | {student.roll_no}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-word" }}>
+                  {student.current_semester ? `Semester ${student.current_semester}, ` : ""}
+                  {student.programme} · {student.branch}
+                </Typography>
+                <StudentCategoryChips studentId={student.id} />
+              </Box>
+            </Stack>
+            <Stack direction="row" spacing={3} divider={<Divider orientation="vertical" flexItem />}>
+              <Stat label="CGPA" value={dash(summary.cgpa ?? student.current_cgpa)} />
+              <Stat label="Applications" value={summary.applications_count ?? 0} />
+              <Stat label="Offers" value={summary.offers_count ?? offers.length} />
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
 
       <Card>
         <Tabs value={tab} onChange={(_e, value) => setTab(value)} variant="scrollable" allowScrollButtonsMobile>
-          <Tab label="Overview" />
-          <Tab label={`Cycles (${student.cycle_enrollments?.length ?? 0})`} />
-          <Tab label={`Applications (${applications.length})`} />
-          <Tab label="Offers & Blocks" />
-          <Tab label="Audit trail" />
+          <Tab value="overview" label="Overview" />
+          <Tab value="placements" label={`Placements (${student.placements?.length ?? 0})`} />
+          <Tab value="applications" label={`Applications (${applications.length})`} />
+          <Tab value="offers" label="Offers & Blocks" />
+          <Tab value="resumes" label={`Resumes & Documents (${student.resumes?.length ?? 0})`} />
+          <Tab value="notes" label="Notes" />
+          <Tab value="activity" label="Activity" />
         </Tabs>
         <CardContent>
-          {tab === 0 && (
-            <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
-              <Box sx={{ textAlign: "center" }}>
-                <Avatar src={photoUrl ?? undefined} sx={{ width: 120, height: 120, mx: "auto", fontSize: 40 }}>
-                  {student.full_name?.[0]}
-                </Avatar>
+          {tab === "overview" && (
+            <Stack spacing={3}>
+              {fieldGrid(profileFields, (key) => (key === "date_of_birth" ? formatDate(student[key]) : show(student[key])))}
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                  Academic Details
+                </Typography>
+                {fieldGrid(academicExtraFields, (key) => formatAcademicExtra(student, key))}
               </Box>
-              <Grid container spacing={2} sx={{ flex: 1 }}>
-                {profileFields.map(([label, key]) => (
-                  <Grid key={key} size={{ xs: 12, sm: 6, md: 4 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {label}
-                    </Typography>
-                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-                      {key === "date_of_birth" ? formatDate(student[key]) : show(student[key])}
-                    </Typography>
-                  </Grid>
-                ))}
-              </Grid>
             </Stack>
           )}
 
-          {tab === 1 && (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Cycle</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Cycle status</TableCell>
-                    <TableCell>Enrolment</TableCell>
-                    <TableCell>Enrolled on</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(student.cycle_enrollments ?? []).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5}>Not enrolled in any placement cycle.</TableCell>
-                    </TableRow>
-                  )}
-                  {(student.cycle_enrollments ?? []).map((enrollment) => (
-                    <TableRow key={enrollment.id}>
-                      <TableCell>
-                        <Link href={`/admin/placement-cycles/${enrollment.placement_cycle?.id}`}>
-                          {enrollment.placement_cycle?.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{titleCase(enrollment.placement_cycle?.type)}</TableCell>
-                      <TableCell>
-                        <Chip size="small" variant="outlined" color={statusColor(enrollment.placement_cycle?.status)} label={titleCase(enrollment.placement_cycle?.status)} />
-                      </TableCell>
-                      <TableCell>
-                        <Chip size="small" variant="outlined" color={statusColor(enrollment.status)} label={titleCase(enrollment.status)} />
-                      </TableCell>
-                      <TableCell>{formatDate(enrollment.created_at)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
+          {tab === "placements" && <StudentPlacements student={student} />}
 
-          {tab === 2 && (
+          {tab === "applications" && (
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Posting</TableCell>
+                    <TableCell>Job Profile</TableCell>
                     <TableCell>Company</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Flags</TableCell>
@@ -269,7 +317,7 @@ export default function AdminStudentDetailPage({ params }) {
                       </TableCell>
                       <TableCell>{application.company_name}</TableCell>
                       <TableCell>
-                        <Chip size="small" variant="outlined" color={statusColor(application.status)} label={titleCase(application.status)} />
+                        <Chip size="small" variant="outlined" color={statusColor(application.status)} label={application.status === "waitlisted" ? "On Hold" : titleCase(application.status)} />
                       </TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={0.5}>
@@ -285,7 +333,7 @@ export default function AdminStudentDetailPage({ params }) {
             </TableContainer>
           )}
 
-          {tab === 3 && (
+          {tab === "offers" && (
             <Stack spacing={3}>
               <Box>
                 <Typography variant="subtitle1" fontWeight={700} gutterBottom>
@@ -299,7 +347,7 @@ export default function AdminStudentDetailPage({ params }) {
                       <TableHead>
                         <TableRow>
                           <TableCell>Company</TableCell>
-                          <TableCell>Cycle</TableCell>
+                          <TableCell>Placement</TableCell>
                           <TableCell>Type</TableCell>
                           <TableCell>CTC / Stipend</TableCell>
                           <TableCell>Announced</TableCell>
@@ -327,7 +375,11 @@ export default function AdminStudentDetailPage({ params }) {
             </Stack>
           )}
 
-          {tab === 4 && (
+          {tab === "resumes" && <StudentResumes student={student} onChanged={load} />}
+
+          {tab === "notes" && <StudentNotes studentId={student.id} />}
+
+          {tab === "activity" && (
             <TableContainer>
               <Table size="small">
                 <TableHead>

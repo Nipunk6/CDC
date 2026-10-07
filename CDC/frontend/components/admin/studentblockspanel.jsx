@@ -122,7 +122,7 @@ export default function StudentBlocksPanel({ student, cycleId, onChanged }) {
             <TableHead>
               <TableRow>
                 {!student && <TableCell>Student</TableCell>}
-                <TableCell>Cycle</TableCell>
+                <TableCell>Placement</TableCell>
                 <TableCell>Block</TableCell>
                 <TableCell>By</TableCell>
                 <TableCell>Status</TableCell>
@@ -172,8 +172,8 @@ export default function StudentBlocksPanel({ student, cycleId, onChanged }) {
           <Stack spacing={2} sx={{ pt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
             <FormControl fullWidth size="small">
-              <InputLabel id="blk-cycle">Placement cycle</InputLabel>
-              <Select labelId="blk-cycle" label="Placement cycle" value={dialog?.cycle ?? ""} onChange={(e) => setDialog((d) => ({ ...d, cycle: e.target.value }))}>
+              <InputLabel id="blk-cycle">Placement</InputLabel>
+              <Select labelId="blk-cycle" label="Placement" value={dialog?.cycle ?? ""} onChange={(e) => setDialog((d) => ({ ...d, cycle: e.target.value }))}>
                 {cycles.map((c) => (
                   <MenuItem key={c.id} value={String(c.id)}>
                     {c.name}
@@ -192,7 +192,7 @@ export default function StudentBlocksPanel({ student, cycleId, onChanged }) {
             <FormControl fullWidth size="small">
               <InputLabel id="blk-scope">Scope</InputLabel>
               <Select labelId="blk-scope" label="Scope" value={dialog?.scope ?? "all"} onChange={(e) => setDialog((d) => ({ ...d, scope: e.target.value }))}>
-                <MenuItem value="all">Everything in the cycle</MenuItem>
+                <MenuItem value="all">Everything in the placement</MenuItem>
                 <MenuItem value="internships_only">Internships only</MenuItem>
               </Select>
             </FormControl>

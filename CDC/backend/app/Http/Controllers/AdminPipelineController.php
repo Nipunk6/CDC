@@ -44,11 +44,21 @@ class AdminPipelineController extends Controller
             ->orderBy('applied_at')
             ->get();
 
+        // Every offer the applicants hold, for the overall Status column and the "Placed in <role> at <company>" tooltip.
+        $offers = \App\Models\Offer::query()
+            ->with(['company:id,name', 'jobPosting.postable'])
+            ->whereIn('student_profile_id', $applications->pluck('student_profile_id'))
+            ->get()
+            ->groupBy('student_profile_id');
+
         return response()->json([
             'rounds' => $rounds->map(fn (PostingRound $round) => $round->only(['id', 'name', 'round_type', 'sort_order', 'scheduled_at', 'status', 'is_final']) + [
                 'draft_count' => $round->results()->whereNull('published_at')->where('result', '!=', 'pending')->count(),
                 'published_count' => $round->results()->whereNotNull('published_at')->count(),
-                'pool_count' => $this->pipeline->pool($round)->count(),
+                'pool_count' => ($poolIds = $this->pipeline->pool($round)->pluck('id'))->count(),
+                // Rows of live applicants outside the pool (addenda, D70(b)), shown as "+N outside pool" (fix L8).
+                'outside_pool_count' => $round->results()->whereNotIn('application_id', $poolIds)
+                    ->whereHas('application', fn ($q) => $q->where('status', 'applied'))->count(),
             ]),
             'applications' => $applications->map(fn (Application $a) => [
                 'id' => $a->id,
@@ -57,6 +67,11 @@ class AdminPipelineController extends Controller
                 'resume_url' => $a->resume?->previewUrl(),
                 'used_unverified_resume' => $a->used_unverified_resume,
                 'placed_elsewhere_flag' => $a->placed_elsewhere_flag,
+                'offer_here' => $offers->get($a->student_profile_id, collect())->contains('application_id', $a->id),
+                'offers' => $offers->get($a->student_profile_id, collect())
+                    ->reject(fn ($o) => $o->application_id === $a->id)
+                    ->map(fn ($o) => ['role' => $o->jobPosting?->title(), 'company' => $o->company?->name, 'offer_type' => $o->offer_type])
+                    ->values(),
                 'results' => $a->roundResults->mapWithKeys(fn (ApplicationRoundResult $r) => [
                     $r->posting_round_id => [
                         'attendance' => $r->attendance,
@@ -85,12 +100,15 @@ class AdminPipelineController extends Controller
 
         $request->validate([
             'entries' => ['sometimes', 'array'],
-            'entries.*.roll_no' => ['required', 'string', 'max:30'],
+            // A roll number or an email address identifies the student (Superset parity S1.3).
+            'entries.*.roll_no' => ['required', 'string', 'max:255'],
             'entries.*.result' => ['required', 'in:pending,selected,rejected,waitlisted'],
             'roll_nos' => ['sometimes', 'array'],
-            'roll_nos.*' => ['nullable', 'string', 'max:30'],
+            'roll_nos.*' => ['nullable', 'string', 'max:255'],
             'result' => ['required_with:roll_nos', 'in:selected,rejected,waitlisted'],
             'file' => array_merge(['sometimes'], SpreadsheetImportService::UPLOAD_RULES),
+            // Strict check on the current stage: entries outside the stage's pool are refused instead of warned (B2-12).
+            'strict' => ['nullable', 'boolean'],
         ]);
 
         try {
@@ -103,22 +121,43 @@ class AdminPipelineController extends Controller
             return response()->json(['message' => 'No roll numbers were found in the input.'], 422);
         }
 
+        [$entries, $emailErrors] = $this->pipeline->resolveEmails($jobPosting, $entries);
         [$found, $unknown] = $this->pipeline->resolveApplicants($jobPosting, array_column($entries, 'roll_no'));
+        $unknown = array_merge($emailErrors, $unknown);
+        $strict = $request->boolean('strict');
 
         $pool = $this->pipeline->pool($postingRound)->pluck('id')->all();
         $previous = $jobPosting->rounds()->where('sort_order', '<', $postingRound->sort_order)->get()->last();
         $waitlisted = $previous ? $previous->results()->where('result', 'waitlisted')->whereNotNull('published_at')->pluck('application_id')->all() : [];
         $warnings = [];
         $drafts = [];
+        $seen = [];
         foreach ($entries as $entry) {
             $application = $found[$entry['roll_no']] ?? null;
             if (! $application) {
                 continue;
             }
+            // The same student entered twice (by roll number and by email, or the same line twice): the first entry
+            // counts, the others are reported, so each student is written once (L9).
+            $as = $entry['email'] ?? $entry['roll_no'];
+            if (isset($seen[$application->id])) {
+                $unknown[] = ['roll_no' => $entry['roll_no'], 'reason' => ($seen[$application->id] === $as
+                    ? 'Listed more than once.'
+                    : "Listed more than once (as {$seen[$application->id]} and {$as}).").' Only the first entry was used.'];
+
+                continue;
+            }
+            $seen[$application->id] = $as;
             if (! in_array($application->id, $pool, true)) {
-                $warnings[] = ['roll_no' => $entry['roll_no'], 'reason' => in_array($application->id, $waitlisted, true)
-                    ? 'Is on the previous round\'s waitlist — use "Move" on the Waitlist tab first.'
-                    : 'Was not selected in the previous round.'];
+                $reason = in_array($application->id, $waitlisted, true)
+                    ? 'Is On Hold at the previous stage — use "Move" on the On Hold tab first.'
+                    : 'Was not shortlisted in the previous stage.';
+                if ($strict) {
+                    $unknown[] = ['roll_no' => $entry['roll_no'], 'reason' => $reason.' Not saved (strict check on current stage).'];
+
+                    continue;
+                }
+                $warnings[] = ['roll_no' => $entry['roll_no'], 'reason' => $reason];
             }
             $drafts[] = ['application' => $application] + $entry;
         }
@@ -130,6 +169,7 @@ class AdminPipelineController extends Controller
                 'posting_id' => $jobPosting->id,
                 'written' => $report['written'],
                 'entries' => array_slice(array_map(fn ($e) => $e['roll_no'].':'.$e['result'], $entries), 0, 100),
+                'strict' => $strict,
             ]);
         }
 
@@ -199,21 +239,21 @@ class AdminPipelineController extends Controller
 
         if ($postingRound->is_final) {
             return response()->json([
-                'message' => 'The final round is published from the Results page, where offers are created.',
+                'message' => 'The final stage is published from the Shortlist for Offer page, where offers are created.',
             ], 422);
         }
 
         // Rounds are published in order (D75).
         $earlier = $jobPosting->rounds()->where('sort_order', '<', $postingRound->sort_order)->where('status', '!=', 'completed')->first();
         if ($earlier) {
-            return response()->json(['message' => "Publish \"{$earlier->name}\" before this round."], 422);
+            return response()->json(['message' => "Publish \"{$earlier->name}\" before this stage."], 422);
         }
 
         $rejectRemaining = (bool) ($validated['reject_remaining'] ?? false);
         $preview = $this->pipeline->publishPreview($postingRound);
 
         if ($preview['drafts'] === 0 && (! $rejectRemaining || $preview['to_reject'] === 0)) {
-            return response()->json(['message' => 'There is nothing new to publish for this round.'], 422);
+            return response()->json(['message' => 'There is nothing new to publish for this stage.'], 422);
         }
 
         $counts = $this->pipeline->publish($postingRound, $request->user(), $rejectRemaining);
@@ -229,7 +269,7 @@ class AdminPipelineController extends Controller
 
         return response()->json([
             'message' => sprintf(
-                'Published: %d selected, %d waitlisted, %d not selected. Students have been notified.',
+                'Published: %d shortlisted, %d on hold, %d not selected. Students have been notified.',
                 $counts['selected'],
                 $counts['waitlisted'],
                 $counts['rejected']
@@ -272,7 +312,7 @@ class AdminPipelineController extends Controller
         }
 
         return response()->json([
-            'message' => "{$report['written']} addendum candidate(s) added as drafts. Publish the round to notify them.",
+            'message' => "{$report['written']} addendum candidate(s) added as drafts. Publish the stage to notify them.",
             'errors' => array_merge($unknown, $report['skipped']),
         ]);
     }
@@ -297,7 +337,7 @@ class AdminPipelineController extends Controller
         $row = $postingRound->results()->where('application_id', $application->id)->first();
 
         if (! $row || $row->result !== 'rejected' || ! $row->isPublished()) {
-            return response()->json(['message' => 'Only a candidate whose rejection in this round was published can be re-added.'], 422);
+            return response()->json(['message' => 'Only a candidate whose rejection in this stage was published can be re-added.'], 422);
         }
 
         $before = $row->only(['result', 'is_addendum', 'published_at', 'remark']);
@@ -322,7 +362,7 @@ class AdminPipelineController extends Controller
             'warning'
         );
 
-        return response()->json(['message' => 'Candidate re-added as a draft and the company has been notified. Publish the round to inform the student.']);
+        return response()->json(['message' => 'Candidate re-added as a draft and the company has been notified. Publish the stage to inform the student.']);
     }
 
     /**
@@ -336,7 +376,7 @@ class AdminPipelineController extends Controller
 
         $row = $this->pipeline->removeFromWaitlist($postingRound, $application, $request->user());
         if (! $row) {
-            return response()->json(['message' => 'This candidate is not on the waitlist for this round.'], 422);
+            return response()->json(['message' => 'This candidate is not On Hold at this stage.'], 422);
         }
 
         $this->audit->log($request, 'waitlist.remove', $postingRound, ['application_id' => $application->id, 'result' => 'waitlisted'], [
@@ -348,7 +388,7 @@ class AdminPipelineController extends Controller
             $this->pipeline->dispatchResultMails($postingRound, [$row->id], false);
         }
 
-        return response()->json(['message' => 'Removed from the waitlist.']);
+        return response()->json(['message' => 'Removed from On Hold.']);
     }
 
     /**
@@ -365,20 +405,20 @@ class AdminPipelineController extends Controller
 
         $row = $this->pipeline->promoteFromWaitlist($postingRound, $application, $request->user());
         if (! $row) {
-            return response()->json(['message' => 'Only a candidate on this round\'s PUBLISHED waitlist can be moved on. (A draft waitlist entry can simply be changed to "selected".)'], 422);
+            return response()->json(['message' => 'Only a candidate on this stage\'s PUBLISHED On Hold list can be moved on. (A draft On Hold entry can simply be changed to "shortlisted".)'], 422);
         }
 
         $this->audit->log($request, 'waitlist.promote', $postingRound, ['application_id' => $application->id, 'result' => 'waitlisted'], [
             'application_id' => $application->id,
             'result' => 'selected',
-            'remark' => 'Promoted from waitlist',
+            'remark' => 'Promoted from On Hold',
         ]);
         $this->pipeline->dispatchResultMails($postingRound, [$row->id]);
 
         $next = $jobPosting->rounds()->where('sort_order', '>', $postingRound->sort_order)->first();
 
         return response()->json([
-            'message' => $application->studentProfile->roll_no.' moved off the waitlist'.($next ? " and into {$next->name}" : '').'. The student has been notified.',
+            'message' => $application->studentProfile->roll_no.' moved off On Hold'.($next ? " and into {$next->name}" : '').'. The student has been notified.',
         ]);
     }
 
@@ -434,7 +474,7 @@ class AdminPipelineController extends Controller
             : $jobPosting->rounds()->get()->first(fn (PostingRound $r) => ! in_array($r->id, $published, true));
 
         if (! $round) {
-            return response()->json(['message' => 'Every round of this application is already decided.'], 422);
+            return response()->json(['message' => 'Every stage of this application is already decided.'], 422);
         }
 
         $existing = $application->roundResults()->where('posting_round_id', $round->id)->first();
@@ -458,7 +498,7 @@ class AdminPipelineController extends Controller
                 $jobPosting,
                 'Candidate withdrawn from your process',
                 sprintf('%s (%s) has been selected elsewhere through the CDC and is no longer part of your process for %s.', $student->full_name, $student->roll_no, $jobPosting->title()),
-                ['If you need replacement candidates, open the drive in the Company Portal and send a "Replacement request" proposal for the current round.'],
+                ['If you need replacement candidates, open the job profile in the Company Portal and send a "Replacement request" proposal for the current stage.'],
                 'warning'
             );
         }
@@ -477,7 +517,7 @@ class AdminPipelineController extends Controller
             $entries = [];
             foreach ($this->spreadsheets->rows($request->file('file')) as $cells) {
                 $roll = strtoupper(trim($cells[0] ?? ''));
-                if ($roll === '' || preg_replace('/[^A-Z]/', '', $roll) === 'ROLLNO') {
+                if ($roll === '' || in_array(preg_replace('/[^A-Z]/', '', $roll), ['ROLLNO', 'ROLLNUMBER', 'EMAIL', 'EMAILID', 'EMAILADDRESS'], true)) {
                     continue;
                 }
                 $result = strtolower(trim($cells[1] ?? '')) ?: (string) $request->input('result', 'selected');
@@ -512,7 +552,7 @@ class AdminPipelineController extends Controller
     private function blocked(JobPosting $posting): ?JsonResponse
     {
         if ($posting->status === 'cancelled') {
-            return response()->json(['message' => 'This posting is cancelled.'], 422);
+            return response()->json(['message' => 'This job profile is cancelled.'], 422);
         }
 
         if ($posting->acceptsApplications()) {
@@ -524,6 +564,6 @@ class AdminPipelineController extends Controller
 
     private function assertRoundOf(JobPosting $posting, PostingRound $round): void
     {
-        abort_if($round->job_posting_id !== $posting->id, 404, 'Round not found.');
+        abort_if($round->job_posting_id !== $posting->id, 404, 'Stage not found.');
     }
 }

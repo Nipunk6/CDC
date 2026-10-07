@@ -22,8 +22,8 @@ import {
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
-const typeColors = { event: "#1e3a8a", deadline: "#7B1113", round: "#b45309" };
-const typeLabels = { event: "Event", deadline: "Application deadline", round: "Selection round" };
+const typeColors = { event: "#1e3a8a", deadline: "#7B1113", round: "#b45309", visit: "#047857" };
+const typeLabels = { event: "Event", deadline: "Application deadline", round: "Selection stage", visit: "Date of visit" };
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const monthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;

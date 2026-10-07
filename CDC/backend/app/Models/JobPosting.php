@@ -18,6 +18,8 @@ class JobPosting extends Model
     /** form_data keys frozen into eligibility_snapshot at float time (spec M5.3). */
     public const SNAPSHOT_KEYS = [
         'eligibility', 'globalCgpa', 'globalBacklogs', 'genderFilter', 'graduatingBatch', 'minTenthPercent', 'minTwelfthPercent',
+        // S8.4: ids of Student Categories, at least one of which a student needs (empty = no restriction).
+        'allowedStudentCategories',
     ];
 
     /** Phase 1 selection-round slugs → display names (mirrors selectionprocessbuilder.tsx). */
@@ -25,6 +27,8 @@ class JobPosting extends Model
         'ppt' => 'Pre-Placement Talk',
         'resume' => 'Resume Shortlisting',
         'written_test' => 'Written Test',
+        'online_test' => 'Online Test',
+        'take_home_assignment' => 'Take Home Assignment',
         'aptitude_test' => 'Aptitude Test',
         'technical_test' => 'Technical Test',
         'group_discussion' => 'Group Discussion',
@@ -51,6 +55,8 @@ class JobPosting extends Model
         'floated_by',
         'floated_at',
         'eligibility_snapshot',
+        'visit_date',
+        'scheduled_open_at',
     ];
 
     /**
@@ -65,7 +71,27 @@ class JobPosting extends Model
             'floated_at' => 'datetime',
             'share_contact_details' => 'boolean',
             'eligibility_snapshot' => 'array',
+            'visit_date' => 'date',
+            'scheduled_open_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Job profiles students may see: not scheduled to open later (Superset parity S6.2, "Schedule For Later") and not
+     * in a Draft placement (S8.3; a draft takes no job profiles, this keeps students safe if one ever holds some).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<JobPosting>  $query
+     */
+    public function scopeReleased(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        $query->where(fn ($q) => $q->whereNull('scheduled_open_at')->orWhere('scheduled_open_at', '<=', now()))
+            ->whereIn('placement_cycle_id', PlacementCycle::query()->visibleToStudents()->select('id'));
+    }
+
+    /** Waiting to open (S6.2): only an `open` job profile whose opening time is still ahead (fix M4). */
+    public function isScheduled(): bool
+    {
+        return $this->status === 'open' && $this->scheduled_open_at !== null && $this->scheduled_open_at->isFuture();
     }
 
     public function postable(): MorphTo
@@ -96,6 +122,11 @@ class JobPosting extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(PostingDocument::class)->orderBy('id');
     }
 
     public function proposals(): HasMany
@@ -145,7 +176,18 @@ class JobPosting extends Model
             return $this->eligibility_snapshot;
         }
 
-        return array_intersect_key($this->formData(), array_flip(self::SNAPSHOT_KEYS));
+        return self::withoutAdminOnlyKeys(array_intersect_key($this->formData(), array_flip(self::SNAPSHOT_KEYS)));
+    }
+
+    /**
+     * Eligibility keys only the CDC may set (fix M2): `allowedStudentCategories` comes from the admin's validated input
+     * (open dialog, Edit eligibility, Add New Job), never from a JNF/INF's form_data, which the company writes.
+     */
+    public const ADMIN_ONLY_KEYS = ['allowedStudentCategories'];
+
+    public static function withoutAdminOnlyKeys(?array $data): ?array
+    {
+        return $data === null ? null : array_diff_key($data, array_flip(self::ADMIN_ONLY_KEYS));
     }
 
     public function title(): string
@@ -173,7 +215,7 @@ class JobPosting extends Model
     public function acceptsApplications(): bool
     {
         // A closed placement cycle stops taking applications for all of its postings (D67).
-        return $this->status === 'open' && ! $this->deadlinePassed() && ($this->placementCycle?->isOpen() ?? true);
+        return $this->status === 'open' && ! $this->isScheduled() && ! $this->deadlinePassed() && ($this->placementCycle?->isOpen() ?? true);
     }
 
     /**

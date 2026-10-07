@@ -86,7 +86,7 @@ export default function GraduatingBatchDialog({
         <SchoolIcon />
         <Box sx={{ pr: onBack ? 16 : 0 }}>
           <Typography variant="h6" fontWeight={700}>
-            Select Graduating Batch
+            Select Passout Batch
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.9 }}>
             {formType === "JNF"
@@ -125,18 +125,18 @@ export default function GraduatingBatchDialog({
       <DialogContent sx={{ pt: 3, pb: 1 }}>
         <Stack spacing={3} sx={{ mt: 1 }}>
           <Typography variant="body1" color="text.secondary">
-            Please select the graduating batch you are hiring for. This will
+            Please select the passout batch you are hiring for. This will
             apply to all eligible programmes in this {formType}.
           </Typography>
 
           <FormControl fullWidth>
             <InputLabel id="graduating-batch-select-label">
-              Graduating Batch (Year) *
+              Passout Batch (Year) *
             </InputLabel>
             <Select
               labelId="graduating-batch-select-label"
               value={selectedBatch}
-              label="Graduating Batch (Year) *"
+              label="Passout Batch (Year) *"
               onChange={(e) => setSelectedBatch(e.target.value)}
               sx={{
                 fontSize: "1.1rem",
@@ -173,7 +173,7 @@ export default function GraduatingBatchDialog({
               This choice cannot be changed later
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Once you proceed, the graduating batch for this {formType} will be
+              Once you proceed, the passout batch for this {formType} will be
               locked and cannot be modified. If you need to hire for a different
               batch, you will need to create a new {formType}.
             </Typography>

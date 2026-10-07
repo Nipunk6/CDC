@@ -183,7 +183,9 @@ export default function StudentResumesPage() {
                           size="small"
                           variant="outlined"
                           color={statusColor(resume.status)}
-                          label={resume.status === "pending" ? "Pending verification" : titleCase(resume.status)}
+                          label={
+                            resume.status === "pending" ? "Pending verification" : resume.status === "approved" ? "Verified" : titleCase(resume.status)
+                          }
                         />
                       </Box>
                       {resume.status === "rejected" && resume.admin_remark && (

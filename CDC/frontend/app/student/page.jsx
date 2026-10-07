@@ -26,7 +26,7 @@ import { studentApi } from "@/lib/studentapi";
 import { formatDateTime, formatMoney } from "@/lib/format";
 
 const typeColors = { event: "secondary", deadline: "primary", round: "warning" };
-const typeLabels = { event: "Event", deadline: "Deadline", round: "Round" };
+const typeLabels = { event: "Event", deadline: "Deadline", round: "Stage" };
 
 const greeting = () => {
   const hour = new Date().getHours();

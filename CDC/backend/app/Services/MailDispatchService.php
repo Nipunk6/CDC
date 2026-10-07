@@ -29,16 +29,21 @@ class MailDispatchService
     ) {
     }
 
-    public function send(User|string $to, Mailable $mailable, string $subject, string $template): void
+    /**
+     * @param  array{job_posting_id?: int|null, kind?: string|null}  $context  written on the email_logs rows (Communication Log, S6.8)
+     */
+    public function send(User|string $to, Mailable $mailable, string $subject, string $template, array $context = []): void
     {
+        $context = self::context($context);
+
         if ($this->mode() === 'sync') {
             if ($to instanceof User) {
-                $this->notifications->sendLoggedEmail($to, $mailable, $subject, $template);
+                $this->notifications->sendLoggedEmail($to, $mailable, $subject, $template, $context);
 
                 return;
             }
 
-            $this->sendToAddress($to, $mailable, $subject, $template);
+            $this->sendToAddress($to, $mailable, $subject, $template, $context);
 
             return;
         }
@@ -54,7 +59,7 @@ class MailDispatchService
             'template' => $template,
             'message_ref' => $ref,
             'status' => 'queued',
-        ]);
+        ] + $context);
 
         try {
             Mail::to($email)->queue($mailable->metadata(self::LOG_REF, $ref));
@@ -69,9 +74,11 @@ class MailDispatchService
      * The To header is the portal's own address so students never see each other's emails.
      *
      * @param  iterable<User>  $users
+     * @param  array{job_posting_id?: int|null, kind?: string|null}  $context  written on the email_logs rows (Communication Log, S6.8)
      */
-    public function sendBulk(iterable $users, Mailable $mailable, string $subject, string $template): void
+    public function sendBulk(iterable $users, Mailable $mailable, string $subject, string $template, array $context = []): void
     {
+        $context = self::context($context) + ['job_posting_id' => null, 'kind' => null];
         $recipients = collect($users)->filter(fn ($user) => $user instanceof User && filled($user->email))->unique('email')->values();
 
         foreach ($recipients->chunk($this->batchSize()) as $batch) {
@@ -90,6 +97,8 @@ class MailDispatchService
                 'template' => $template,
                 'message_ref' => $ref,
                 'status' => 'queued',
+                'job_posting_id' => $context['job_posting_id'],
+                'kind' => $context['kind'],
                 'created_at' => $now,
                 'updated_at' => $now,
             ])->all());
@@ -153,7 +162,15 @@ class MailDispatchService
         return $this->settings->get('mail_mode') === 'sync' ? 'sync' : 'queued';
     }
 
-    private function sendToAddress(string $email, Mailable $mailable, string $subject, string $template): void
+    /**
+     * @return array{job_posting_id?: int|null, kind?: string|null}
+     */
+    private static function context(array $context): array
+    {
+        return array_intersect_key($context, array_flip(['job_posting_id', 'kind']));
+    }
+
+    private function sendToAddress(string $email, Mailable $mailable, string $subject, string $template, array $context = []): void
     {
         try {
             Mail::to($email)->send($mailable);
@@ -164,7 +181,7 @@ class MailDispatchService
                 'template' => $template,
                 'status' => 'sent',
                 'sent_at' => now(),
-            ]);
+            ] + $context);
         } catch (Throwable $exception) {
             EmailLog::create([
                 'recipient_email' => $email,
@@ -172,7 +189,7 @@ class MailDispatchService
                 'template' => $template,
                 'status' => 'failed',
                 'error_message' => $exception->getMessage(),
-            ]);
+            ] + $context);
         }
     }
 }

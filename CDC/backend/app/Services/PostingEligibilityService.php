@@ -33,6 +33,7 @@ final class PostingEligibilityService
         'graduatingBatch' => '',
         'minTenthPercent' => '',
         'minTwelfthPercent' => '',
+        'allowedStudentCategories' => [],
     ];
 
     private const PROGRAMME_KEYS = ['programme', 'expanded', 'courseDurationYears', 'graduatingBatch', 'graduatingBatches', 'branches'];
@@ -49,7 +50,7 @@ final class PostingEligibilityService
     {
         return in_array($posting->status, self::EDITABLE_STATUSES, true)
             ? null
-            : "This drive is {$posting->status}, so its eligibility can no longer be changed.";
+            : "This job profile is {$posting->status}, so its eligibility can no longer be changed.";
     }
 
     /**
@@ -62,10 +63,10 @@ final class PostingEligibilityService
             return $refusal;
         }
         if (ApplicationRoundResult::query()->whereIn('posting_round_id', $posting->rounds()->pluck('id'))->exists()) {
-            return 'Results have already been entered for this drive, so applications cannot be reopened.';
+            return 'Results have already been entered for this job profile, so applications cannot be reopened.';
         }
         if ($posting->placementCycle && ! $posting->placementCycle->isOpen()) {
-            return 'The placement cycle is closed, so applications cannot be reopened.';
+            return 'The placement is closed, so applications cannot be reopened.';
         }
 
         return null;
@@ -104,6 +105,7 @@ final class PostingEligibilityService
                 'eligibility' => $this->normaliseMatrix($value),
                 'globalBacklogs' => $this->truthy($value),
                 'genderFilter' => strtolower((string) $value),
+                'allowedStudentCategories' => EligibilityService::categoryIds(['allowedStudentCategories' => $value ?? []]),
                 default => trim((string) ($value ?? '')),
             };
         }
@@ -199,7 +201,7 @@ final class PostingEligibilityService
 
             if ($changed) {
                 $form = $posting->postable_type::query()->lockForUpdate()->findOrFail($posting->postable_id);
-                $form->form_data = array_replace(is_array($form->form_data) ? $form->form_data : [], $criteria);
+                $form->form_data = array_replace(is_array($form->form_data) ? $form->form_data : [], JobPosting::withoutAdminOnlyKeys($criteria)); // categories live only in the snapshot (fix M2)
                 $form->save();
 
                 $posting->eligibility_snapshot = $criteria;
@@ -332,6 +334,8 @@ final class PostingEligibilityService
             'graduatingBatch' => ['sometimes', 'nullable', $year],
             'minTenthPercent' => ['sometimes', 'nullable', $percent],
             'minTwelfthPercent' => ['sometimes', 'nullable', $percent],
+            'allowedStudentCategories' => ['sometimes', 'nullable', 'array', 'max:50'],
+            'allowedStudentCategories.*' => ['integer', 'exists:student_categories,id'],
         ];
     }
 
@@ -341,9 +345,10 @@ final class PostingEligibilityService
         return [
             'eligibility.min' => 'Select at least one programme and branch.',
             'genderFilter.in' => 'Gender must be all, male or female.',
-            'graduatingBatch.regex' => 'The graduating batch must be a four-digit year.',
-            'eligibility.*.graduatingBatches.*.regex' => 'Graduating batches must be four-digit years.',
-            'eligibility.*.graduatingBatch.regex' => 'Graduating batches must be four-digit years.',
+            'graduatingBatch.regex' => 'The passout batch must be a four-digit year.',
+            'eligibility.*.graduatingBatches.*.regex' => 'Passout batches must be four-digit years.',
+            'eligibility.*.graduatingBatch.regex' => 'Passout batches must be four-digit years.',
+            'allowedStudentCategories.*.exists' => 'One of the chosen student categories no longer exists.',
         ];
     }
 
@@ -357,8 +362,8 @@ final class PostingEligibilityService
             $text = trim((string) $value);
             if (! preg_match('/^\d{1,'.$digits.'}(\.\d{1,2})?$/', $text) || (float) $text > $max) {
                 $label = match (true) {
-                    str_ends_with($attribute, 'minTenthPercent') => 'Min 10th %',
-                    str_ends_with($attribute, 'minTwelfthPercent') => 'Min 12th %',
+                    str_ends_with($attribute, 'minTenthPercent') => 'Min Class X Percentage',
+                    str_ends_with($attribute, 'minTwelfthPercent') => 'Min Class XII Percentage',
                     str_ends_with($attribute, 'globalCgpa') => 'The global CGPA',
                     default => 'A branch CGPA cut-off',
                 };
@@ -487,6 +492,7 @@ final class PostingEligibilityService
             $string($criteria['graduatingBatch']),
             $string($criteria['minTenthPercent']),
             $string($criteria['minTwelfthPercent']),
+            (function (array $ids) { sort($ids); return $ids; })(EligibilityService::categoryIds($criteria)),
         ]);
     }
 

@@ -13,6 +13,9 @@ class SettingsService
     /** Defaults used when a key has never been written. */
     public const DEFAULTS = [
         'mail_mode' => 'queued',
+        // Account (S8.1): the institute display name and the account logo ({path, mime} on the private disk).
+        'institute_name' => null,
+        'account_logo' => null,
     ];
 
     public function __construct(private readonly AuditService $audit)
@@ -30,20 +33,28 @@ class SettingsService
         });
     }
 
-    public function set(string $key, mixed $value, User $admin): void
+    /** `$action` names the audit row (default `setting.update`); the Account tab uses its own `settings.*` names. */
+    public function set(string $key, mixed $value, User $admin, string $action = 'setting.update'): void
     {
         $setting = PortalSetting::query()->firstOrNew(['key' => $key]);
         $before = $setting->exists ? $setting->value : null;
 
-        $setting->value = $value;
-        $setting->save();
+        // `value` is NOT NULL: clearing a key removes its row, so it falls back to the default.
+        if ($value === null) {
+            if ($setting->exists) {
+                $setting->delete();
+            }
+        } else {
+            $setting->value = $value;
+            $setting->save();
+        }
 
         Cache::forget($this->cacheKey($key));
 
         $this->audit->logAs(
             actor: $admin,
             ip: request()?->ip(),
-            action: 'setting.update',
+            action: $action,
             subject: $setting,
             before: ['key' => $key, 'value' => $before],
             after: ['key' => $key, 'value' => $value],

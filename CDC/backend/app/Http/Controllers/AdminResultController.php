@@ -38,7 +38,7 @@ class AdminResultController extends Controller
     {
         $final = $this->finalRound($jobPosting);
         if (! $final) {
-            return response()->json(['message' => 'This posting has no final round.'], 422);
+            return response()->json(['message' => 'This job profile has no final stage.'], 422);
         }
 
         $rows = $final->results()
@@ -136,7 +136,7 @@ class AdminResultController extends Controller
         ]);
 
         if ($jobPosting->status === 'cancelled') {
-            return response()->json(['message' => 'This posting is cancelled.'], 422);
+            return response()->json(['message' => 'This job profile is cancelled.'], 422);
         }
         if ($jobPosting->acceptsApplications()) {
             return response()->json(['message' => 'Close applications before announcing results.'], 422);
@@ -144,7 +144,7 @@ class AdminResultController extends Controller
 
         $final = $this->finalRound($jobPosting);
         if (! $final) {
-            return response()->json(['message' => 'This posting has no final round.'], 422);
+            return response()->json(['message' => 'This job profile has no final stage.'], 422);
         }
         if ($problem = $this->orderProblem($jobPosting, $final)) {
             return response()->json(['message' => $problem], 422);
@@ -159,10 +159,10 @@ class AdminResultController extends Controller
         foreach ($validated['selections'] as $selection) {
             $application = $applications->get($selection['application_id']);
             if (! $application || $application->status !== 'applied') {
-                return response()->json(['message' => "Application #{$selection['application_id']} is not a live application of this posting."], 422);
+                return response()->json(['message' => "Application #{$selection['application_id']} is not a live application of this job profile."], 422);
             }
             if ($application->offer) {
-                return response()->json(['message' => "{$application->studentProfile->roll_no} already has an offer for this posting."], 422);
+                return response()->json(['message' => "{$application->studentProfile->roll_no} already has an offer for this job profile."], 422);
             }
         }
 
@@ -171,7 +171,7 @@ class AdminResultController extends Controller
         $finalIds = $final->results()->pluck('application_id')->all();
         foreach ($applications as $application) {
             if (! in_array($application->id, $poolIds, true) && ! in_array($application->id, $finalIds, true)) {
-                return response()->json(['message' => "{$application->studentProfile->roll_no} did not reach the final round. Use Re-add on the round where they were not selected."], 422);
+                return response()->json(['message' => "{$application->studentProfile->roll_no} did not reach the final stage. Use Re-add on the stage where they were not selected."], 422);
             }
         }
 
@@ -334,7 +334,7 @@ class AdminResultController extends Controller
             );
 
             $mailable = new OfferMail($student->full_name, $company, $title, Offer::LABELS[$offer->offer_type], $compensation, $blockNote);
-            $this->mail->send($student->user, $mailable, $mailable->envelope()->subject, 'emails.offer');
+            $this->mail->send($student->user, $mailable, $mailable->envelope()->subject, 'emails.offer', ['job_posting_id' => $posting->id, 'kind' => 'offer']);
         }
     }
 
@@ -346,7 +346,7 @@ class AdminResultController extends Controller
         $rounds = $posting->rounds()->get();
 
         if ($rounds->last()?->id !== $final->id) {
-            return 'The final round must be the last round. Reorder the rounds or mark the last round as final.';
+            return 'The final stage must be the last stage. Reorder the stages or mark the last stage as final.';
         }
 
         $pending = $rounds->first(fn (PostingRound $r) => $r->sort_order < $final->sort_order && $r->status !== 'completed');

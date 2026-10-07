@@ -242,7 +242,7 @@ class S10CompanyTest extends TestCase
         // COMPANY_B proposing COMPANY_A's applicant on B's OWN posting is refused without revealing anything.
         $r = $this->postJson("/api/company/postings/{$postingB->id}/rounds/{$roundB->id}/proposals", ['kind' => 'shortlist', 'entries' => [['roll_no' => $studentA->roll_no]]])->assertStatus(422);
         $this->assertStringNotContainsString('Zelda', $r->getContent());
-        $this->assertSame('Not an applicant of this posting.', $r->json('errors.0.reason'));
+        $this->assertSame('Not an applicant of this job profile.', $r->json('errors.0.reason'));
 
         // The sweep cannot be satisfied trivially: COMPANY_A itself gets 200s on the same URLs.
         Sanctum::actingAs($this->userA);

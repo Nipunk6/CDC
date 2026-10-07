@@ -22,7 +22,8 @@ class SendStudentInvitation implements ShouldQueue
     {
         $student = StudentProfile::query()->with('user')->find($this->studentProfileId);
 
-        if ($student && $student->user) {
+        // Revoked after this job was queued, or the student already set a password: no new link (S5).
+        if ($student && $student->user && $student->user->activated_at === null && $student->user->invite_revoked_at === null) {
             $accounts->deliverInvitation($student);
         }
     }

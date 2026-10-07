@@ -34,7 +34,13 @@ class CalendarController extends Controller
             ->whereHas('jobPosting', fn (Builder $p) => $p->where('status', '!=', 'cancelled'))
             ->get();
 
-        return response()->json(['items' => $this->items($events, $postings, $rounds, 'admin')]);
+        // Date of Visit / Process (S6.3), compared as IST calendar days.
+        $visits = JobPosting::query()->with(['postable.company:id,name'])
+            ->where('status', '!=', 'cancelled')
+            ->whereBetween('visit_date', [$from->timezone('Asia/Kolkata')->toDateString(), $to->timezone('Asia/Kolkata')->toDateString()])
+            ->get();
+
+        return response()->json(['items' => $this->items($events, $postings, $rounds, 'admin', $visits)]);
     }
 
     public function student(Request $request, EligibilityService $eligibility): JsonResponse
@@ -54,6 +60,7 @@ class CalendarController extends Controller
         $postings = JobPosting::query()->with(['postable.company:id,name'])
             ->whereIn('placement_cycle_id', $cycleIds)
             ->where('status', '!=', 'cancelled')
+            ->released()
             ->whereBetween('application_deadline', [$from, $to])
             ->get()
             // Drives that leave the student's branch out are not theirs to see (owner decision, QA T3.2).
@@ -67,7 +74,15 @@ class CalendarController extends Controller
             ->whereBetween('scheduled_at', [$from, $to])
             ->get();
 
-        return response()->json(['items' => $this->items($events, $postings, $rounds, 'student')]);
+        $visits = JobPosting::query()->with(['postable.company:id,name'])
+            ->whereIn('placement_cycle_id', $cycleIds)
+            ->where('status', '!=', 'cancelled')
+            ->released()
+            ->whereBetween('visit_date', [$from->timezone('Asia/Kolkata')->toDateString(), $to->timezone('Asia/Kolkata')->toDateString()])
+            ->get()
+            ->filter(fn (JobPosting $p) => $appliedPostingIds->contains($p->id) || $eligibility->offersBranch($student, $p));
+
+        return response()->json(['items' => $this->items($events, $postings, $rounds, 'student', $visits)]);
     }
 
     /** @return array{0: CarbonImmutable, 1: CarbonImmutable} */
@@ -80,7 +95,7 @@ class CalendarController extends Controller
         return [$start->utc(), $start->endOfMonth()->utc()];
     }
 
-    private function items(Collection $events, Collection $postings, Collection $rounds, string $audience): array
+    private function items(Collection $events, Collection $postings, Collection $rounds, string $audience, ?Collection $visits = null): array
     {
         $prefix = $audience === 'admin' ? '/admin' : '/student';
 
@@ -105,9 +120,18 @@ class CalendarController extends Controller
                 'type' => 'round',
                 'at' => $r->scheduled_at,
                 'title' => $r->name.' — '.$r->jobPosting->title(),
-                'subtitle' => $r->jobPosting->company()?->name ?? '',
+                'subtitle' => trim(($r->jobPosting->company()?->name ?? '').($r->venue ? ' · '.$r->venue : '')),
                 'draft' => false,
                 'link' => $prefix.'/postings/'.$r->job_posting_id,
+            ]))
+            ->merge(($visits ?? collect())->map(fn (JobPosting $p) => [
+                'type' => 'visit',
+                // A date without a time: 10:00 IST so it lands on the right day in every view.
+                'at' => \Carbon\Carbon::parse($p->visit_date->toDateString().' 10:00', 'Asia/Kolkata')->utc(),
+                'title' => 'Visit: '.$p->title(),
+                'subtitle' => $p->company()?->name ?? '',
+                'draft' => false,
+                'link' => $prefix.'/postings/'.$p->id,
             ]));
 
         return $items->sortBy('at')->values()->all();

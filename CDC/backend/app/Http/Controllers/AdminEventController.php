@@ -118,7 +118,7 @@ class AdminEventController extends Controller
             'audience_filter.job_posting_id' => ['required_if:audience_type,posting_applicants', 'integer', 'exists:job_postings,id'],
         ], [
             'audience_filter.branches.required_if' => 'Pick at least one programme or branch.',
-            'audience_filter.job_posting_id.required_if' => 'Pick the posting whose applicants should see this event.',
+            'audience_filter.job_posting_id.required_if' => 'Pick the job profile whose applicants should see this event.',
         ]);
 
         $validated['audience_type'] ??= 'all';

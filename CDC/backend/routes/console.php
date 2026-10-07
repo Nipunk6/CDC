@@ -26,3 +26,35 @@ Artisan::command('placement:extend-offer-blocks', function (BlockingPolicy $poli
     }
     $this->info("{$created} block(s) added, {$flagged} live application(s) flagged as placed elsewhere.");
 })->purpose('Extend existing offer blocks to every open cycle the student is enrolled in (QA F-004)');
+
+// "Schedule For Later" (Superset parity S6.2): open job profiles whose opening time has come and send E2 once.
+// Runs every minute from the scheduler (`php artisan schedule:work` locally, cron `schedule:run` in production).
+Artisan::command('placement:open-scheduled', function (AuditService $audit, \App\Services\MailDispatchService $mail) {
+    $opened = 0;
+    \App\Models\JobPosting::query()
+        ->whereNotNull('scheduled_open_at')
+        ->where('scheduled_open_at', '<=', now())
+        ->where('status', 'open')
+        ->orderBy('scheduled_open_at')
+        ->get()
+        ->each(function (\App\Models\JobPosting $posting) use ($audit, $mail, &$opened): void {
+            // Claim it atomically, so two overlapping runs can never open (and mail) the same job profile twice.
+            $claimed = \App\Models\JobPosting::query()
+                ->whereKey($posting->id)
+                ->whereNotNull('scheduled_open_at')
+                ->where('scheduled_open_at', '<=', now())
+                ->update(['scheduled_open_at' => null]);
+            if ($claimed !== 1) {
+                return;
+            }
+
+            $audit->logAs(null, null, 'posting.scheduled_open', $posting, ['scheduled_open_at' => $posting->scheduled_open_at?->toIso8601String()], ['scheduled_open_at' => null]);
+            $mail->mode() === 'sync'
+                ? \App\Jobs\SendPostingFloatedMails::dispatchSync($posting->id)
+                : \App\Jobs\SendPostingFloatedMails::dispatch($posting->id);
+            $opened++;
+        });
+    $this->info("{$opened} scheduled job profile(s) opened.");
+})->purpose('Open job profiles scheduled for later and notify eligible students (S6.2)');
+
+\Illuminate\Support\Facades\Schedule::command('placement:open-scheduled')->everyMinute()->withoutOverlapping();

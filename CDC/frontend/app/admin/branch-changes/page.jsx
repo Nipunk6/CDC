@@ -154,11 +154,11 @@ export default function AdminBranchChangesPage() {
                       color="success"
                       disabled={busy}
                       onClick={() =>
-                        window.confirm(`Approve and move ${item.student_profile?.roll_no} to ${item.requested_branch}?`) &&
+                        window.confirm(`Accept changes and move ${item.student_profile?.roll_no} to ${item.requested_branch}?`) &&
                         decide(item, "approved")
                       }
                     >
-                      Approve
+                      Accept Changes
                     </Button>
                     <Button
                       variant="outlined"
@@ -169,7 +169,7 @@ export default function AdminBranchChangesPage() {
                         setRejecting(item);
                       }}
                     >
-                      Reject
+                      Reject Changes
                     </Button>
                   </Stack>
                 )}
@@ -204,7 +204,7 @@ export default function AdminBranchChangesPage() {
             Cancel
           </Button>
           <Button color="error" variant="contained" disabled={busy || !remark.trim()} onClick={() => decide(rejecting, "rejected", remark.trim())}>
-            Reject
+            Reject Changes
           </Button>
         </DialogActions>
       </Dialog>

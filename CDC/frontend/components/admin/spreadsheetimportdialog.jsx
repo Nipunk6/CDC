@@ -9,6 +9,10 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -25,6 +29,7 @@ import { adminDownload } from "@/lib/adminapi";
 import { adminUpload } from "@/lib/adminupload";
 
 // Upload an .xlsx/.csv, optionally preview with ?dry_run=1, then run for real and show the per-row report.
+// `batchOptions` (years) adds the optional "Select student batch" pre-selection, sent as `default_batch` (S5.6).
 export default function SpreadsheetImportDialog({
   open,
   onClose,
@@ -35,8 +40,10 @@ export default function SpreadsheetImportDialog({
   templatePath,
   templateName,
   dryRun = false,
+  batchOptions = null,
 }) {
   const [file, setFile] = useState(null);
+  const [batch, setBatch] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [report, setReport] = useState(null);
@@ -45,6 +52,7 @@ export default function SpreadsheetImportDialog({
   useEffect(() => {
     if (open) {
       setFile(null);
+      setBatch("");
       setError(null);
       setReport(null);
       setPreviewed(false);
@@ -61,6 +69,7 @@ export default function SpreadsheetImportDialog({
     const body = new FormData();
     body.append("file", file);
     if (isDryRun) body.append("dry_run", "1");
+    if (batchOptions && batch) body.append("default_batch", batch);
     try {
       const response = await adminUpload(endpoint, body);
       setReport(response);
@@ -100,6 +109,29 @@ export default function SpreadsheetImportDialog({
               </Button>
             </Box>
           )}
+          {batchOptions && (
+            <FormControl size="small" sx={{ maxWidth: 320 }}>
+              <InputLabel id="sid-batch">Select student batch</InputLabel>
+              <Select
+                labelId="sid-batch"
+                label="Select student batch"
+                value={batch}
+                disabled={busy}
+                onChange={(event) => {
+                  setBatch(event.target.value);
+                  setReport(null);
+                  setPreviewed(false);
+                }}
+              >
+                <MenuItem value="">None (use the file&apos;s batch column)</MenuItem>
+                {batchOptions.map((year) => (
+                  <MenuItem key={year} value={String(year)}>
+                    {year} Passout Batch
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
             <Button variant="outlined" component="label" startIcon={<UploadFileIcon />} disabled={busy}>
               Choose file
@@ -130,7 +162,7 @@ export default function SpreadsheetImportDialog({
                 <TableHead>
                   <TableRow>
                     <TableCell>Row</TableCell>
-                    <TableCell>Roll no</TableCell>
+                    <TableCell>Roll Number</TableCell>
                     <TableCell>Field</TableCell>
                     <TableCell>Problem</TableCell>
                   </TableRow>

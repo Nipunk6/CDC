@@ -31,7 +31,7 @@ class RoundResultMail extends Mailable
     {
         $subject = match ($this->outcome) {
             'selected' => "Shortlisted: {$this->companyName} — {$this->roundName}",
-            'waitlisted' => "Waitlisted: {$this->companyName} — {$this->roundName}",
+            'waitlisted' => "On Hold: {$this->companyName} — {$this->roundName}",
             default => "Update on your application: {$this->companyName}",
         };
 

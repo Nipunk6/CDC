@@ -18,6 +18,7 @@ class PostingQuestion extends Model
     protected $fillable = [
         'job_posting_id',
         'question',
+        'help_text',
         'qtype',
         'options',
         'required',

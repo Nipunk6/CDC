@@ -88,7 +88,7 @@ class AdminProposalController extends Controller
 
         if ($validated['status'] === 'approved') {
             if ($posting->status === 'cancelled') {
-                return response()->json(['message' => 'This posting is cancelled.'], 422);
+                return response()->json(['message' => 'This job profile is cancelled.'], 422);
             }
             if ($posting->acceptsApplications()) {
                 return response()->json(['message' => 'Applications are still open. Close applications before approving proposals.'], 422);
@@ -172,7 +172,7 @@ class AdminProposalController extends Controller
             $posting,
             'Your '.str_replace('_', ' ', $shortlistProposal->kind).' was '.($approved ? 'accepted' : 'declined'),
             $approved
-                ? sprintf('The CDC accepted your %s for %s — %s. Candidates are informed once the CDC publishes the round.', str_replace('_', ' ', $shortlistProposal->kind), $posting->title(), $round->name)
+                ? sprintf('The CDC accepted your %s for %s — %s. Candidates are informed once the CDC publishes the stage.', str_replace('_', ' ', $shortlistProposal->kind), $posting->title(), $round->name)
                 : sprintf('The CDC declined your %s for %s — %s.', str_replace('_', ' ', $shortlistProposal->kind), $posting->title(), $round->name),
             $approved ? [] : ['CDC remark: '.$validated['admin_remark']],
             $approved ? 'success' : 'warning'
@@ -180,7 +180,7 @@ class AdminProposalController extends Controller
 
         return response()->json([
             'message' => $approved
-                ? "Proposal approved: {$report['written']} draft result(s) written. Publish the round to notify students."
+                ? "Proposal approved: {$report['written']} draft result(s) written. Publish the stage to notify students."
                 : 'Proposal rejected and the company has been told.',
             'errors' => array_merge($unknown, $report['skipped']),
         ]);

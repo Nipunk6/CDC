@@ -77,8 +77,8 @@ class AdminBlockController extends Controller
 
         $this->notifications->createInAppNotification(
             $block->studentProfile->user,
-            $validated['reason'] === 'debarred' ? 'Debarred from a placement cycle' : 'Placement block added',
-            $block->message().' Placement cycle: '.$block->placementCycle->name.'.',
+            $validated['reason'] === 'debarred' ? 'Debarred from a placement' : 'Placement block added',
+            $block->message().' Placement: '.$block->placementCycle->name.'.',
             'warning'
         );
 

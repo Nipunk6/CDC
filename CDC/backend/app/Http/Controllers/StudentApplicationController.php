@@ -61,7 +61,7 @@ class StudentApplicationController extends Controller
         ]);
 
         if (! $this->isVisible($student, $jobPosting)) {
-            return response()->json(['message' => 'Posting not found.'], 404);
+            return response()->json(['message' => 'Job profile not found.'], 404);
         }
 
         if (! $jobPosting->acceptsApplications()) {
@@ -71,7 +71,7 @@ class StudentApplicationController extends Controller
         $check = $this->eligibility->check($student, $jobPosting);
         if (! $check['eligible']) {
             return response()->json([
-                'message' => 'You are not eligible for this posting.',
+                'message' => 'You are not eligible for this job profile.',
                 'reasons' => $check['reasons'],
             ], 422);
         }
@@ -280,7 +280,7 @@ class StudentApplicationController extends Controller
             rtrim((string) config('app.frontend_url'), '/').'/student/applications'
         );
 
-        $this->mail->send($student->user, $mailable, $mailable->envelope()->subject, 'emails.application-submitted');
+        $this->mail->send($student->user, $mailable, $mailable->envelope()->subject, 'emails.application-submitted', ['job_posting_id' => $application->job_posting_id, 'kind' => 'application_receipt']);
     }
 
     /** @return array<string, mixed>|null */
@@ -296,12 +296,12 @@ class StudentApplicationController extends Controller
     private function closedMessage(JobPosting $posting): string
     {
         if ($posting->status !== 'open') {
-            return 'This posting is no longer accepting applications.';
+            return 'This job profile is no longer accepting applications.';
         }
 
         return $posting->deadlinePassed()
             ? 'The application deadline has passed.'
-            : 'This placement cycle is closed, so it no longer accepts applications.';
+            : 'This placement is closed, so it no longer accepts applications.';
     }
 
     private function ownResume(StudentProfile $student, int $resumeId): ?Resume
@@ -312,6 +312,9 @@ class StudentApplicationController extends Controller
     private function isVisible(StudentProfile $student, JobPosting $posting): bool
     {
         return $posting->status !== 'cancelled'
+            && ! $posting->placementCycle?->is_draft
+            // A job profile scheduled to open later does not exist for students yet (fix L16): 404 like its detail.
+            && ! ($posting->scheduled_open_at !== null && $posting->scheduled_open_at->isFuture())
             && $student->cycleEnrollments()->where('placement_cycle_id', $posting->placement_cycle_id)->exists();
     }
 

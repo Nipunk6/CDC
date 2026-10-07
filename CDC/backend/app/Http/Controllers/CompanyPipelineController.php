@@ -112,6 +112,17 @@ class CompanyPipelineController extends Controller
         return $exports->applicantsWorkbook($jobPosting, 'company');
     }
 
+    /**
+     * The link the CDC mails with "Send Applicant List" (S6.11): signed and time-limited, the same company-safe
+     * export the company downloads from its portal. Cancelled job profiles are not served.
+     */
+    public function signedExport(JobPosting $jobPosting, \App\Services\ExportService $exports): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        abort_if($jobPosting->status === 'cancelled', 404, 'Job profile not found.');
+
+        return $exports->applicantsWorkbook($jobPosting, 'company');
+    }
+
     public function proposals(Request $request, JobPosting $jobPosting): JsonResponse
     {
         $this->authorizePosting($request, $jobPosting);
@@ -130,7 +141,7 @@ class CompanyPipelineController extends Controller
     public function storeProposal(Request $request, JobPosting $jobPosting, PostingRound $postingRound): JsonResponse
     {
         $this->authorizePosting($request, $jobPosting);
-        abort_if($postingRound->job_posting_id !== $jobPosting->id, 404, 'Round not found.');
+        abort_if($postingRound->job_posting_id !== $jobPosting->id, 404, 'Stage not found.');
 
         $validated = $request->validate([
             'kind' => ['required', 'in:shortlist,waitlist,addendum,replacement_request'],
@@ -141,7 +152,7 @@ class CompanyPipelineController extends Controller
         // A completed drive still takes replacement requests and addenda (E9 invites them; QA F-010).
         if ($jobPosting->status === 'cancelled'
             || ($jobPosting->status === 'completed' && ! in_array($validated['kind'], ['addendum', 'replacement_request'], true))) {
-            return response()->json(['message' => 'This drive is '.$jobPosting->status.'.'.($jobPosting->status === 'completed' ? ' You can still send a replacement request or an addendum.' : '')], 422);
+            return response()->json(['message' => 'This job profile is '.$jobPosting->status.'.'.($jobPosting->status === 'completed' ? ' You can still send a replacement request or an addendum.' : '')], 422);
         }
         if ($jobPosting->acceptsApplications()) {
             return response()->json(['message' => 'Applications are still open. You can propose candidates once the application window closes.'], 422);
@@ -158,7 +169,7 @@ class CompanyPipelineController extends Controller
 
         if ($unknown !== []) {
             return response()->json([
-                'message' => 'Some roll numbers are not applicants of this posting. Remove them and try again.',
+                'message' => 'Some roll numbers are not applicants of this job profile. Remove them and try again.',
                 'errors' => $unknown,
             ], 422);
         }
@@ -179,7 +190,8 @@ class CompanyPipelineController extends Controller
             "{$company} proposed a {$this->kindLabel($validated['kind'])}",
             sprintf('%s submitted a %s of %d candidate(s) for %s — %s.', $company, $this->kindLabel($validated['kind']), count($payload), $jobPosting->title(), $postingRound->name),
             [],
-            "/admin/postings/{$jobPosting->id}"
+            "/admin/postings/{$jobPosting->id}",
+            ['job_posting_id' => $jobPosting->id, 'kind' => 'shortlist_proposal']
         );
 
         return response()->json([
@@ -208,7 +220,7 @@ class CompanyPipelineController extends Controller
     private function authorizePosting(Request $request, JobPosting $posting): void
     {
         // 404, not 403, so other companies' posting ids cannot be probed (Phase 1 pattern).
-        abort_unless($this->ownPostings($request)->whereKey($posting->id)->exists(), 404, 'Posting not found.');
+        abort_unless($this->ownPostings($request)->whereKey($posting->id)->exists(), 404, 'Job profile not found.');
     }
 
     private function summary(JobPosting $posting): array
@@ -226,6 +238,10 @@ class CompanyPipelineController extends Controller
             'share_contact_details' => $posting->share_contact_details,
             'applicant_count' => (int) ($posting->applicant_count ?? 0),
             'rounds_count' => $posting->relationLoaded('rounds') ? $posting->rounds->count() : null,
+            // For the shared status label (fix L17): Closed For Applications until a stage is published.
+            'any_stage_published' => $posting->relationLoaded('rounds')
+                ? $posting->rounds->contains(fn ($r) => $r->status === 'completed')
+                : $posting->rounds()->where('status', 'completed')->exists(),
         ];
     }
 }

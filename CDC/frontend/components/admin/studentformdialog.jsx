@@ -43,6 +43,18 @@ const blank = {
   home_state: "",
   linkedin_url: "",
   github_url: "",
+  // S4.6 academic extras (CDC-entered only)
+  current_semester: "",
+  course_start_date: "",
+  course_end_date: "",
+  lateral_entry: false,
+  tenth_board: "",
+  tenth_passing_year: "",
+  twelfth_board: "",
+  twelfth_passing_year: "",
+  previous_degree: "",
+  previous_degree_score: "",
+  previous_degree_score_type: "",
 };
 
 const fromStudent = (student) =>
@@ -142,7 +154,7 @@ export default function StudentFormDialog({ open, student, onClose, onSaved }) {
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>{field("graduating_batch", "Graduating batch", { required: true, type: "number" })}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{field("graduating_batch", "Passout Batch", { required: true, type: "number" })}</Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <FormControl fullWidth size="small" required>
               <InputLabel id="student-gender">Gender</InputLabel>
@@ -156,16 +168,55 @@ export default function StudentFormDialog({ open, student, onClose, onSaved }) {
           <Grid size={{ xs: 6, sm: 3 }}>{field("current_cgpa", "CGPA", { type: "number", inputProps: { step: 0.01, min: 0, max: 10 } })}</Grid>
           <Grid size={{ xs: 6, sm: 3 }}>{field("ongoing_backlogs", "Ongoing backlogs", { type: "number", inputProps: { min: 0 } })}</Grid>
           <Grid size={{ xs: 6, sm: 3 }}>{field("total_backlogs", "Total backlogs", { type: "number", inputProps: { min: 0 } })}</Grid>
-          <Grid size={{ xs: 6, sm: 3 }}>{field("tenth_percent", "10th %", { type: "number", inputProps: { step: 0.01 } })}</Grid>
-          <Grid size={{ xs: 6, sm: 3 }}>{field("twelfth_percent", "12th %", { type: "number", inputProps: { step: 0.01 } })}</Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>{field("tenth_percent", "Class X Percentage", { type: "number", inputProps: { step: 0.01 } })}</Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>{field("twelfth_percent", "Class XII Percentage", { type: "number", inputProps: { step: 0.01 } })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{field("date_of_birth", "Date of birth", { type: "date" })}</Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>{field("phone", "Phone")}</Grid>
-          <Grid size={{ xs: 6, sm: 4 }}>{field("category", "Category")}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{field("phone", "Contact No.")}</Grid>
+          <Grid size={{ xs: 6, sm: 4 }}>{field("category", "Social Category")}</Grid>
           <Grid size={{ xs: 6, sm: 4 }}>{field("home_state", "Home state")}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{field("linkedin_url", "LinkedIn URL")}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{field("github_url", "GitHub URL")}</Grid>
           <Grid size={{ xs: 12 }}>
             <FormControlLabel control={<Checkbox checked={Boolean(form.pwd)} onChange={set("pwd")} />} label="Person with disability (PwD)" />
+          </Grid>
+
+          <Grid size={{ xs: 12 }}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              Academic Details
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Optional. Students see these read-only.
+            </Typography>
+          </Grid>
+          <Grid size={{ xs: 6, sm: 4 }}>{field("current_semester", "Current Semester", { type: "number", inputProps: { min: 1, max: 12 } })}</Grid>
+          <Grid size={{ xs: 6, sm: 4 }}>{field("course_start_date", "Course Start Date", { type: "date" })}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{field("course_end_date", "Course End Date", { type: "date" })}</Grid>
+          <Grid size={{ xs: 12, sm: 8 }}>{field("tenth_board", "Xth Board")}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{field("tenth_passing_year", "Year of passing 10th", { type: "number" })}</Grid>
+          <Grid size={{ xs: 12, sm: 8 }}>{field("twelfth_board", "XIIth Board")}</Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>{field("twelfth_passing_year", "Year of passing 12th", { type: "number" })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{field("previous_degree", "Previous Degree")}</Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>{field("previous_degree_score", "Previous Degree Score", { type: "number", inputProps: { step: 0.01, min: 0 } })}</Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="student-previous-score-type">Score type</InputLabel>
+              <Select
+                labelId="student-previous-score-type"
+                label="Score type"
+                value={form.previous_degree_score_type ?? ""}
+                onChange={set("previous_degree_score_type")}
+              >
+                <MenuItem value="">—</MenuItem>
+                <MenuItem value="cgpa">CGPA</MenuItem>
+                <MenuItem value="percentage">Percentage</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <FormControlLabel
+              control={<Checkbox checked={Boolean(form.lateral_entry)} onChange={set("lateral_entry")} />}
+              label="Lateral Entry"
+            />
           </Grid>
         </Grid>
       </DialogContent>

@@ -334,7 +334,7 @@ export default function CompanyDashboard() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Job Title / Profile</TableCell>
-                    <TableCell>Graduating Batch</TableCell>
+                    <TableCell>Passout Batch</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Last Updated</TableCell>
                     <TableCell align="right">Actions</TableCell>
@@ -466,7 +466,7 @@ export default function CompanyDashboard() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Internship Title / Profile</TableCell>
-                    <TableCell>Graduating Batch</TableCell>
+                    <TableCell>Passout Batch</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Last Updated</TableCell>
                     <TableCell align="right">Actions</TableCell>

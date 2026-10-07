@@ -374,7 +374,7 @@ class S4PipelineTest extends TestCase
 
         // Every bad row is REPORTED.
         $errors = collect($response->json('errors'))->keyBy('roll_no');
-        $this->assertSame('Not an applicant of this posting.', $errors[self::NOT_APPLIED]['reason'] ?? null, 'non-applicant reported');
+        $this->assertSame('Not an applicant of this job profile.', $errors[self::NOT_APPLIED]['reason'] ?? null, 'non-applicant reported');
         $this->assertSame('Withdrew the application.', $errors[self::WITHDRAWN]['reason'] ?? null, 'withdrawn applicant reported');
         $this->assertNotNull($errors['99ZZ9999'] ?? null, 'non-existent roll reported');
 
@@ -688,7 +688,7 @@ class S4PipelineTest extends TestCase
         // Writing a next-round result for someone still on the waitlist is flagged with a precise hint.
         Sanctum::actingAs($this->admin);
         $this->postJson($this->base()."/rounds/{$r2->id}/results", ['entries' => [['roll_no' => '23QA0004', 'result' => 'selected']]])
-            ->assertOk()->assertJsonPath('warnings.0.reason', 'Is on the previous round\'s waitlist — use "Move" on the Waitlist tab first.');
+            ->assertOk()->assertJsonPath('warnings.0.reason', 'Is On Hold at the previous stage — use "Move" on the On Hold tab first.');
 
         // Someone who was neither selected nor waitlisted is still flagged.
         Sanctum::actingAs($this->admin);

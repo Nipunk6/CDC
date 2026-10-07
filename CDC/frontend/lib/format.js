@@ -72,3 +72,25 @@ export const titleCase = (value) =>
   String(value ?? "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+
+/**
+ * Display label for a job profile (posting) status (Superset parity S6.12); enum values stay unchanged.
+ * Pass the posting itself (or `{ status, deadline_passed, any_stage_published, is_scheduled }`) for the finer labels:
+ * open + deadline ahead → Accepting Applications; open past the deadline or in_process before any stage is published
+ * → Closed For Applications; in_process after a publish → In Process; scheduled → Scheduled to Open.
+ */
+export const postingStatusLabel = (statusOrPosting) => {
+  const p = typeof statusOrPosting === "object" && statusOrPosting !== null ? statusOrPosting : { status: statusOrPosting };
+  // Only an open job profile can be waiting to open; a cancelled/closed one shows its real status (fix M4).
+  if (p.is_scheduled && p.status === "open") return "Scheduled to Open";
+  if (p.status === "open" && (p.deadline_passed || p.accepts_applications === false)) return "Closed For Applications";
+  if (p.status === "in_process" && p.any_stage_published === false) return "Closed For Applications";
+  return (
+    {
+      open: "Accepting Applications",
+      in_process: "In Process",
+      completed: "Completed",
+      cancelled: "Cancelled",
+    }[p.status] ?? titleCase(p.status)
+  );
+};

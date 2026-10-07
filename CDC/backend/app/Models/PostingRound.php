@@ -22,6 +22,7 @@ class PostingRound extends Model
         'round_type',
         'sort_order',
         'scheduled_at',
+        'venue',
         'status',
         'is_final',
     ];

@@ -9,7 +9,7 @@ import { adminApi } from "@/lib/adminapi";
 export default function AdminCalendarPage() {
   return (
     <>
-      <PageHeader icon={<CalendarMonthIcon />} title="Calendar" subtitle="Events, application deadlines and scheduled selection rounds." backHref="/admin" backLabel="Back to Dashboard" />
+      <PageHeader icon={<CalendarMonthIcon />} title="Calendar" subtitle="Events, application deadlines and scheduled selection stages." backHref="/admin" backLabel="Back to Dashboard" />
       <MonthCalendar api={adminApi} endpoint="/admin/calendar" />
     </>
   );

@@ -12,6 +12,7 @@ import {
   FormControl,
   FormControlLabel,
   FormGroup,
+  FormHelperText,
   FormLabel,
   InputLabel,
   List,
@@ -129,7 +130,7 @@ export default function ApplyPanel({ posting, onChanged }) {
       )}
       {applied && <Alert severity="success">You applied on {formatDateTime(application.applied_at)}.</Alert>}
       {application?.status === "withdrawn" && <Alert severity="info">You withdrew this application. You can apply again until the deadline.</Alert>}
-      {!open && <Alert severity="info">Applications are closed for this posting.</Alert>}
+      {!open && <Alert severity="info">Applications are closed for this job profile.</Alert>}
 
       {error && (
         <Alert severity="error">
@@ -182,11 +183,13 @@ export default function ApplyPanel({ posting, onChanged }) {
                   value={answers[q.id] ?? ""}
                   onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
                   inputProps={{ maxLength: 2000 }}
+                  helperText={q.help_text || undefined}
                 />
               )}
               {q.qtype === "mcq_single" && (
                 <FormControl>
                   <FormLabel>{`${q.question}${q.required ? " *" : ""}`}</FormLabel>
+                  {q.help_text && <FormHelperText sx={{ mx: 0 }}>{q.help_text}</FormHelperText>}
                   <RadioGroup value={answers[q.id] ?? ""} onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}>
                     {(q.options ?? []).map((option) => (
                       <FormControlLabel key={option} value={option} control={<Radio size="small" />} label={option} />
@@ -197,6 +200,7 @@ export default function ApplyPanel({ posting, onChanged }) {
               {q.qtype === "mcq_multi" && (
                 <FormControl>
                   <FormLabel>{`${q.question}${q.required ? " *" : ""}`}</FormLabel>
+                  {q.help_text && <FormHelperText sx={{ mx: 0 }}>{q.help_text}</FormHelperText>}
                   <FormGroup>
                     {(q.options ?? []).map((option) => (
                       <FormControlLabel

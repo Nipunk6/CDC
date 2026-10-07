@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -25,6 +24,8 @@ import {
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { companyApi } from "@/lib/companyapi";
+import BrandLogo from "@/components/shared/brandlogo";
+import { useBranding } from "@/lib/branding";
 
 const handleSignOut = async () => {
   try {
@@ -41,7 +42,7 @@ const navItems = [
   { label: "JNF Form", href: "/company/jnf/new" },
   { label: "INF Form", href: "/company/inf/new" },
   { label: "Submissions", href: "/company/submissions" },
-  { label: "Drives", href: "/company/postings" },
+  { label: "Job Profiles", href: "/company/postings" },
   { label: "Notifications", href: "/company/notifications" },
 ];
 
@@ -54,6 +55,7 @@ export default function CompanyShell({
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const hideNavigation = pathname === "/company/register";
+  const branding = useBranding();
 
   return (
     <Box
@@ -109,7 +111,7 @@ export default function CompanyShell({
                 onClick={handleSignOut}
                 sx={{ borderRadius: 1, color: "secondary.main" }}
               >
-                <ListItemText primary="Sign Out" primaryTypographyProps={{ fontWeight: 600 }} />
+                <ListItemText primary="Logout" primaryTypographyProps={{ fontWeight: 600 }} />
               </ListItemButton>
             </ListItem>
           </List>
@@ -150,11 +152,7 @@ export default function CompanyShell({
                     justifyContent: "center",
                   }}
                 >
-                  <img
-                    src="/images/centenary-badge.png"
-                    alt="Centenary Badge"
-                    style={{ objectFit: "contain", width: 32, height: 32 }}
-                  />
+                  <BrandLogo branding={branding} />
                 </Box>
                 <Typography
                   component={Link}
@@ -167,8 +165,12 @@ export default function CompanyShell({
                     fontSize: { xs: "1rem", sm: "1.25rem" }
                   }}
                 >
-                  <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                    IIT ISM CDC - Company Portal
+                  <Box
+                    component="span"
+                    title={branding?.display_name ?? undefined}
+                    sx={{ display: { xs: "none", sm: "inline-block" }, maxWidth: { sm: 260, md: 360 }, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" }}
+                  >
+                    {branding?.display_name ?? "IIT ISM CDC - Company Portal"}
                   </Box>
                   <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
                     CDC Recruiter
@@ -203,7 +205,7 @@ export default function CompanyShell({
                   size="small"
                   onClick={handleSignOut}
                 >
-                  Sign Out
+                  Logout
                 </Button>
               </Stack>
             </Container>

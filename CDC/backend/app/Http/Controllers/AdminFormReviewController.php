@@ -1277,7 +1277,7 @@ class AdminFormReviewController extends Controller
         }
 
         return response()->json([
-            'message' => 'This form is live for students as a job posting. Cancel the posting first if it really needs to go back for review.',
+            'message' => 'This form is open for applications as a job profile. Cancel the job profile first if it really needs to go back for review.',
         ], 422);
     }
 

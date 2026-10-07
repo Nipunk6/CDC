@@ -19,7 +19,7 @@ import WorkIcon from "@mui/icons-material/Work";
 import PageHeader from "@/components/shared/pageheader";
 import EventCard from "@/components/shared/eventcard";
 import { companyApi } from "@/lib/companyapi";
-import { formatDateTime, statusColor, titleCase } from "@/lib/format";
+import { formatDateTime, postingStatusLabel, statusColor } from "@/lib/format";
 
 export default function CompanyPostingsPage() {
   const [postings, setPostings] = useState(null);
@@ -37,12 +37,12 @@ export default function CompanyPostingsPage() {
 
   return (
     <>
-      <PageHeader icon={<WorkIcon />} title="Campus Drives" subtitle="Your accepted JNFs/INFs that the CDC has opened to students." backHref="/company" backLabel="Dashboard" />
+      <PageHeader icon={<WorkIcon />} title="Job Profiles" subtitle="Your accepted JNFs/INFs that the CDC has opened to students." backHref="/company" backLabel="Dashboard" />
       {error && <Alert severity="error">{error}</Alert>}
       {!postings && !error && <LinearProgress />}
       {postings && postings.length === 0 && (
         <Paper sx={{ p: 5, textAlign: "center" }}>
-          <Typography color="text.secondary">No drives yet. Once the CDC accepts your form and opens it to students, it appears here.</Typography>
+          <Typography color="text.secondary">No job profiles yet. Once the CDC accepts your form and opens it to students, it appears here.</Typography>
         </Paper>
       )}
       <Stack spacing={1.5}>
@@ -57,7 +57,7 @@ export default function CompanyPostingsPage() {
                     </Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
                       <Chip size="small" variant="outlined" label={`${posting.form_type.toUpperCase()} · ${posting.type === "fulltime" ? "Full Time" : "Internship"}`} />
-                      <Chip size="small" variant="outlined" color={statusColor(posting.status)} label={titleCase(posting.status)} />
+                      <Chip size="small" variant="outlined" color={statusColor(posting.status)} label={postingStatusLabel(posting)} />
                     </Stack>
                     <Typography variant="caption" color="text.secondary">
                       Applications close {formatDateTime(posting.application_deadline)}

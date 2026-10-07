@@ -130,21 +130,21 @@ export default function AdminAnalyticsPage() {
         </Alert>
       )}
       {!overview && !error && <LinearProgress />}
-      {overview && overview.length === 0 && <Alert severity="info">Create a placement cycle to see analytics.</Alert>}
+      {overview && overview.length === 0 && <Alert severity="info">Create a placement to see analytics.</Alert>}
 
       {overview && overview.length > 0 && (
         <Stack spacing={3}>
-          <Panel title="All cycles">
+          <Panel title="All placements">
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Cycle</TableCell>
+                    <TableCell>Placement</TableCell>
                     <TableCell>Enrolled</TableCell>
                     <TableCell>Placed</TableCell>
                     <TableCell sx={{ minWidth: 160 }}>Placed %</TableCell>
                     <TableCell>Offers</TableCell>
-                    <TableCell>Postings</TableCell>
+                    <TableCell>Job Profiles</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -170,8 +170,8 @@ export default function AdminAnalyticsPage() {
           </Panel>
 
           <FormControl size="small" sx={{ maxWidth: 320 }}>
-            <InputLabel id="an-cycle">Cycle</InputLabel>
-            <Select labelId="an-cycle" label="Cycle" value={cycleId} onChange={(e) => selectCycle(e.target.value)}>
+            <InputLabel id="an-cycle">Placement</InputLabel>
+            <Select labelId="an-cycle" label="Placement" value={cycleId} onChange={(e) => selectCycle(e.target.value)}>
               {overview.map((c) => (
                 <MenuItem key={c.id} value={String(c.id)}>
                   {c.name}
@@ -191,7 +191,7 @@ export default function AdminAnalyticsPage() {
                   <Stat label="Placed" value={`${data.totals.placed_percent}%`} hint={`${data.totals.placed} placed · ${data.totals.unplaced} unplaced`} color="primary.main" />
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
-                  <Stat label="Offers" value={data.totals.offers} hint={`${data.totals.drives_completed} drive(s) completed · ${data.totals.drives_ongoing} ongoing`} />
+                  <Stat label="Offers" value={data.totals.offers} hint={`${data.totals.drives_completed} job profile(s) completed · ${data.totals.drives_ongoing} ongoing`} />
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
                   <Stat
@@ -356,7 +356,7 @@ export default function AdminAnalyticsPage() {
                   </Panel>
                 </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
-                  <Panel title="Placed by graduating batch">
+                  <Panel title="Placed by passout batch">
                     {data.by_batch.map((b) => (
                       <Stack key={b.key} direction="row" spacing={1} alignItems="center" sx={{ mt: 0.75 }}>
                         <Typography variant="body2" sx={{ width: 60 }}>

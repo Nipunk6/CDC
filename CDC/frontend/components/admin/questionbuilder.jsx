@@ -21,9 +21,9 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 
-const typeLabels = { text: "Text answer", mcq_single: "Choose one", mcq_multi: "Choose many" };
+const typeLabels = { text: "Text Answer", mcq_single: "Multiple options, single answer", mcq_multi: "Multiple options, multiple answers" };
 
-const blankQuestion = () => ({ question: "", qtype: "text", options: ["", ""], required: false });
+const blankQuestion = () => ({ question: "", help_text: "", qtype: "text", options: ["", ""], required: false });
 
 /**
  * Returns the questions in API shape, or an error string for the first invalid row.
@@ -35,7 +35,7 @@ export const cleanQuestions = (questions) => {
     if (!text) return `Question ${index + 1} is empty.`;
     const options = q.qtype === "text" ? [] : Array.from(new Set(q.options.map((o) => o.trim()).filter(Boolean)));
     if (q.qtype !== "text" && options.length < 2) return `Question ${index + 1} needs at least two different options.`;
-    cleaned.push({ ...(q.id ? { id: q.id } : {}), question: text, qtype: q.qtype, options: q.qtype === "text" ? null : options, required: Boolean(q.required) });
+    cleaned.push({ ...(q.id ? { id: q.id } : {}), question: text, help_text: (q.help_text ?? "").trim() || null, qtype: q.qtype, options: q.qtype === "text" ? null : options, required: Boolean(q.required) });
   }
   return cleaned;
 };
@@ -45,6 +45,7 @@ export const toEditable = (questions = []) =>
   questions.map((q) => ({
     id: q.id,
     question: q.question ?? "",
+    help_text: q.help_text ?? "",
     qtype: q.qtype ?? "text",
     options: q.qtype === "text" ? ["", ""] : [...(q.options ?? []), ...(q.options?.length >= 2 ? [] : ["", ""])].slice(0, Math.max(2, q.options?.length ?? 0)),
     required: Boolean(q.required),
@@ -63,7 +64,7 @@ export default function QuestionBuilder({ value, onChange, disabled = false }) {
     <Stack spacing={1.5}>
       {value.length === 0 && (
         <Typography variant="body2" color="text.secondary">
-          No questions.
+          No additional questions.
         </Typography>
       )}
       {value.map((q, index) => (
@@ -73,14 +74,14 @@ export default function QuestionBuilder({ value, onChange, disabled = false }) {
               <TextField
                 size="small"
                 fullWidth
-                label={`Question ${index + 1}`}
+                label="Question Title"
                 value={q.question}
                 disabled={disabled}
                 onChange={(e) => update(index, { question: e.target.value })}
               />
-              <FormControl size="small" sx={{ minWidth: 160 }} disabled={disabled}>
-                <InputLabel id={`qtype-${index}`}>Type</InputLabel>
-                <Select labelId={`qtype-${index}`} label="Type" value={q.qtype} onChange={(e) => update(index, { qtype: e.target.value })}>
+              <FormControl size="small" sx={{ minWidth: 280 }} disabled={disabled}>
+                <InputLabel id={`qtype-${index}`}>Answer Type</InputLabel>
+                <Select labelId={`qtype-${index}`} label="Answer Type" value={q.qtype} onChange={(e) => update(index, { qtype: e.target.value })}>
                   {Object.entries(typeLabels).map(([key, label]) => (
                     <MenuItem key={key} value={key}>
                       {label}
@@ -89,6 +90,16 @@ export default function QuestionBuilder({ value, onChange, disabled = false }) {
                 </Select>
               </FormControl>
             </Stack>
+            <TextField
+              size="small"
+              fullWidth
+              label="Help Text"
+              helperText="Anything that will help the users understand that what kind of information is required."
+              value={q.help_text ?? ""}
+              disabled={disabled}
+              inputProps={{ maxLength: 500 }}
+              onChange={(e) => update(index, { help_text: e.target.value })}
+            />
             {q.qtype !== "text" && (
               <Stack spacing={1}>
                 {q.options.map((option, optionIndex) => (
@@ -120,7 +131,7 @@ export default function QuestionBuilder({ value, onChange, disabled = false }) {
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <FormControlLabel
                 control={<Checkbox size="small" checked={q.required} disabled={disabled} onChange={(e) => update(index, { required: e.target.checked })} />}
-                label="Required"
+                label="This question is mandatory"
               />
               <Stack direction="row">
                 <Tooltip title="Move up">
@@ -151,7 +162,7 @@ export default function QuestionBuilder({ value, onChange, disabled = false }) {
       ))}
       <Box>
         <Button size="small" startIcon={<AddIcon />} disabled={disabled} onClick={() => onChange([...value, blankQuestion()])}>
-          Add question
+          Add Additional Question
         </Button>
       </Box>
     </Stack>

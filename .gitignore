@@ -69,3 +69,8 @@ bootstrap/cache/
 
 # Scratch / Transfer folders
 _xfer/
+
+# Local screen recordings (never commit)
+videos/
+*.mp4
+*.mov

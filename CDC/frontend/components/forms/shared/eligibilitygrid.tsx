@@ -551,11 +551,11 @@ export default function EligibilityGrid({
                         sx={{ minWidth: { xs: 220, md: 320 } }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <InputLabel>Graduating batch</InputLabel>
+                        <InputLabel>Passout Batch</InputLabel>
                         <Select
                           multiple
                           value={prog.graduatingBatches ?? []}
-                          label="Graduating batch"
+                          label="Passout Batch"
                           onChange={(e) => {
                             const value = e.target.value;
                             updateProgrammeBatches(

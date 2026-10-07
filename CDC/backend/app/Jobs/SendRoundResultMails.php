@@ -19,7 +19,7 @@ class SendRoundResultMails implements ShouldQueue
     public int $timeout = 1200;
 
     /** @param  list<int>  $rowIds */
-    public function __construct(public int $roundId, public array $rowIds, public bool $withNextRound = true)
+    public function __construct(public int $roundId, public array $rowIds, public bool $withNextRound = true, public string $kind = 'stage_result')
     {
     }
 
@@ -37,6 +37,6 @@ class SendRoundResultMails implements ShouldQueue
             ->whereIn('id', $this->rowIds)
             ->whereNotNull('published_at')
             ->with(['application.studentProfile.user', 'application.offer'])
-            ->chunkById($mail->batchSize(), fn ($rows) => $pipeline->notifyResults($posting, $round, $rows, $next));
+            ->chunkById($mail->batchSize(), fn ($rows) => $pipeline->notifyResults($posting, $round, $rows, $next, $this->kind));
     }
 }

@@ -80,7 +80,15 @@ class AuthController extends Controller
 
         $email = $this->resolveResetEmail($validated);
 
-        if ($email === null) {
+        // A revoked invitation (S5.4) must not be side-stepped through forgot-password: same response, no link.
+        $revoked = $email !== null && User::query()
+            ->where('email', $email)
+            ->where('role', 'student')
+            ->whereNull('activated_at')
+            ->whereNotNull('invite_revoked_at')
+            ->exists();
+
+        if ($email === null || $revoked) {
             // Unknown roll number: same response as an unknown email so nothing can be enumerated.
             return response()->json([
                 'message' => 'If the account exists, a password reset link has been sent.',
@@ -146,7 +154,12 @@ class AuthController extends Controller
             $user->forceFill([
                 'password' => $password,
                 'remember_token' => Str::random(60),
-            ])->save();
+            ]);
+            // S5: the first password a student sets accepts the invitation (status Accepted for good).
+            if ($user->role === 'student' && $user->activated_at === null) {
+                $user->forceFill(['activated_at' => now(), 'invite_revoked_at' => null]);
+            }
+            $user->save();
 
             $user->tokens()->delete();
             // Whichever link was used, an outstanding invitation link stops working too.

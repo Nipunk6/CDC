@@ -46,16 +46,70 @@ class PipelineService
         foreach ($normalised as $roll) {
             $application = $applications->get($roll);
             if (! $application) {
-                $unknown[] = ['roll_no' => $roll, 'reason' => 'Not an applicant of this posting.'];
+                $unknown[] = ['roll_no' => $roll, 'reason' => 'Not an applicant of this job profile.'];
             } elseif ($application->status !== 'applied') {
                 // Companies never learn who withdrew (D88).
-                $unknown[] = ['roll_no' => $roll, 'reason' => $forCompany ? 'Not an applicant of this posting.' : 'Withdrew the application.'];
+                $unknown[] = ['roll_no' => $roll, 'reason' => $forCompany ? 'Not an applicant of this job profile.' : 'Withdrew the application.'];
             } else {
                 $found[$roll] = $application;
             }
         }
 
         return [$found, $unknown];
+    }
+
+    /**
+     * Entries may name a student by email instead of roll number (Superset parity S1.3). Emails are matched against the
+     * institute and personal email of this posting's applicants and replaced by the roll number; unmatched emails are
+     * reported, never dropped.
+     *
+     * @param  list<array{roll_no: string, result: string}>  $entries
+     * @return array{0: list<array{roll_no: string, result: string, email?: string}>, 1: list<array{roll_no: string, reason: string}>}
+     */
+    public function resolveEmails(JobPosting $posting, array $entries): array
+    {
+        $emails = array_values(array_unique(array_map(
+            fn ($e) => strtolower(trim($e['roll_no'])),
+            array_filter($entries, fn ($e) => str_contains($e['roll_no'], '@'))
+        )));
+        if ($emails === []) {
+            return [$entries, []];
+        }
+
+        // Both sides lower-cased, so matching does not depend on the column's collation (L10).
+        $byEmail = [];
+        $posting->applications()
+            ->with('studentProfile:id,roll_no,institute_email,personal_email')
+            ->whereHas('studentProfile', fn ($q) => $q->where(fn ($w) => $w
+                ->whereIn(DB::raw('LOWER(TRIM(institute_email))'), $emails)
+                ->orWhereIn(DB::raw('LOWER(TRIM(personal_email))'), $emails)))
+            ->get()
+            ->each(function (Application $a) use (&$byEmail): void {
+                foreach (['institute_email', 'personal_email'] as $field) {
+                    if ($a->studentProfile->{$field}) {
+                        $byEmail[strtolower(trim($a->studentProfile->{$field}))] = $a->studentProfile->roll_no;
+                    }
+                }
+            });
+
+        $resolved = [];
+        $errors = [];
+        foreach ($entries as $entry) {
+            if (! str_contains($entry['roll_no'], '@')) {
+                $resolved[] = $entry;
+
+                continue;
+            }
+            $roll = $byEmail[strtolower(trim($entry['roll_no']))] ?? null;
+            if ($roll === null) {
+                $errors[] = ['roll_no' => strtolower(trim($entry['roll_no'])), 'reason' => 'No applicant of this job profile has this email.'];
+
+                continue;
+            }
+            $resolved[] = ['roll_no' => $roll, 'email' => strtolower(trim($entry['roll_no']))] + $entry;
+        }
+
+        return [$resolved, $errors];
     }
 
     /**
@@ -108,8 +162,8 @@ class PipelineService
                     $skipped[] = [
                         'roll_no' => $roll,
                         'reason' => $row->result === 'rejected'
-                            ? 'Already rejected in this round (published). Use "Re-add" to bring them back.'
-                            : 'Result already published for this round.',
+                            ? 'Already rejected in this stage (published). Use "Re-add" to bring them back.'
+                            : 'Result already published for this stage.',
                     ];
 
                     continue;
@@ -117,7 +171,7 @@ class PipelineService
 
                 // Someone published as not selected in an EARLIER round comes back only through Re-add (D75).
                 if ($entry['result'] !== 'rejected' && $this->rejectedEarlier($application, $round)) {
-                    $skipped[] = ['roll_no' => $roll, 'reason' => 'Not selected in an earlier round. Use "Re-add" on that round first.'];
+                    $skipped[] = ['roll_no' => $roll, 'reason' => 'Not shortlisted in an earlier stage. Use "Re-add" on that stage first.'];
 
                     continue;
                 }
@@ -236,7 +290,7 @@ class PipelineService
      *
      * @param  iterable<int>  $rowIds
      */
-    public function dispatchResultMails(PostingRound $round, iterable $rowIds, bool $withNextRound = true): void
+    public function dispatchResultMails(PostingRound $round, iterable $rowIds, bool $withNextRound = true, string $kind = 'stage_result'): void
     {
         $ids = collect($rowIds)->map(fn ($id) => (int) $id)->unique()->values()->all();
         if ($ids === []) {
@@ -244,12 +298,12 @@ class PipelineService
         }
 
         if ($this->mail->mode() === 'sync') {
-            SendRoundResultMails::dispatchSync($round->id, $ids, $withNextRound);
+            SendRoundResultMails::dispatchSync($round->id, $ids, $withNextRound, $kind);
 
             return;
         }
 
-        SendRoundResultMails::dispatch($round->id, $ids, $withNextRound);
+        SendRoundResultMails::dispatch($round->id, $ids, $withNextRound, $kind);
     }
 
     /**
@@ -265,7 +319,7 @@ class PipelineService
                 return null;
             }
 
-            $row->update(['result' => 'selected', 'published_at' => now(), 'decided_by' => $admin?->id, 'remark' => 'Promoted from waitlist']);
+            $row->update(['result' => 'selected', 'published_at' => now(), 'decided_by' => $admin?->id, 'remark' => 'Promoted from On Hold']);
 
             return $row;
         });
@@ -283,7 +337,7 @@ class PipelineService
             }
 
             if ($row->isPublished()) {
-                $row->update(['result' => 'rejected', 'published_at' => now(), 'decided_by' => $admin?->id, 'remark' => 'Removed from waitlist']);
+                $row->update(['result' => 'rejected', 'published_at' => now(), 'decided_by' => $admin?->id, 'remark' => 'Removed from On Hold']);
             } else {
                 $row->delete();
             }
@@ -307,7 +361,7 @@ class PipelineService
      *
      * @param  Collection<int, ApplicationRoundResult>  $rows
      */
-    public function notifyResults(JobPosting $posting, PostingRound $round, Collection $rows, ?PostingRound $next): void
+    public function notifyResults(JobPosting $posting, PostingRound $round, Collection $rows, ?PostingRound $next, string $kind = 'stage_result'): void
     {
         $company = $posting->company()?->name ?? 'the company';
         $title = $posting->title();
@@ -322,8 +376,8 @@ class PipelineService
 
             $outcome = $row->result;
             $message = match ($outcome) {
-                'selected' => "You cleared {$round->name} for {$title} at {$company}.",
-                'waitlisted' => "You are waitlisted after {$round->name} for {$title} at {$company}.",
+                'selected' => "You have been shortlisted in {$round->name} for {$title} at {$company}.",
+                'waitlisted' => "You are On Hold at {$round->name} for {$title} at {$company}.",
                 default => "You were not shortlisted after {$round->name} for {$title} at {$company}.",
             };
 
@@ -340,7 +394,7 @@ class PipelineService
         foreach ($batches as $key => $users) {
             [$outcome, $addendum] = explode('|', $key);
             $mailable = new RoundResultMail(null, $company, $title, $round->name, $outcome, $next?->name, (bool) $addendum);
-            $this->mail->sendBulk($users, $mailable, $mailable->envelope()->subject, 'emails.round-result');
+            $this->mail->sendBulk($users, $mailable, $mailable->envelope()->subject, 'emails.round-result', ['job_posting_id' => $posting->id, 'kind' => $kind]);
         }
     }
 }

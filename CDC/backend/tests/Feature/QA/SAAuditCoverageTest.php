@@ -9,18 +9,26 @@ use App\Models\BranchChangeRequest;
 use App\Models\CampusEvent;
 use App\Models\Company;
 use App\Models\CycleEnrollment;
+use App\Models\ExportTemplate;
 use App\Models\FormStatusHistory;
 use App\Models\Inf;
 use App\Models\Jnf;
 use App\Models\JobPosting;
+use App\Models\Notice;
+use App\Models\Offer;
 use App\Models\PlacementBlock;
 use App\Models\PlacementCycle;
 use App\Models\PolicyDocument;
+use App\Models\PostingDocument;
 use App\Models\ProgrammeBranch;
 use App\Models\ShortlistProposal;
+use App\Models\StudentCategory;
+use App\Models\StudentNote;
 use App\Models\StudentProfile;
+use App\Models\Survey;
 use App\Models\User;
 use App\Services\EligibilityService;
+use App\Services\SettingsService;
 use App\Services\StudentAccountService;
 use Database\Factories\StudentProfileFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -63,6 +71,14 @@ class SAAuditCoverageTest extends TestCase
         'POST api/admin/policy-documents',
         'PUT|PATCH api/admin/policy-documents/{policy_document}',
         'DELETE api/admin/policy-documents/{policy_document}',
+    ];
+
+    /**
+     * Admin mutating routes that write NO audit row by design. They are still called and must succeed; only the audit
+     * assertion is skipped. Keep a one-line reason per entry.
+     */
+    private const NO_AUDIT_ROUTES = [
+        'POST api/admin/audiences/preview' => 'read-only audience count for the notice/survey composers; writes nothing',
     ];
 
     private User $adminA;
@@ -186,8 +202,21 @@ class SAAuditCoverageTest extends TestCase
         $proposal = ShortlistProposal::create(['job_posting_id' => $p->id, 'posting_round_id' => $pR1->id, 'proposed_by' => $companyUser->id, 'kind' => 'shortlist', 'payload' => [['roll_no' => $s[3]->roll_no]], 'status' => 'pending']);
         $block = PlacementBlock::create(['student_profile_id' => $s[4]->id, 'placement_cycle_id' => $ft->id, 'scope' => 'all', 'reason' => 'manual', 'remark' => 'QA', 'active' => true, 'blocked_by' => $this->adminB->id]);
 
+        // Superset parity fixtures.
+        $note = StudentNote::create(['student_profile_id' => $s[1]->id, 'author_id' => $this->adminB->id, 'body' => 'Called about the PPT']);
+        Storage::disk('local')->put("posting-documents/{$open->id}/jd.pdf", '%PDF-1.4 qa');
+        $document = PostingDocument::create(['job_posting_id' => $open->id, 'title' => 'JD', 'file_path' => "posting-documents/{$open->id}/jd.pdf", 'file_size' => 11, 'uploaded_by' => $this->adminB->id]);
+        $category = StudentCategory::create(['title' => 'QA Sports Quota', 'description' => 'QA', 'created_by' => $this->adminB->id]);
+        $template = ExportTemplate::create(['name' => 'QA Template', 'type' => 'STUDENT_LIST', 'columns' => [['key' => 'name', 'label' => 'Name']], 'created_by' => $this->adminB->id]);
+        $notice = Notice::create(['title' => 'QA Draft Notice', 'body' => 'Bring your ID card.', 'created_by' => $this->adminB->id]);
+        $notice->audiences()->create(['audience_type' => 'all', 'audience_filter' => null]);
+        $survey = Survey::create(['title' => 'QA Draft Survey', 'status' => 'draft', 'created_by' => $this->adminB->id]);
+        $survey->questions()->create(['qtype' => 'text', 'question' => 'Any feedback?', 'required' => false, 'sort_order' => 1]);
+        $survey->audiences()->create(['audience_type' => 'all', 'audience_filter' => null]);
+
         return compact('company', 'companyUser', 'ft', 'in', 's', 'outsider', 'p', 'pApps', 'pR1', 'open', 'openRounds', 'final', 'finalApps',
-            'notFloated', 'jSub', 'jDraft', 'iSub', 'iDraft', 'pendingResume', 'event', 'branch', 'policy', 'branchChange', 'proposal', 'block');
+            'notFloated', 'jSub', 'jDraft', 'iSub', 'iDraft', 'pendingResume', 'event', 'branch', 'policy', 'branchChange', 'proposal', 'block',
+            'note', 'document', 'category', 'template', 'notice', 'survey');
     }
 
     /**
@@ -206,6 +235,16 @@ class SAAuditCoverageTest extends TestCase
             'application_id' => $app($i)->id, 'posting_round_id' => $r1, 'result' => $result, 'published_at' => $published ? now() : null,
         ]);
         $csv = fn (string $name, array $lines) => UploadedFile::fake()->createWithContent($name, implode("\n", $lines));
+        $offer = fn () => Offer::create([
+            'application_id' => $w['finalApps'][$s[2]->id]->id, 'student_profile_id' => $s[2]->id, 'company_id' => $w['company']->id,
+            'job_posting_id' => $w['final']->id, 'placement_cycle_id' => $w['ft']->id, 'offer_type' => 'fulltime',
+            'ctc_annual' => 1_200_000, 'currency' => 'INR', 'announced_by' => $this->adminB->id, 'announced_at' => now(),
+        ]);
+        $formData = json_encode(['jobTitle' => 'QA Wizard Role', 'internshipTitle' => 'QA Wizard Intern', 'graduatingBatch' => '2027',
+            'eligibility' => [['programme' => self::BTECH, 'branches' => [['branch' => 'Computer Science & Engineering', 'selected' => true, 'cgpa' => '7.0', 'backlogsAllowed' => false]]]],
+            'selectionRounds' => [['id' => '1', 'type' => 'hr_interview', 'enabled' => true]]]);
+        $jnfBody = ['job_title' => 'QA Wizard Role', 'job_description' => 'Build things.', 'form_data' => $formData, 'status' => 'submitted'];
+        $infBody = ['internship_title' => 'QA Wizard Intern', 'internship_description' => 'Intern things.', 'form_data' => $formData, 'status' => 'submitted'];
         $cycleBody = [
             'name' => 'QA FT (renamed)', 'type' => 'fulltime', 'starts_on' => '2026-07-01', 'ends_on' => '2027-06-30',
             'description' => 'Updated by QA', 'allowed_programmes' => [['programme' => self::BTECH, 'batches' => [2027]]],
@@ -224,13 +263,13 @@ class SAAuditCoverageTest extends TestCase
             },
             // ---------------- students
             'POST api/admin/students' => fn () => ['POST', '/api/admin/students', [
-                'roll_no' => '26QA9002', 'full_name' => 'Aarav Sharma', 'institute_email' => '26qa9002@students.qa.test',
+                'roll_no' => '26QA9002', 'full_name' => 'Aarav Sharma', 'institute_email' => '26qa9002@iitism.ac.in',
                 'programme' => self::BTECH, 'branch' => 'Computer Science & Engineering', 'graduating_batch' => 2027, 'gender' => 'male',
                 'current_cgpa' => 8.1, 'ongoing_backlogs' => 0, 'total_backlogs' => 0, 'tenth_percent' => 91, 'twelfth_percent' => 90,
             ]],
             'POST api/admin/students/import' => fn () => ['POST', '/api/admin/students/import', ['file' => $csv('students.csv', [
                 implode(',', StudentAccountService::IMPORT_COLUMNS),
-                '26QA9001,Import Student,26qa9001@students.qa.test,'.self::BTECH.',Mining Engineering,2027,female,7.5,0,0,88,87,2004-05-06,,,GEN,no,Bihar',
+                '26QA9001,Import Student,26qa9001@iitism.ac.in,'.self::BTECH.',Mining Engineering,2027,female,7.5,0,0,88,87,2004-05-06,,,GEN,no,Bihar',
             ])], true],
             'POST api/admin/students/academics/import' => fn () => ['POST', '/api/admin/students/academics/import', ['file' => $csv('academics.csv', [
                 'roll_no,current_cgpa,ongoing_backlogs,total_backlogs', "{$s[1]->roll_no},9.10,0,0",
@@ -243,6 +282,10 @@ class SAAuditCoverageTest extends TestCase
                 return ['PATCH', "/api/admin/students/{$s[6]->id}/reactivate", []];
             },
             'POST api/admin/students/{studentProfile}/resend-invitation' => fn () => ['POST', "/api/admin/students/{$s[1]->id}/resend-invitation", []],
+            // S5 invitations (domain rule B2-10 is why the student payloads above use @iitism.ac.in)
+            'POST api/admin/students/{studentProfile}/revoke-invitation' => fn () => ['POST', "/api/admin/students/{$s[2]->id}/revoke-invitation", []],
+            'POST api/admin/students/invitations/resend' => fn () => ['POST', '/api/admin/students/invitations/resend', ['student_ids' => [$s[1]->id]]],
+            'POST api/admin/students/invitations/revoke' => fn () => ['POST', '/api/admin/students/invitations/revoke', ['student_ids' => [$s[3]->id]]],
             'PATCH api/admin/resumes/{resume}' => fn () => ['PATCH', "/api/admin/resumes/{$w['pendingResume']->id}", ['status' => 'approved']],
             // ---------------- postings
             'POST api/admin/postings' => fn () => ['POST', '/api/admin/postings', [
@@ -312,6 +355,93 @@ class SAAuditCoverageTest extends TestCase
             'PATCH api/admin/settings' => fn () => ['PATCH', '/api/admin/settings', ['mail_mode' => 'sync']],
             'PATCH api/admin/branch-changes/{branchChangeRequest}' => fn () => ['PATCH', "/api/admin/branch-changes/{$w['branchChange']->id}", ['status' => 'approved']],
 
+            // ---------------- Superset parity
+            'PATCH api/admin/manage-admins/{user}' => fn () => ['PATCH', "/api/admin/manage-admins/{$this->adminB->id}", ['first_name' => 'Admin', 'last_name' => 'Gamma', 'designation' => 'TPO']],
+            'PATCH api/admin/placement-cycles/{placementCycle}/publish' => function () use ($w) {
+                $w['in']->update(['is_draft' => true]);
+
+                return ['PATCH', "/api/admin/placement-cycles/{$w['in']->id}/publish", []];
+            },
+            'PATCH api/admin/placement-cycles/{placementCycle}/enrollments/{enrollment}' => function () use ($w, $s) {
+                $enrollment = CycleEnrollment::where('placement_cycle_id', $w['ft']->id)->where('student_profile_id', $s[3]->id)->sole();
+
+                return ['PATCH', "/api/admin/placement-cycles/{$w['ft']->id}/enrollments/{$enrollment->id}", ['status' => 'suspended']];
+            },
+            'POST api/admin/students/{studentProfile}/notes' => fn () => ['POST', "/api/admin/students/{$s[1]->id}/notes", ['body' => 'Wants a core role']],
+            'DELETE api/admin/students/{studentProfile}/notes/{note}' => fn () => ['DELETE', "/api/admin/students/{$s[1]->id}/notes/{$w['note']->id}", []],
+            'POST api/admin/students/{studentProfile}/resumes/verify-all' => fn () => ['POST', "/api/admin/students/{$s[1]->id}/resumes/verify-all", ['resumes' => [
+                ['id' => $w['pendingResume']->id, 'expected_updated_at' => $w['pendingResume']->fresh()->updated_at->toIso8601String()],
+            ]]],
+            'POST api/admin/postings/{jobPosting}/open-now' => function () use ($w) {
+                JobPosting::whereKey($w['open']->id)->update(['scheduled_open_at' => now()->addDay()]);
+
+                return ['POST', "/api/admin/postings/{$w['open']->id}/open-now", []];
+            },
+            'POST api/admin/postings/{jobPosting}/documents' => fn () => ['POST', "/api/admin/postings/{$w['open']->id}/documents", ['title' => 'Brochure', 'file' => UploadedFile::fake()->create('brochure.pdf', 10, 'application/pdf')], true],
+            'DELETE api/admin/postings/{jobPosting}/documents/{postingDocument}' => fn () => ['DELETE', "/api/admin/postings/{$w['open']->id}/documents/{$w['document']->id}", []],
+            'POST api/admin/postings/{jobPosting}/send-applicant-list' => fn () => ['POST', "/api/admin/postings/{$p}/send-applicant-list", ['note' => 'Please confirm the test slots.']],
+            'POST api/admin/student-categories' => fn () => ['POST', '/api/admin/student-categories', ['title' => 'QA PwD', 'description' => 'Persons with disability']],
+            'PATCH api/admin/student-categories/{studentCategory}' => fn () => ['PATCH', "/api/admin/student-categories/{$w['category']->id}", ['title' => 'QA Sports Quota (renamed)']],
+            'DELETE api/admin/student-categories/{studentCategory}' => fn () => ['DELETE', "/api/admin/student-categories/{$w['category']->id}", []],
+            'POST api/admin/student-categories/{studentCategory}/students' => fn () => ['POST', "/api/admin/student-categories/{$w['category']->id}/students", ['roll_nos' => [$s[1]->roll_no]]],
+            'DELETE api/admin/student-categories/{studentCategory}/students/{studentProfile}' => function () use ($w, $s) {
+                $w['category']->students()->attach($s[2]->id, ['assigned_by' => $this->adminB->id]);
+
+                return ['DELETE', "/api/admin/student-categories/{$w['category']->id}/students/{$s[2]->id}", []];
+            },
+            'POST api/admin/export-templates' => fn () => ['POST', '/api/admin/export-templates', ['name' => 'QA New Template']],
+            'PATCH api/admin/export-templates/{exportTemplate}' => fn () => ['PATCH', "/api/admin/export-templates/{$w['template']->id}", ['name' => 'QA Template (renamed)']],
+            'POST api/admin/export-templates/{exportTemplate}/duplicate' => fn () => ['POST', "/api/admin/export-templates/{$w['template']->id}/duplicate", []],
+            'DELETE api/admin/export-templates/{exportTemplate}' => fn () => ['DELETE', "/api/admin/export-templates/{$w['template']->id}", []],
+            'POST api/admin/postings/{jobPosting}/offers/ctc-upload' => function () use ($offer, $csv, $s, $w) {
+                $offer();
+
+                return ['POST', "/api/admin/postings/{$w['final']->id}/offers/ctc-upload", ['file' => $csv('ctcs.csv', ['roll_no,ctc,interval,currency', "{$s[2]->roll_no},1500000,YEAR,INR"])], true];
+            },
+            'PATCH api/admin/offers/{offer}' => fn () => ['PATCH', '/api/admin/offers/'.$offer()->id, ['ctc_annual' => 1_400_000, 'apply_blocking' => false]],
+            'POST api/admin/offers/{offer}/revoke' => fn () => ['POST', '/api/admin/offers/'.$offer()->id.'/revoke', ['confirm' => true, 'remark' => 'Company withdrew the offer']],
+            'POST api/admin/audiences/preview' => fn () => ['POST', '/api/admin/audiences/preview', ['kind' => 'notice', 'audiences' => [['audience_type' => 'all']]]],
+            'POST api/admin/notices' => fn () => ['POST', '/api/admin/notices', ['title' => 'QA Notice', 'body' => 'PPT at 5 PM.', 'audiences' => [['audience_type' => 'all']]]],
+            'PUT api/admin/notices/{notice}' => fn () => ['PUT', "/api/admin/notices/{$w['notice']->id}", ['title' => 'QA Draft Notice (edited)', 'body' => 'Bring two ID cards.', 'audiences' => [['audience_type' => 'all']]]],
+            'DELETE api/admin/notices/{notice}' => fn () => ['DELETE', "/api/admin/notices/{$w['notice']->id}", []],
+            'POST api/admin/notices/{notice}/publish' => fn () => ['POST', "/api/admin/notices/{$w['notice']->id}/publish", ['send_email' => false]],
+            'POST api/admin/notices/{notice}/attachment' => fn () => ['POST', "/api/admin/notices/{$w['notice']->id}/attachment", ['file' => UploadedFile::fake()->create('notice.pdf', 10, 'application/pdf')], true],
+            'DELETE api/admin/notices/{notice}/attachment' => function () use ($w) {
+                Storage::disk('local')->put("notices/{$w['notice']->id}/old.pdf", '%PDF-1.4 qa');
+                $w['notice']->update(['attachment_path' => "notices/{$w['notice']->id}/old.pdf", 'attachment_name' => 'old.pdf', 'attachment_size' => 11]);
+
+                return ['DELETE', "/api/admin/notices/{$w['notice']->id}/attachment", []];
+            },
+            'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/reconcile' => function () use ($s, $p, $r1, $app) {
+                $s[3]->update(['current_cgpa' => 5.0]); // below the 6.0 cut-off → ineligible
+
+                return ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/reconcile", ['application_ids' => [$app(3)->id], 'confirm' => true]];
+            },
+            'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/email' => function () use ($row, $p, $r1) {
+                $row(1, 'selected', true);
+
+                return ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/email", ['subject' => 'Interview venue', 'message' => 'Report to NLHC at 9 AM.', 'results' => ['selected']]];
+            },
+            'POST api/admin/surveys' => fn () => ['POST', '/api/admin/surveys', ['title' => 'QA New Survey']],
+            'PUT api/admin/surveys/{survey}' => fn () => ['PUT', "/api/admin/surveys/{$w['survey']->id}", ['title' => 'QA Draft Survey (edited)', 'allow_edits' => true]],
+            'DELETE api/admin/surveys/{survey}' => fn () => ['DELETE', "/api/admin/surveys/{$w['survey']->id}", []],
+            'POST api/admin/surveys/{survey}/publish' => fn () => ['POST', "/api/admin/surveys/{$w['survey']->id}/publish", ['send_email' => false]],
+            'POST api/admin/surveys/{survey}/clone' => fn () => ['POST', "/api/admin/surveys/{$w['survey']->id}/clone", []],
+            'POST api/admin/settings/logo' => fn () => ['POST', '/api/admin/settings/logo', ['logo' => UploadedFile::fake()->image('logo.png', 64, 64)], true],
+            'DELETE api/admin/settings/logo' => function () {
+                Storage::disk('local')->put('branding/qa-logo.png', 'png');
+                app(SettingsService::class)->set('account_logo', ['path' => 'branding/qa-logo.png', 'mime' => 'image/png'], $this->adminB, 'settings.logo_update');
+
+                return ['DELETE', '/api/admin/settings/logo', []];
+            },
+            'POST api/admin/form-builder/companies' => fn () => ['POST', '/api/admin/form-builder/companies', ['name' => 'Offline Co', 'hr_name' => 'Asha Rao', 'hr_email' => 'asha@offline.qa.test']],
+            'POST api/admin/form-builder/{company}/jnfs/autosave' => fn () => ['POST', "/api/admin/form-builder/{$w['company']->id}/jnfs/autosave", ['job_title' => 'QA Wizard Role', 'job_description' => 'Build things.']],
+            'POST api/admin/form-builder/{company}/jnfs' => fn () => ['POST', "/api/admin/form-builder/{$w['company']->id}/jnfs", $jnfBody],
+            'PUT api/admin/form-builder/{company}/jnfs/{jnf}' => fn () => ['PUT', "/api/admin/form-builder/{$w['company']->id}/jnfs/{$w['jDraft']->id}", $jnfBody],
+            'POST api/admin/form-builder/{company}/infs/autosave' => fn () => ['POST', "/api/admin/form-builder/{$w['company']->id}/infs/autosave", ['internship_title' => 'QA Wizard Intern', 'internship_description' => 'Intern things.']],
+            'POST api/admin/form-builder/{company}/infs' => fn () => ['POST', "/api/admin/form-builder/{$w['company']->id}/infs", $infBody],
+            'PUT api/admin/form-builder/{company}/infs/{inf}' => fn () => ['PUT', "/api/admin/form-builder/{$w['company']->id}/infs/{$w['iDraft']->id}", $infBody],
+
             // ---------------- Phase 1 routes
             'POST api/admin/manage-admins' => fn () => ['POST', '/api/admin/manage-admins', ['name' => 'QA New Admin', 'email' => 'qa.cdc.newadmin@gmail.com']],
             'DELETE api/admin/manage-admins/{user}' => fn () => ['DELETE', "/api/admin/manage-admins/{$this->adminB->id}", []],
@@ -370,8 +500,9 @@ class SAAuditCoverageTest extends TestCase
         foreach ($routes as $route) {
             $key = self::key($route);
             $phase1 = in_array($key, self::PHASE1_ROUTES, true);
+            $exempt = self::NO_AUDIT_ROUTES[$key] ?? null;
             if (! isset($plan[$key])) {
-                $results[] = ['key' => $key, 'phase1' => $phase1, 'status' => null, 'actions' => [], 'others' => [], 'before' => false, 'after' => false, 'ip' => false, 'note' => 'NO PLAN (new route — extend the sweep)'];
+                $results[] = ['key' => $key, 'phase1' => $phase1, 'exempt' => $exempt, 'status' => null, 'actions' => [], 'others' => [], 'before' => false, 'after' => false, 'ip' => false, 'note' => 'NO PLAN (new route — extend the sweep)'];
 
                 continue;
             }
@@ -389,7 +520,7 @@ class SAAuditCoverageTest extends TestCase
                 $logs = AuditLog::where('id', '>', $baseline)->orderBy('id')->get();
                 $mine = $logs->where('user_id', $this->adminA->id);
                 $results[] = [
-                    'key' => $key, 'phase1' => $phase1, 'status' => $response->status(),
+                    'key' => $key, 'phase1' => $phase1, 'exempt' => $exempt, 'status' => $response->status(),
                     'actions' => $mine->pluck('action')->unique()->values()->all(),
                     'others' => $logs->where('user_id', '!==', $this->adminA->id)->pluck('action')->all(),
                     'before' => $mine->contains(fn ($l) => $l->before !== null),
@@ -412,6 +543,8 @@ class SAAuditCoverageTest extends TestCase
                 $problems[] = "{$r['key']}: no payload plan";
             } elseif ($r['status'] < 200 || $r['status'] >= 300) {
                 $problems[] = "{$r['key']}: valid call returned {$r['status']} ({$r['note']})";
+            } elseif ($r['exempt'] !== null) {
+                continue; // writes no audit row by design (NO_AUDIT_ROUTES); the call itself must still succeed
             } elseif (! $r['phase1'] && $r['actions'] === []) {
                 $problems[] = "{$r['key']}: MISSING audit row";
             } elseif (! $r['phase1']) {
@@ -498,6 +631,9 @@ class SAAuditCoverageTest extends TestCase
             if ($r['phase1'] && $result === 'MISSING') {
                 $result = 'MISSING (Phase 1 route)';
             }
+            if ($ok && $r['exempt'] !== null && $r['actions'] === []) {
+                $result = 'EXEMPT (no audit by design: '.$r['exempt'].')';
+            }
             $lines[] = sprintf(
                 '| %d | `%s` | %s | %s | %s | %s | %s | %s | %s |',
                 $i + 1, $r['key'], $r['phase1'] ? 'Phase 1 route' : 'Phase 2', $r['status'] ?? '-',
@@ -505,7 +641,7 @@ class SAAuditCoverageTest extends TestCase
                 $r['before'] ? 'yes' : '—', $r['after'] ? 'yes' : '—', $r['ip'] ? 'yes' : '—', $result
             );
         }
-        $missing = array_filter($results, fn ($r) => $r['status'] !== null && $r['actions'] === []);
+        $missing = array_filter($results, fn ($r) => $r['status'] !== null && $r['actions'] === [] && $r['exempt'] === null);
         $lines[] = '';
         $lines[] = '## MISSING';
         foreach ($missing as $r) {
@@ -671,7 +807,7 @@ class SAAuditCoverageTest extends TestCase
 
         // ---- edit ANY student field, incl. admin-controlled academics
         $this->patchJson("/api/admin/students/{$s[6]->id}", [
-            'roll_no' => '26AU9999', 'full_name' => 'Renamed Student', 'institute_email' => '26au9999@students.qa.test',
+            'roll_no' => '26AU9999', 'full_name' => 'Renamed Student', 'institute_email' => '26au9999@iitism.ac.in',
             'programme' => self::BTECH, 'branch' => 'Mining Engineering', 'graduating_batch' => 2028, 'gender' => 'female',
             'current_cgpa' => 6.42, 'ongoing_backlogs' => 1, 'total_backlogs' => 2, 'tenth_percent' => 70, 'twelfth_percent' => 71,
             'date_of_birth' => '2004-01-02', 'category' => 'SC', 'pwd' => true, 'home_state' => 'Jharkhand', 'phone' => '9000011111',
@@ -682,7 +818,7 @@ class SAAuditCoverageTest extends TestCase
         $this->assertSame('Mining Engineering', $fresh->branch);
         $this->assertEquals(6.42, (float) $fresh->current_cgpa);
         $this->assertSame(2028, (int) $fresh->graduating_batch);
-        $this->assertSame('26au9999@students.qa.test', $fresh->user->email, 'login email follows the institute email');
+        $this->assertSame('26au9999@iitism.ac.in', $fresh->user->email, 'login email follows the institute email');
         $edit = AuditLog::where('action', 'student.update')->where('subject_id', $s[6]->id)->sole();
         $this->assertSame('Computer Science & Engineering', $edit->before['branch']);
         $this->assertSame('Mining Engineering', $edit->after['branch']);

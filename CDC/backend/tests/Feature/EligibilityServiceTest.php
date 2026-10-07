@@ -101,7 +101,7 @@ class EligibilityServiceTest extends TestCase
     public function test_not_enrolled(): void
     {
         $posting = $this->posting();
-        $this->assertContains('You are not enrolled in this placement cycle.', $this->reasons($this->student([], false), $posting));
+        $this->assertContains('You are not enrolled in this placement.', $this->reasons($this->student([], false), $posting));
     }
 
     public function test_suspended_enrolment_and_account(): void
@@ -112,7 +112,7 @@ class EligibilityServiceTest extends TestCase
         $student->user->update(['is_active' => false]);
 
         $reasons = $this->reasons($student->fresh(), $posting);
-        $this->assertContains('Your enrolment in this placement cycle is suspended.', $reasons);
+        $this->assertContains('Your enrolment in this placement is suspended.', $reasons);
         $this->assertContains('Your account is suspended.', $reasons);
     }
 
@@ -164,7 +164,7 @@ class EligibilityServiceTest extends TestCase
     public function test_graduating_batch(): void
     {
         $posting = $this->posting();
-        $this->assertContains('Open to the 2027 graduating batch only.', $this->reasons($this->student(['graduating_batch' => 2028]), $posting));
+        $this->assertContains('Open to the 2027 passout batch only.', $this->reasons($this->student(['graduating_batch' => 2028]), $posting));
     }
 
     public function test_tenth_and_twelfth_cutoffs(): void
@@ -172,8 +172,8 @@ class EligibilityServiceTest extends TestCase
         $posting = $this->posting(['minTenthPercent' => '80', 'minTwelfthPercent' => '75.5']);
         $reasons = $this->reasons($this->student(['tenth_percent' => 79.99, 'twelfth_percent' => null]), $posting);
 
-        $this->assertContains('10th % below cutoff (79.99 < 80.0)', $reasons);
-        $this->assertContains('12th % not on record (cutoff 75.5).', $reasons);
+        $this->assertContains('Class X percentage below cutoff (79.99 < 80.0)', $reasons);
+        $this->assertContains('Class XII percentage not on record (cutoff 75.5).', $reasons);
         $this->assertSame([], $this->reasons($this->student(['tenth_percent' => 80, 'twelfth_percent' => 75.5]), $posting));
     }
 
@@ -215,7 +215,7 @@ class EligibilityServiceTest extends TestCase
     public function test_legacy_per_programme_batches_and_phd_exemption(): void
     {
         $posting = $this->posting(['graduatingBatch' => '', 'eligibility' => [0 => ['graduatingBatches' => ['2027']]]]);
-        $this->assertContains('Open to the 2027 graduating batch only.', $this->reasons($this->student(['graduating_batch' => 2029]), $posting));
+        $this->assertContains('Open to the 2027 passout batch only.', $this->reasons($this->student(['graduating_batch' => 2029]), $posting));
         $this->assertSame([], $this->reasons($this->student(['graduating_batch' => 2027]), $posting));
         $this->assertAgrees($posting);
 

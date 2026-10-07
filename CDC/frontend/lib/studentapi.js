@@ -66,7 +66,12 @@ export async function studentUpload(path, formData) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     reportAuthFailure(response.status, payload);
-    throw new Error(payload.message ?? "Upload failed.");
+    // Same error shape as studentApi, so callers can map per-field `errors` (e.g. survey questions, L20).
+    const error = new Error(payload.message ?? "Upload failed.");
+    error.status = response.status;
+    error.payload = payload;
+    error.errors = payload.errors ?? null;
+    throw error;
   }
   return payload;
 }

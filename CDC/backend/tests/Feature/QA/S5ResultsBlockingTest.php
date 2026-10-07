@@ -630,7 +630,7 @@ class S5ResultsBlockingTest extends TestCase
         $this->postJson('/api/admin/blocks', $payload + ['remark' => 'Skipped the PPT'])->assertCreated()->assertJsonPath('block.scope', 'all');
         $this->assertSame(1, AuditLog::where('action', 'block.create')->count());
 
-        $reason = '/^You are debarred from this placement cycle\. \(Skipped the PPT\)$/';
+        $reason = '/^You are debarred from this placement\. \(Skipped the PPT\)$/';
         $this->assertApplyBlocked('24QA0001', $jnf, $reason, 'debarred vs JNF');
         $this->assertApplyBlocked('24QA0001', $inf, $reason, 'debarred vs INF');
         Sanctum::actingAs($this->students['24QA0001']->user);
@@ -784,7 +784,7 @@ class S5ResultsBlockingTest extends TestCase
         $this->publishResults($google, [
             '24QA0001' => ['offer_type' => 'fulltime'],
             'other' => ['offer_type' => 'fulltime', 'application_id' => $this->appFor($amazon, '24QA0001')->id],
-        ])->assertStatus(422)->assertJsonPath('message', 'Application #'.$this->appFor($amazon, '24QA0001')->id.' is not a live application of this posting.');
+        ])->assertStatus(422)->assertJsonPath('message', 'Application #'.$this->appFor($amazon, '24QA0001')->id.' is not a live application of this job profile.');
         $assertNothingWritten('foreign application');
 
         // (2) Mid-way failure (the 2nd offer insert throws) → everything rolled back.

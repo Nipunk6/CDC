@@ -35,6 +35,7 @@ import {
   mergeCustomBranchesIntoProgrammes,
 } from "@/components/forms/shared";
 import { adminApi } from "@/lib/adminapi";
+import StudentCategoryPicker from "@/components/admin/studentcategorypicker";
 import { fromLocalInput, toLocalInput } from "@/lib/format";
 import { shortProgramme } from "@/lib/usecatalogue";
 
@@ -61,6 +62,7 @@ const fromSnapshot = (snapshot) => {
     graduatingBatch: s.graduatingBatch ?? "",
     minTenthPercent: s.minTenthPercent ?? "",
     minTwelfthPercent: s.minTwelfthPercent ?? "",
+    allowedStudentCategories: Array.isArray(s.allowedStudentCategories) ? s.allowedStudentCategories.map(Number) : [],
   };
 };
 
@@ -89,8 +91,8 @@ const compact = (criteria) => ({
 const problemWith = (c) => {
   const selected = c.eligibility.reduce((n, p) => n + p.branches.filter((b) => b.selected).length, 0);
   if (selected === 0) return "Select at least one programme and branch.";
-  if (!isValidBatch(c.graduatingBatch)) return "The graduating batch must be a four-digit year, or blank for any batch.";
-  if (!isValidPercent(c.minTenthPercent) || !isValidPercent(c.minTwelfthPercent)) return "Min 10th % and Min 12th % must be blank or between 0 and 100 with at most 2 decimals.";
+  if (!isValidBatch(c.graduatingBatch)) return "The passout batch must be a four-digit year, or blank for any batch.";
+  if (!isValidPercent(c.minTenthPercent) || !isValidPercent(c.minTwelfthPercent)) return "Min Class X Percentage and Min Class XII Percentage must be blank or between 0 and 100 with at most 2 decimals.";
   if (!c.eligibility.every((p) => p.branches.every((b) => !b.selected || isValidCgpa(b.cgpa)))) return "Branch CGPA cut-offs must be blank or between 0 and 10 with at most 2 decimals.";
   if (!eligibilityNumbersValid(c.eligibility, c.minTenthPercent, c.minTwelfthPercent)) return "Backlog limits must be blank or a whole number from 0 to 999.";
   return null;
@@ -223,7 +225,7 @@ export default function EditEligibilityDialog({ posting, onClose, onSaved }) {
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                     <TextField
                       fullWidth
-                      label="Graduating batch"
+                      label="Passout Batch"
                       value={criteria.graduatingBatch}
                       onChange={(e) => set("graduatingBatch", e.target.value.trim())}
                       error={!isValidBatch(criteria.graduatingBatch)}
@@ -233,7 +235,7 @@ export default function EditEligibilityDialog({ posting, onClose, onSaved }) {
                     <TextField
                       fullWidth
                       type="number"
-                      label="Minimum 10th %"
+                      label="Min Class X Percentage"
                       value={criteria.minTenthPercent}
                       onChange={(e) => set("minTenthPercent", e.target.value)}
                       error={!isValidPercent(criteria.minTenthPercent)}
@@ -243,7 +245,7 @@ export default function EditEligibilityDialog({ posting, onClose, onSaved }) {
                     <TextField
                       fullWidth
                       type="number"
-                      label="Minimum 12th %"
+                      label="Min Class XII Percentage"
                       value={criteria.minTwelfthPercent}
                       onChange={(e) => set("minTwelfthPercent", e.target.value)}
                       error={!isValidPercent(criteria.minTwelfthPercent)}
@@ -251,6 +253,7 @@ export default function EditEligibilityDialog({ posting, onClose, onSaved }) {
                       inputProps={{ min: 0, max: 100, step: 0.01 }}
                     />
                   </Stack>
+                  <StudentCategoryPicker value={criteria.allowedStudentCategories} onChange={(ids) => set("allowedStudentCategories", ids)} />
                 </Stack>
               </Paper>
               {/* The shared wizard grid; on phones its programme header wraps so long programme names get a full row. */}
@@ -271,7 +274,7 @@ export default function EditEligibilityDialog({ posting, onClose, onSaved }) {
 
           {step === "review" && preview && (
             <>
-              {!preview.changed && <Alert severity="warning">These are already the drive&apos;s criteria. Nothing would change.</Alert>}
+              {!preview.changed && <Alert severity="warning">These are already the job profile&apos;s criteria. Nothing would change.</Alert>}
               <Grid container spacing={1.5}>
                 <Grid size={{ xs: 6, md: 3 }}>
                   <Count label="Eligible now" value={preview.currently_eligible} />
@@ -340,12 +343,12 @@ export default function EditEligibilityDialog({ posting, onClose, onSaved }) {
               <Box>
                 <FormControlLabel
                   control={<Checkbox checked={mailPossible && notify} disabled={!mailPossible} onChange={(e) => setNotify(e.target.checked)} />}
-                  label={reopen ? "Email eligible students who were never told about this drive" : "Email newly eligible students"}
+                  label={reopen ? "Email eligible students who were never told about this job profile" : "Email newly eligible students"}
                 />
                 <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
                   {mailPossible
-                    ? `Sends the usual "new opening" email to ${mailCount} student${mailCount === 1 ? "" : "s"}. Applicants and anyone already told about this drive are not emailed again.`
-                    : "Applications are closed for this drive, so nobody is emailed unless you reopen them."}
+                    ? `Sends the usual "new opening" email to ${mailCount} student${mailCount === 1 ? "" : "s"}. Applicants and anyone already told about this job profile are not emailed again.`
+                    : "Applications are closed for this job profile, so nobody is emailed unless you reopen them."}
                 </Typography>
               </Box>
             </>

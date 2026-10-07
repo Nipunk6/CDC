@@ -2,12 +2,14 @@
 
 import { Box, Chip, Step, StepLabel, Stepper, Typography } from "@mui/material";
 
+import { formatDateTime } from "@/lib/format";
+
 const resultChip = (step) => {
   if (!step.published) return null;
   const map = {
-    selected: { color: "success", label: step.is_final ? "Selected" : "Cleared" },
+    selected: { color: "success", label: step.is_final ? "Selected" : "Shortlisted" },
     rejected: { color: "error", label: "Not selected" },
-    waitlisted: { color: "info", label: "Waitlisted" },
+    waitlisted: { color: "info", label: "On Hold" },
     pending: { color: "default", label: "Result pending" },
   };
   const chip = map[step.result] ?? map.pending;
@@ -49,6 +51,13 @@ export default function RoundTrail({ trail = [], status, offer }) {
                       </Typography>
                     )}
                     {resultChip(step)}
+                    {!step.published && !withdrawn && !beyondStop && (step.scheduled_at || step.venue) && (
+                      <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
+                        {step.scheduled_at ? formatDateTime(step.scheduled_at) : ""}
+                        {step.scheduled_at && step.venue ? " · " : ""}
+                        {step.venue ?? ""}
+                      </Typography>
+                    )}
                     {!step.published && !withdrawn && !beyondStop && index === reached + 1 && (
                       <Typography variant="caption" color="text.secondary">
                         Awaiting result

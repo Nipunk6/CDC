@@ -11,6 +11,7 @@ use App\Services\PortalNotificationService;
 use App\Services\SpreadsheetImportService;
 use App\Services\StudentAcademicSyncService;
 use App\Services\StudentAccountService;
+use App\Services\StudentRecordService;
 use App\Support\ProgrammeCatalogue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -35,22 +36,34 @@ class AdminStudentController extends Controller
         'full_name' => 'Name',
         'institute_email' => 'Institute email',
         'personal_email' => 'Personal email',
-        'phone' => 'Phone',
+        'phone' => 'Contact No.',
         'programme' => 'Programme',
         'branch' => 'Branch',
-        'graduating_batch' => 'Graduating batch',
+        'graduating_batch' => 'Passout Batch',
         'current_cgpa' => 'CGPA',
         'ongoing_backlogs' => 'Ongoing backlogs',
         'total_backlogs' => 'Total backlogs',
         'gender' => 'Gender',
         'date_of_birth' => 'Date of birth',
-        'tenth_percent' => '10th %',
-        'twelfth_percent' => '12th %',
-        'category' => 'Category',
+        'tenth_percent' => 'Class X Percentage',
+        'twelfth_percent' => 'Class XII Percentage',
+        'category' => 'Social Category',
         'pwd' => 'PwD',
         'home_state' => 'Home state',
         'linkedin_url' => 'LinkedIn',
         'github_url' => 'GitHub',
+        // S4.6 academic extras (Superset labels)
+        'current_semester' => 'Current Semester',
+        'course_start_date' => 'Course Start Date',
+        'course_end_date' => 'Course End Date',
+        'lateral_entry' => 'Lateral Entry',
+        'tenth_board' => 'Xth Board',
+        'tenth_passing_year' => 'Year of passing 10th',
+        'twelfth_board' => 'XIIth Board',
+        'twelfth_passing_year' => 'Year of passing 12th',
+        'previous_degree' => 'Previous Degree',
+        'previous_degree_score' => 'Previous Degree Score',
+        'previous_degree_score_type' => 'Previous Degree Score Type',
     ];
 
     public function __construct(
@@ -65,42 +78,23 @@ class AdminStudentController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'search' => ['nullable', 'string', 'max:100'],
-            'programme' => ['nullable', 'string', 'max:255'],
-            'branch' => ['nullable', 'string', 'max:255'],
-            'graduating_batch' => ['nullable', 'integer'],
-            'status' => ['nullable', 'in:active,suspended'],
+        $validated = $request->validate($this->filterRules() + [
             'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:'.self::PER_PAGE],
         ]);
 
-        $query = StudentProfile::query()
+        $page = $this->filteredQuery($validated)
             ->with('user:id,email,is_active')
-            ->orderBy('roll_no');
-
-        $search = trim((string) ($validated['search'] ?? ''));
-        if ($search !== '') {
-            $query->where(function (Builder $q) use ($search): void {
-                $q->where('roll_no', 'like', "%{$search}%")
-                    ->orWhere('full_name', 'like', "%{$search}%")
-                    ->orWhere('institute_email', 'like', "%{$search}%");
-            });
-        }
-
-        foreach (['programme', 'branch', 'graduating_batch'] as $filter) {
-            if (! empty($validated[$filter])) {
-                $query->where($filter, $validated[$filter]);
-            }
-        }
-
-        if (! empty($validated['status'])) {
-            $query->whereHas('user', fn (Builder $u) => $u->where('is_active', $validated['status'] === 'active'));
-        }
-
-        $page = $query->paginate(self::PER_PAGE);
+            ->orderBy('roll_no')
+            ->paginate((int) ($validated['per_page'] ?? self::PER_PAGE));
 
         return response()->json([
             'students' => collect($page->items())->map(fn (StudentProfile $s) => $this->listPayload($s)),
+            // S5.5 header: "N students registered · total N students invited" (registered = Accepted).
+            'invitation_summary' => [
+                'registered' => \App\Models\User::query()->where('role', 'student')->whereNotNull('activated_at')->count(),
+                'invited' => \App\Models\User::query()->where('role', 'student')->whereNotNull('invited_at')->count(),
+            ],
             'meta' => [
                 'current_page' => $page->currentPage(),
                 'last_page' => $page->lastPage(),
@@ -110,7 +104,42 @@ class AdminStudentController extends Controller
         ]);
     }
 
-    public function show(StudentProfile $studentProfile): JsonResponse
+    /**
+     * "Download as Excel" of the filtered student list (S4.4): the Default Template, or `?template=<id>`.
+     */
+    public function export(Request $request, \App\Services\TemplateExports $templates): StreamedResponse
+    {
+        $validated = $request->validate($this->filterRules() + ['template' => ['nullable', 'integer']]);
+        $template = \App\Services\TemplateExports::find($validated['template'] ?? null);
+        $query = $this->filteredQuery($validated);
+
+        $this->audit->log($request, 'student.export', null, null, [
+            'count' => (clone $query)->count(),
+            'filters' => \App\Support\StudentDirectoryFilters::active($validated),
+            'template_id' => $template?->id,
+        ]);
+
+        $fileName = 'students'.($template ? '-'.Str::slug($template->name) : '').'-'.now('Asia/Kolkata')->format('Ymd-Hi').'.xlsx';
+
+        return $templates->students($query, $template, $fileName);
+    }
+
+    /**
+     * Pending-requests banner (S4.7): profile update requests waiting for the CDC (branch changes + resumes).
+     */
+    public function pendingRequests(): JsonResponse
+    {
+        $branchChanges = \App\Models\BranchChangeRequest::query()->where('status', 'pending')->count();
+        $resumes = \App\Models\Resume::query()->where('status', 'pending')->count();
+
+        return response()->json([
+            'branch_changes' => $branchChanges,
+            'resumes' => $resumes,
+            'total' => $branchChanges + $resumes,
+        ]);
+    }
+
+    public function show(StudentProfile $studentProfile, StudentRecordService $record): JsonResponse
     {
         $studentProfile->load([
             'user:id,email,is_active,created_at',
@@ -158,8 +187,25 @@ class AdminStudentController extends Controller
                 'cycle_name' => $o->placementCycle?->name,
             ]);
 
+        // S4.5: summary card, Placements section (per cycle, with stage attendance) and Resumes & Documents.
+        $resumes = $studentProfile->resumes()
+            ->with('reviewedBy:id,name')
+            ->orderBy('slot')
+            ->get()
+            ->map(fn (\App\Models\Resume $r) => $r->toArray() + ['preview_url' => $r->previewUrl()]);
+
         return response()->json([
-            'student' => $this->detailPayload($studentProfile) + ['applications' => $applications, 'offers' => $offers],
+            'student' => $this->detailPayload($studentProfile) + [
+                'applications' => $applications,
+                'offers' => $offers,
+                'summary' => [
+                    'cgpa' => $studentProfile->current_cgpa,
+                    'applications_count' => $applications->where('status', 'applied')->count(),
+                    'offers_count' => $offers->count(),
+                ],
+                'placements' => $record->placements($studentProfile),
+                'resumes' => $resumes,
+            ],
             'audit_logs' => $auditTrail,
         ]);
     }
@@ -195,6 +241,13 @@ class AdminStudentController extends Controller
         $data += ['ongoing_backlogs' => $studentProfile->ongoing_backlogs];
         if (! array_key_exists('total_backlogs', $data)) {
             $data['total_backlogs'] = $studentProfile->total_backlogs;
+        }
+        // Same for the S4.6 cross-field checks (end date vs start date, CGPA vs score type).
+        if (! empty($data['course_end_date']) && ! array_key_exists('course_start_date', $data)) {
+            $data['course_start_date'] = $studentProfile->course_start_date?->format('Y-m-d');
+        }
+        if (isset($data['previous_degree_score']) && ! array_key_exists('previous_degree_score_type', $data)) {
+            $data['previous_degree_score_type'] = $studentProfile->previous_degree_score_type;
         }
 
         $validated = Validator::make($data, $rules, StudentAccountService::messages())->validate();
@@ -256,6 +309,11 @@ class AdminStudentController extends Controller
 
     public function resendInvitation(Request $request, StudentProfile $studentProfile): JsonResponse
     {
+        // S5.3: an activated account gets no new set-password link (Forgot password still works for them).
+        if ($studentProfile->user?->activated_at !== null) {
+            return response()->json(['message' => 'This student has already activated their account. They can use Forgot password if they need a new one.'], 422);
+        }
+
         $this->accounts->sendInvitation($studentProfile->load('user'));
         $this->audit->log($request, 'student.invite_resend', $studentProfile, null, ['institute_email' => $studentProfile->institute_email]);
 
@@ -264,51 +322,81 @@ class AdminStudentController extends Controller
 
     /**
      * Two-phase bulk import: `?dry_run=1` reports errors without writing.
+     *
+     * Columns are mapped by header name when the file has a header row (our template, old or new, or Superset's
+     * sample CSV), else by position (S5.6). Every row is accounted for: rows past `students.import_max_rows` are
+     * reported, never dropped (S5.7), and the database uniqueness checks run in chunks so a 10,000-row file stays
+     * at a few dozen queries.
      */
     public function bulkImport(Request $request): JsonResponse
     {
         $request->validate([
             'file' => array_merge(['required'], SpreadsheetImportService::UPLOAD_RULES),
             'dry_run' => ['nullable', 'boolean'],
+            // "Select student batch" (S5.6): fills graduating_batch for rows that leave it blank.
+            'default_batch' => ['nullable', 'integer', 'min:2000', 'max:2100'],
         ]);
 
         $dryRun = $request->boolean('dry_run');
+        $defaultBatch = $request->filled('default_batch') ? (int) $request->input('default_batch') : null;
+        $maxRows = max(1, (int) config('students.import_max_rows', 10000));
 
         try {
-            $sheet = $this->spreadsheets->rows($request->file('file'));
+            ['rows' => $sheet, 'overflow' => $overflow] = $this->spreadsheets->read($request->file('file'), $maxRows + 1);
         } catch (Throwable $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        // Tolerate the template's header row.
+        $map = StudentAccountService::positionalColumnMap();
         $first = array_key_first($sheet);
-        if ($first !== null && preg_replace('/[^a-z]/', '', strtolower($sheet[$first][0] ?? '')) === 'rollno') {
+        if ($first !== null && StudentAccountService::isImportHeader($sheet[$first])) {
+            $map = StudentAccountService::importColumnMap($sheet[$first]);
             unset($sheet[$first]);
+        } elseif ($first !== null && StudentAccountService::normaliseHeader($sheet[$first][0] ?? '') === 'rollno') {
+            unset($sheet[$first]); // a header we cannot read by name: keep the template order
         }
 
-        if ($sheet === []) {
+        // The cap counts student rows, so a header row does not cost one.
+        while (count($sheet) > $maxRows) {
+            $last = array_key_last($sheet);
+            $overflow = [$last => $sheet[$last]] + $overflow;
+            unset($sheet[$last]);
+        }
+
+        if ($sheet === [] && $overflow === []) {
             return response()->json(['message' => 'The file has no student rows.'], 422);
         }
 
         $catalogue = ProgrammeCatalogue::all();
-        $rules = $this->accounts->rules();
+        // Uniqueness against the database is checked below in chunks, not one query per row.
+        $rules = array_map(
+            fn (array $fieldRules) => array_values(array_filter($fieldRules, fn ($rule) => ! $rule instanceof \Illuminate\Validation\Rules\Unique)),
+            $this->accounts->rules()
+        );
+        $messages = StudentAccountService::messages();
         $errors = [];
         $valid = [];
         $seenRoll = [];
         $seenEmail = [];
 
         foreach ($sheet as $rowNumber => $cells) {
-            $row = [];
-            foreach (StudentAccountService::IMPORT_COLUMNS as $index => $column) {
-                $row[$column] = $cells[$index] ?? null;
+            $row = StudentAccountService::mapImportRow($cells, $map, $catalogue, $courseError);
+            if ($defaultBatch !== null && trim((string) ($row['graduating_batch'] ?? '')) === '') {
+                $row['graduating_batch'] = $defaultBatch;
             }
             $row = $this->accounts->normalise($row);
             $rollNo = (string) ($row['roll_no'] ?? '');
 
-            $validator = Validator::make($row, $rules, StudentAccountService::messages());
-            if ($validator->fails()) {
-                foreach ($validator->errors()->toArray() as $field => $messages) {
-                    $errors[] = ['row' => $rowNumber, 'roll_no' => $rollNo, 'field' => $field, 'reason' => $messages[0]];
+            $validator = Validator::make($row, $rules, $messages);
+            if ($courseError !== null || $validator->fails()) {
+                // An unreadable Current Course Name (L18) replaces the "programme/branch required" errors.
+                if ($courseError !== null) {
+                    $errors[] = ['row' => $rowNumber, 'roll_no' => $rollNo, 'field' => 'programme', 'reason' => $courseError];
+                }
+                foreach ($validator->errors()->toArray() as $field => $fieldMessages) {
+                    if ($courseError === null || ! in_array($field, ['programme', 'branch'], true)) {
+                        $errors[] = ['row' => $rowNumber, 'roll_no' => $rollNo, 'field' => $field, 'reason' => $fieldMessages[0]];
+                    }
                 }
 
                 continue;
@@ -334,14 +422,47 @@ class AdminStudentController extends Controller
             $valid[$rowNumber] = $data;
         }
 
+        foreach (array_chunk($valid, 500, true) as $chunk) {
+            $rolls = StudentProfile::query()->whereIn('roll_no', array_column($chunk, 'roll_no'))->pluck('roll_no')
+                ->map(fn ($r) => strtoupper((string) $r))->flip();
+            $emails = array_column($chunk, 'institute_email');
+            $taken = StudentProfile::query()->whereIn('institute_email', $emails)->pluck('institute_email')
+                ->merge(\App\Models\User::query()->whereIn('email', $emails)->pluck('email'))
+                ->map(fn ($e) => strtolower((string) $e))->flip();
+
+            foreach ($chunk as $rowNumber => $data) {
+                $field = isset($rolls[$data['roll_no']]) ? 'roll_no' : (isset($taken[$data['institute_email']]) ? 'institute_email' : null);
+                if ($field !== null) {
+                    $errors[] = ['row' => $rowNumber, 'roll_no' => $data['roll_no'], 'field' => $field, 'reason' => $messages[$field.'.unique']];
+                    unset($valid[$rowNumber]);
+                }
+            }
+        }
+
+        foreach ($overflow as $rowNumber => $cells) {
+            $errors[] = [
+                'row' => $rowNumber,
+                'roll_no' => strtoupper(trim((string) ($cells[$map['roll_no'] ?? 0] ?? ''))),
+                'field' => null,
+                'reason' => sprintf('Not imported: one file can hold at most %s students. Upload this row in a second file.', number_format($maxRows)),
+            ];
+        }
+
+        usort($errors, fn (array $a, array $b) => $a['row'] <=> $b['row']);
+
         if ($dryRun) {
             return response()->json([
                 'message' => sprintf('%d row(s) ready to import, %d error(s).', count($valid), count($errors)),
                 'dry_run' => true,
                 'valid_rows' => count($valid),
                 'created' => 0,
+                'over_limit_rows' => count($overflow),
                 'errors' => $errors,
             ]);
+        }
+
+        if (count($valid) > 500) {
+            @set_time_limit(0); // thousands of rows: one transaction per row, invitations queued per student
         }
 
         $created = [];
@@ -371,6 +492,7 @@ class AdminStudentController extends Controller
                 'error_count' => count($errors),
                 'roll_nos' => array_slice($created, 0, 100),
                 'roll_nos_truncated' => count($created) > 100,
+                'default_batch' => $defaultBatch,
             ]);
         }
 
@@ -379,18 +501,20 @@ class AdminStudentController extends Controller
             'dry_run' => false,
             'valid_rows' => count($valid),
             'created' => count($created),
+            'over_limit_rows' => count($overflow),
             'errors' => $errors,
         ]);
     }
 
     public function importTemplate(): StreamedResponse
     {
-        return $this->templateResponse(StudentAccountService::IMPORT_COLUMNS, 'student_import_template.xlsx');
+        // Human-readable headers with hints (S5.6); the importer maps by header name and still reads old templates.
+        return $this->templateResponse(array_values(StudentAccountService::IMPORT_HEADERS), 'student_import_template.xlsx');
     }
 
     public function academicsTemplate(): StreamedResponse
     {
-        return $this->templateResponse(array_merge(['roll_no'], StudentAcademicSyncService::FIELDS), 'academic_update_template.xlsx');
+        return $this->templateResponse(array_merge(['roll_no'], StudentAcademicSyncService::FIELDS, StudentAcademicSyncService::EXTRA_FIELDS), 'academic_update_template.xlsx');
     }
 
     /**
@@ -409,18 +533,27 @@ class AdminStudentController extends Controller
         }
 
         $rows = [];
+        $extraIndexes = null;
         foreach ($sheet as $rowNumber => $cells) {
             if (preg_replace('/[^a-z]/', '', strtolower($cells[0] ?? '')) === 'rollno') {
+                // A header row names where the optional S4.6 extras are.
+                $extraIndexes ??= StudentAccountService::extraColumnIndexes($cells, 4);
+
                 continue;
             }
 
-            $rows[] = [
+            $row = [
                 'row' => $rowNumber,
                 'roll_no' => $cells[0] ?? '',
                 'current_cgpa' => $cells[1] ?? '',
                 'ongoing_backlogs' => $cells[2] ?? '',
                 'total_backlogs' => $cells[3] ?? '',
             ];
+            // Optional S4.6 extras: by header name, else positionally after the four original columns.
+            foreach ($extraIndexes ?? StudentAccountService::extraColumnIndexes(null, 4) as $field => $index) {
+                $row[$field] = $cells[$index] ?? '';
+            }
+            $rows[] = $row;
         }
 
         if ($rows === []) {
@@ -522,6 +655,43 @@ class AdminStudentController extends Controller
         ]);
     }
 
+    /**
+     * The student-list filters: the original single-value ones plus Apply Filters (S4.1).
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function filterRules(): array
+    {
+        return \App\Support\StudentDirectoryFilters::rules() + [
+            'programme' => ['nullable', 'string', 'max:255'],
+            'branch' => ['nullable', 'string', 'max:255'],
+            'graduating_batch' => ['nullable', 'integer'],
+            'status' => ['nullable', 'in:active,suspended'],
+        ];
+    }
+
+    /**
+     * @return Builder<StudentProfile>
+     */
+    private function filteredQuery(array $validated): Builder
+    {
+        $query = StudentProfile::query();
+
+        foreach (['programme', 'branch', 'graduating_batch'] as $filter) {
+            if (! empty($validated[$filter])) {
+                $query->where($filter, $validated[$filter]);
+            }
+        }
+
+        if (! empty($validated['status'])) {
+            $query->whereHas('user', fn (Builder $u) => $u->where('is_active', $validated['status'] === 'active'));
+        }
+
+        \App\Support\StudentDirectoryFilters::apply($query, $validated);
+
+        return $query;
+    }
+
     private function listPayload(StudentProfile $student): array
     {
         return [
@@ -529,6 +699,9 @@ class AdminStudentController extends Controller
             'roll_no' => $student->roll_no,
             'full_name' => $student->full_name,
             'institute_email' => $student->institute_email,
+            'personal_email' => $student->personal_email,
+            'phone' => $student->phone,
+            'has_photo' => $student->has_photo,
             'programme' => $student->programme,
             'branch' => $student->branch,
             'graduating_batch' => $student->graduating_batch,
@@ -542,8 +715,10 @@ class AdminStudentController extends Controller
 
     private function detailPayload(StudentProfile $student): array
     {
+        $user = $student->user ? \App\Models\User::query()->find($student->user_id) : null;
+
         return $student->toArray() + [
             'is_active' => (bool) ($student->user?->is_active ?? true),
-        ];
+        ] + ($user ? AdminStudentInvitationController::invitationFields($user) : []);
     }
 }

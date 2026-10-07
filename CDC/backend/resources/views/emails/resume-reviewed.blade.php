@@ -7,7 +7,7 @@
     @if ($approved)
         <p>Your resume <strong>{{ $label }}</strong> has been verified by the CDC. Applications that use it are no longer flagged.</p>
     @else
-        <p>Your resume <strong>{{ $label }}</strong> was not approved.</p>
+        <p>Your resume <strong>{{ $label }}</strong> was not verified.</p>
         <p style="padding:12px;background:#fff7ed;border-left:4px solid #b45309;"><strong>CDC remark:</strong> {{ $remark }}</p>
         <p>Please upload a corrected version into the same slot. It will be reviewed again.</p>
     @endif

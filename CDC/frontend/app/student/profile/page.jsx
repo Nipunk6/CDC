@@ -31,27 +31,28 @@ import BlockIcon from "@mui/icons-material/Block";
 import { studentApi, studentBlobUrl, studentUpload } from "@/lib/studentapi";
 import useCatalogue from "@/lib/usecatalogue";
 import { dash, formatDate, formatDateTime, statusColor, titleCase } from "@/lib/format";
+import { academicExtraFields, formatAcademicExtra } from "@/lib/academicextras";
 
 const academicFields = [
   ["Roll number", "roll_no"],
   ["Institute email", "institute_email"],
   ["Programme", "programme"],
   ["Branch", "branch"],
-  ["Graduating batch", "graduating_batch"],
+  ["Passout Batch", "graduating_batch"],
   ["CGPA", "current_cgpa"],
   ["Ongoing backlogs", "ongoing_backlogs"],
   ["Total backlogs", "total_backlogs"],
-  ["10th %", "tenth_percent"],
-  ["12th %", "twelfth_percent"],
+  ["Class X Percentage", "tenth_percent"],
+  ["Class XII Percentage", "twelfth_percent"],
   ["Gender", "gender"],
   ["Date of birth", "date_of_birth"],
-  ["Category", "category"],
+  ["Social Category", "category"],
   ["PwD", "pwd"],
 ];
 
 const personalFields = [
   ["personal_email", "Personal email"],
-  ["phone", "Phone"],
+  ["phone", "Contact No."],
   ["home_state", "Home state"],
   ["linkedin_url", "LinkedIn URL"],
   ["github_url", "GitHub URL"],
@@ -251,6 +252,17 @@ export default function StudentProfilePage() {
                       : key === "gender"
                         ? titleCase(student[key])
                         : dash(student[key])}
+                </Typography>
+              </Grid>
+            ))}
+            {/* S4.6: CDC-entered academic extras, read-only for the student. */}
+            {academicExtraFields.map(([label, key]) => (
+              <Grid key={key} size={{ xs: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {label}
+                </Typography>
+                <Typography variant="body2" fontWeight={500} sx={{ wordBreak: "break-word" }}>
+                  {formatAcademicExtra(student, key)}
                 </Typography>
               </Grid>
             ))}

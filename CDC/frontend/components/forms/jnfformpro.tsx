@@ -224,9 +224,12 @@ type JnfFormProProps = {
   initialData?: Partial<JnfFormData> & { id?: number };
   onSaved?: (id: number) => void;
   onCancel?: () => void;
+  // Admin "Add New Job" (S6.1) reuses the wizard with adminApi and /admin/form-builder/{company}.
+  api?: <T>(path: string, init?: RequestInit) => Promise<T>;
+  apiPrefix?: string;
 };
 
-export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormProProps) {
+export default function JnfFormPro({ initialData, onSaved, onCancel, api = companyApi, apiPrefix = "/company" }: JnfFormProProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const [formData, setFormData] = useState<JnfFormData>(() => {
@@ -279,8 +282,8 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
         status: "draft",
       };
 
-      const response = await companyApi<{ jnf: { id: number } }>(
-        "/company/jnfs/autosave",
+      const response = await api<{ jnf: { id: number } }>(
+        `${apiPrefix}/jnfs/autosave`,
         { method: "POST", body: JSON.stringify(payload) }
       );
       setDraftId(response.jnf.id);
@@ -316,7 +319,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
   useEffect(() => {
     const fetchCompanyProfile = async () => {
       try {
-        const response = await companyApi<{
+        const response = await api<{
           company: {
             name: string;
             website: string | null;
@@ -335,7 +338,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
             hr_name?: string | null;
             hr_designation?: string | null;
           };
-        }>("/company/profile");
+        }>(`${apiPrefix}/profile`);
 
         setFormData((prev) => {
           return {
@@ -380,7 +383,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
     };
 
     fetchCompanyProfile();
-  }, []);
+  }, [api, apiPrefix]);
 
   // Auto-save debounce
   const autoSave = useCallback(async () => {
@@ -402,8 +405,8 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
         status: "draft",
       };
 
-      const response = await companyApi<{ jnf: { id: number } }>(
-        "/company/jnfs/autosave",
+      const response = await api<{ jnf: { id: number } }>(
+        `${apiPrefix}/jnfs/autosave`,
         { method: "POST", body: JSON.stringify(payload) }
       );
       setDraftId(response.jnf.id);
@@ -419,7 +422,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
     } finally {
       setSaving(false);
     }
-  }, [formData, draftId, submitting, submitted]);
+  }, [formData, draftId, submitting, submitted, api, apiPrefix]);
 
   // Debounced auto-save
   useEffect(() => {
@@ -434,7 +437,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
   useEffect(() => {
     const fetchCustomBranches = async () => {
       try {
-        const response = await companyApi<{
+        const response = await api<{
           programme_branches: ProgrammeBranchGroup[];
           branch_states: ProgrammeBranchStateGroup[];
         }>("/programme-branches");
@@ -453,7 +456,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
     };
 
     fetchCustomBranches();
-  }, []);
+  }, [api]);
 
   const updateFormData = <K extends keyof JnfFormData>(field: K, value: JnfFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -508,10 +511,10 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
         status: "submitted",
       };
 
-      const path = draftId ? `/company/jnfs/${draftId}` : "/company/jnfs";
+      const path = draftId ? `${apiPrefix}/jnfs/${draftId}` : `${apiPrefix}/jnfs`;
       const method = draftId ? "PUT" : "POST";
 
-      const response = await companyApi<{ jnf: { id: number } }>(path, {
+      const response = await api<{ jnf: { id: number } }>(path, {
         method,
         body: JSON.stringify(payload),
       });
@@ -578,9 +581,9 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           <DialogContentText>
-            You have selected graduating batch <strong>{formData.graduatingBatch}</strong>.
+            You have selected passout batch <strong>{formData.graduatingBatch}</strong>.
             <br /><br />
-            The graduating batch for this JNF is locked and cannot be modified. If you need to hire for a different batch, you will need to create a new JNF.
+            The passout batch for this JNF is locked and cannot be modified. If you need to hire for a different batch, you will need to create a new JNF.
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -618,7 +621,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
             {formData.graduatingBatch && (
               <Chip
                 icon={<SchoolIcon style={{ color: "white" }} />}
-                label={`Graduating Batch of ${formData.graduatingBatch}`}
+                label={`Passout Batch of ${formData.graduatingBatch}`}
                 sx={{
                   bgcolor: "rgba(255, 255, 255, 0.2)",
                   color: "white",
@@ -659,7 +662,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
             borderColor: "info.light",
           }}
         >
-          You are currently Hiring for Graduating Batch <strong>{formData.graduatingBatch}</strong>. This choice is locked for this JNF. If you need to hire for a different batch, you will need to create a new JNF.
+          You are currently Hiring for Passout Batch <strong>{formData.graduatingBatch}</strong>. This choice is locked for this JNF. If you need to hire for a different batch, you will need to create a new JNF.
         </Alert>
       )}
 
@@ -1001,7 +1004,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
                 <TextField
                   fullWidth
                   type="number"
-                  label="Minimum 10th % (optional)"
+                  label="Minimum Class X Percentage (optional)"
                   value={formData.minTenthPercent ?? ""}
                   onChange={(e) => updateFormData("minTenthPercent", e.target.value)}
                   inputProps={{ min: 0, max: 100, step: 0.01 }}
@@ -1011,7 +1014,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
                 <TextField
                   fullWidth
                   type="number"
-                  label="Minimum 12th % (optional)"
+                  label="Minimum Class XII Percentage (optional)"
                   value={formData.minTwelfthPercent ?? ""}
                   onChange={(e) => updateFormData("minTwelfthPercent", e.target.value)}
                   inputProps={{ min: 0, max: 100, step: 0.01 }}
@@ -1060,7 +1063,7 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
           <Stack spacing={3}>
             <FormSection
               title="Selection Process"
-              subtitle="Configure your hiring process - tests, interviews, and rounds"
+              subtitle="Configure your hiring process - tests, interviews, and stages"
               icon={<AssignmentIcon />}
               required
             >
@@ -1083,6 +1086,8 @@ export default function JnfFormPro({ initialData, onSaved, onCancel }: JnfFormPr
             <DeclarationChecklist
               formType="jnf"
               draftId={draftId}
+              api={api}
+              apiPrefix={apiPrefix}
               declarations={formData.declarations}
               onDeclarationsChange={(v) => updateFormData("declarations", v)}
             />

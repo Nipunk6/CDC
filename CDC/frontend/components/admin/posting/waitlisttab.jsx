@@ -68,7 +68,7 @@ export default function WaitlistTab({ posting, onMessage, onChanged }) {
   };
 
   const moveOn = (application) => {
-    if (!window.confirm(`Move ${application.student?.roll_no} off the waitlist into ${nextRound.name}? The student is told straight away.`)) return;
+    if (!window.confirm(`Move ${application.student?.roll_no} off hold into ${nextRound.name}? The student is told straight away.`)) return;
     void run(
       () => adminApi(`/admin/postings/${posting.id}/rounds/${roundId}/waitlist/${application.id}/promote`, { method: "POST" }),
       "Failed to move the candidate."
@@ -76,7 +76,7 @@ export default function WaitlistTab({ posting, onMessage, onChanged }) {
   };
 
   const remove = (application) => {
-    if (!window.confirm(`Remove ${application.student?.roll_no} from the waitlist? If the waitlist was published they are told they were not selected.`)) return;
+    if (!window.confirm(`Remove ${application.student?.roll_no} from On Hold? If the hold was published they are told they were not selected.`)) return;
     void run(() => adminApi(`/admin/postings/${posting.id}/rounds/${roundId}/waitlist/${application.id}`, { method: "DELETE" }), "Failed to remove.");
   };
 
@@ -86,11 +86,11 @@ export default function WaitlistTab({ posting, onMessage, onChanged }) {
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
       {roundsWithWaitlist.length === 0 ? (
-        <Typography color="text.secondary">No round has waitlisted candidates yet. Mark candidates as waitlisted from the Pipeline tab.</Typography>
+        <Typography color="text.secondary">No stage has on-hold candidates yet. Hold candidates at their current stage from the Progress Grid tab.</Typography>
       ) : (
         <FormControl size="small" sx={{ maxWidth: 320 }}>
-          <InputLabel id="wl-round">Round</InputLabel>
-          <Select labelId="wl-round" label="Round" value={roundId} onChange={(e) => setRoundId(e.target.value)}>
+          <InputLabel id="wl-round">Stage</InputLabel>
+          <Select labelId="wl-round" label="Stage" value={roundId} onChange={(e) => setRoundId(e.target.value)}>
             {roundsWithWaitlist.map((r) => (
               <MenuItem key={r.id} value={String(r.id)}>
                 {r.name}
@@ -103,8 +103,8 @@ export default function WaitlistTab({ posting, onMessage, onChanged }) {
       {roundId && (
         <>
           <Typography variant="body2" color="text.secondary">
-            The waitlist has no order — move any candidate on{nextRound ? ` to ${nextRound.name}` : ""}. Moving marks them as
-            selected in this round and notifies them; {nextRound ? `${nextRound.name} then decides them like everyone else.` : "this is the last round — tick them on the Results page to give an offer."}
+            The On Hold list has no order — move any candidate on{nextRound ? ` to ${nextRound.name}` : ""}. Moving marks them as
+            shortlisted in this stage and notifies them; {nextRound ? `${nextRound.name} then decides them like everyone else.` : "this is the last stage — tick them on the Shortlist for Offer page to give an offer."}
           </Typography>
           <Stack spacing={1}>
             {waitlisted.map((a) => {
@@ -118,7 +118,7 @@ export default function WaitlistTab({ posting, onMessage, onChanged }) {
                     <Typography variant="caption" color="text.secondary">
                       {a.student?.branch} · CGPA {a.student?.current_cgpa ?? "—"}
                     </Typography>
-                    {!published && <Chip size="small" variant="outlined" label="draft — publish the round first" />}
+                    {!published && <Chip size="small" variant="outlined" label="draft — publish the stage first" />}
                     <Box sx={{ flex: 1 }} />
                     <Stack direction="row" spacing={1}>
                       {nextRound && (

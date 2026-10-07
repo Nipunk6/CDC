@@ -21,16 +21,16 @@ export const blocksCompletely = (offerType) => COMPLETE.includes(offerType);
 /** What a selection under this category means for the student. */
 export const selectionConsequence = (offerType) =>
   blocksCompletely(offerType)
-    ? "Selected students are blocked from all further placement and internship opportunities in every cycle they are registered for."
+    ? "Selected students are blocked from all further placement and internship opportunities in every placement they are registered for."
     : "Selected students are blocked from further internship opportunities; full-time opportunities stay open.";
 
 /** The same rule, addressed to a student about to apply. */
 export const studentConsequence = (offerType) =>
   blocksCompletely(offerType)
-    ? "If you are selected, CDC policy blocks you from all further placement and internship opportunities in the cycles you are registered for."
+    ? "If you are selected, CDC policy blocks you from all further placement and internship opportunities in the placements you are registered for."
     : "If you are selected, CDC policy blocks you from further internship opportunities; full-time opportunities stay open to you.";
 
 export const BLOCK_SCOPE_LABEL = {
-  all: "Completely — every cycle",
+  all: "Completely — every placement",
   internships_only: "Internships only — full-time open",
 };

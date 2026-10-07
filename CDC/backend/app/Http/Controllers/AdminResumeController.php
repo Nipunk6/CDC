@@ -90,6 +90,29 @@ class AdminResumeController extends Controller
             'admin_remark.required_if' => 'Add a remark telling the student what to fix.',
         ]);
 
+        if (! $this->decide($request, $resume, $validated)) {
+            return response()->json([
+                'message' => 'The student replaced this resume after you opened it. Review the new file before deciding.',
+            ], 409);
+        }
+
+        $approved = $validated['status'] === 'approved';
+
+        return response()->json([
+            'message' => $approved ? 'Resume verified.' : 'Resume rejected.',
+            'resume' => $resume->fresh()->load(['studentProfile:id,roll_no,full_name,programme,branch,graduating_batch', 'reviewedBy:id,name']),
+        ]);
+    }
+
+    /**
+     * The one write path for a resume decision (also used by "Mark all as verified" on the student page, S4.5):
+     * the D60 race guard, the B3 flag clearing, the audit row, the in-app notice and the E-mail.
+     * Returns false (and changes nothing) when the file changed after `expected_updated_at`.
+     *
+     * @param  array{status: string, admin_remark?: ?string, expected_updated_at?: ?string}  $validated
+     */
+    public function decide(Request $request, Resume $resume, array $validated): bool
+    {
         $before = $resume->only(['status', 'admin_remark']);
 
         $stale = DB::transaction(function () use ($resume, $validated, $request): bool {
@@ -116,9 +139,7 @@ class AdminResumeController extends Controller
         });
 
         if ($stale) {
-            return response()->json([
-                'message' => 'The student replaced this resume after you opened it. Review the new file before deciding.',
-            ], 409);
+            return false;
         }
 
         $this->audit->log($request, 'resume.'.($validated['status'] === 'approved' ? 'approve' : 'reject'), $resume, $before, $resume->only(['status', 'admin_remark']));
@@ -128,14 +149,14 @@ class AdminResumeController extends Controller
 
         $this->notifications->createInAppNotification(
             $student->user,
-            $approved ? 'Resume approved' : 'Resume needs changes',
+            $approved ? 'Resume verified' : 'Resume needs changes',
             $approved
                 ? sprintf('Your resume "%s" has been verified by the CDC.', $resume->label)
                 : sprintf('Your resume "%s" was rejected. Remark: %s', $resume->label, $validated['admin_remark']),
             $approved ? 'success' : 'warning'
         );
 
-        $subject = $approved ? 'Your resume has been approved' : 'Your resume needs changes';
+        $subject = $approved ? 'Your resume has been verified' : 'Your resume needs changes';
         $this->mail->send(
             $student->user,
             new ResumeReviewedMail($student->full_name, $resume->label, $approved, $validated['admin_remark'] ?? null, $subject),
@@ -143,10 +164,7 @@ class AdminResumeController extends Controller
             'emails.resume-reviewed'
         );
 
-        return response()->json([
-            'message' => $approved ? 'Resume approved.' : 'Resume rejected.',
-            'resume' => $resume->fresh()->load(['studentProfile:id,roll_no,full_name,programme,branch,graduating_batch', 'reviewedBy:id,name']),
-        ]);
+        return true;
     }
 
     /**

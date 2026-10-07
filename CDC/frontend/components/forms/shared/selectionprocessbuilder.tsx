@@ -185,7 +185,7 @@ export default function SelectionProcessBuilder({
                 }
                 label={
                   <Typography variant="body2">
-                    {typeInfo?.icon} {round.type === "other" ? (round.description || "Custom Round") : typeInfo?.label}
+                    {typeInfo?.icon} {round.type === "other" ? (round.description || "Custom Stage") : typeInfo?.label}
                   </Typography>
                 }
                 sx={{
@@ -265,7 +265,7 @@ export default function SelectionProcessBuilder({
                       {round.type === "other" ? (
                         <TextField
                           size="small"
-                          placeholder="Round Name"
+                          placeholder="Stage Name"
                           value={round.description ?? ""}
                           onChange={(e) => updateRound(round.id, "description", e.target.value)}
                           variant="standard"

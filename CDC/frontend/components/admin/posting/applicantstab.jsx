@@ -25,6 +25,7 @@ import {
   Typography,
 } from "@mui/material";
 
+import StudentQuickView from "@/components/admin/studentquickview";
 import { adminApi } from "@/lib/adminapi";
 import { formatDateTime } from "@/lib/format";
 import { shortProgramme } from "@/lib/usecatalogue";
@@ -32,6 +33,9 @@ import { shortProgramme } from "@/lib/usecatalogue";
 const proxied = (url) => `/api/proxy-pdf?url=${encodeURIComponent(url)}`;
 
 const renderAnswer = (answer) => (Array.isArray(answer) ? answer.join(", ") : String(answer ?? "—"));
+
+// A student's name opens the quick-view drawer (Superset parity S4.3).
+const nameButtonSx = { border: 0, p: 0, bgcolor: "transparent", color: "primary.main", cursor: "pointer", textAlign: "left", font: "inherit" };
 
 /**
  * Applicants of a posting with every admin-only flag. `rowActions(application, reload)` lets later
@@ -44,6 +48,7 @@ export default function ApplicantsTab({ posting, rowActions }) {
   const [view, setView] = useState("applied");
   const [search, setSearch] = useState("");
   const [answersFor, setAnswersFor] = useState(null);
+  const [quickView, setQuickView] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,17 +82,17 @@ export default function ApplicantsTab({ posting, rowActions }) {
       {error && <Alert severity="error">{error}</Alert>}
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
         <Tabs value={view} onChange={(_e, value) => setView(value)}>
-          <Tab value="applied" label={`Applied (${applications.filter((a) => a.status === "applied").length})`} />
+          <Tab value="applied" label={`${applications.filter((a) => a.status === "applied").length} Applicants`} />
           <Tab value="withdrawn" label={`Withdrawn (${applications.filter((a) => a.status === "withdrawn").length})`} />
         </Tabs>
-        <TextField size="small" label="Search roll no, name, branch" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <TextField size="small" label="Search Roll Number, name, branch" value={search} onChange={(e) => setSearch(e.target.value)} />
       </Stack>
       {loading && <LinearProgress />}
       <TableContainer>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Roll no</TableCell>
+              <TableCell>Roll Number</TableCell>
               <TableCell>Name</TableCell>
               <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Programme · Branch</TableCell>
               <TableCell>CGPA</TableCell>
@@ -112,7 +117,11 @@ export default function ApplicantsTab({ posting, rowActions }) {
                 <TableCell sx={{ fontWeight: 600 }}>
                   <Link href={`/admin/students/${a.student_profile?.id}`}>{a.student_profile?.roll_no}</Link>
                 </TableCell>
-                <TableCell>{a.student_profile?.full_name}</TableCell>
+                <TableCell>
+                  <Typography component="button" type="button" variant="body2" onClick={() => setQuickView(a.student_profile?.id)} sx={nameButtonSx}>
+                    {a.student_profile?.full_name}
+                  </Typography>
+                </TableCell>
                 <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
                   {shortProgramme(a.student_profile?.programme)} · {a.student_profile?.branch}
                 </TableCell>
@@ -146,6 +155,8 @@ export default function ApplicantsTab({ posting, rowActions }) {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <StudentQuickView studentId={quickView} onClose={() => setQuickView(null)} />
 
       <Dialog open={Boolean(answersFor)} onClose={() => setAnswersFor(null)} maxWidth="sm" fullWidth>
         <DialogTitle>

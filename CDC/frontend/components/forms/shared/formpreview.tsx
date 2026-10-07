@@ -383,7 +383,7 @@ export function JnfPreview({
       >
         <Grid2 container spacing={2}>
           <Grid2 size={{ xs: 6, md: 3 }}>
-            <Typography variant="caption" color="text.secondary">Graduating Batch</Typography>
+            <Typography variant="caption" color="text.secondary">Passout Batch</Typography>
             <Typography variant="body2" fontWeight={600}>{graduatingBatch || "-"}</Typography>
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
@@ -401,11 +401,11 @@ export function JnfPreview({
           {(minTenthPercent || minTwelfthPercent) && (
             <>
               <Grid2 size={{ xs: 6, md: 3 }}>
-                <Typography variant="caption" color="text.secondary">Min 10th %</Typography>
+                <Typography variant="caption" color="text.secondary">Min Class X Percentage</Typography>
                 <Typography variant="body2">{minTenthPercent || "No Cutoff"}</Typography>
               </Grid2>
               <Grid2 size={{ xs: 6, md: 3 }}>
-                <Typography variant="caption" color="text.secondary">Min 12th %</Typography>
+                <Typography variant="caption" color="text.secondary">Min Class XII Percentage</Typography>
                 <Typography variant="body2">{minTwelfthPercent || "No Cutoff"}</Typography>
               </Grid2>
             </>
@@ -933,7 +933,7 @@ export function InfPreview({
       >
         <Grid2 container spacing={2}>
           <Grid2 size={{ xs: 6, md: 3 }}>
-            <Typography variant="caption" color="text.secondary">Graduating Batch</Typography>
+            <Typography variant="caption" color="text.secondary">Passout Batch</Typography>
             <Typography variant="body2" fontWeight={600}>{graduatingBatch || "-"}</Typography>
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
@@ -951,11 +951,11 @@ export function InfPreview({
           {(minTenthPercent || minTwelfthPercent) && (
             <>
               <Grid2 size={{ xs: 6, md: 3 }}>
-                <Typography variant="caption" color="text.secondary">Min 10th %</Typography>
+                <Typography variant="caption" color="text.secondary">Min Class X Percentage</Typography>
                 <Typography variant="body2">{minTenthPercent || "No Cutoff"}</Typography>
               </Grid2>
               <Grid2 size={{ xs: 6, md: 3 }}>
-                <Typography variant="caption" color="text.secondary">Min 12th %</Typography>
+                <Typography variant="caption" color="text.secondary">Min Class XII Percentage</Typography>
                 <Typography variant="body2">{minTwelfthPercent || "No Cutoff"}</Typography>
               </Grid2>
             </>

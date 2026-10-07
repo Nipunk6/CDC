@@ -31,6 +31,7 @@ use Illuminate\Support\Str;
  * Demo logins (local development only):
  *   students  roll number (e.g. 23JE0101) / Student@2026
  *   companies hr@nimbus.demo, hr@vertex.demo, hr@helix.demo / Company@2026
+ *   admin     admin@cdc-demo.test / Admin@2026 (demo super admin for local browser checks, D107)
  */
 class Phase2DemoSeeder extends Seeder
 {
@@ -67,6 +68,10 @@ class Phase2DemoSeeder extends Seeder
         $this->faker = FakerFactory::create('en_IN');
         $this->faker->seed(2026);
         mt_srand(2026);
+        User::query()->firstOrCreate(
+            ['email' => 'admin@cdc-demo.test'],
+            ['name' => 'Demo CDC Admin', 'password' => Hash::make('Admin@2026'), 'role' => 'admin', 'is_super_admin' => true, 'is_active' => true]
+        );
         $this->adminId = User::query()->where('role', 'admin')->value('id');
 
         $ft = PlacementCycle::create([
@@ -122,6 +127,111 @@ class Phase2DemoSeeder extends Seeder
             'audience_filter' => ['branches' => [['programme' => self::BTECH, 'branch' => null]]],
             'published_at' => now()->subHours(3), 'created_by' => $this->adminId,
         ]);
+
+        $this->seedSupersetParity($ft);
+    }
+
+    /**
+     * Demo rows for the Superset parity screens (SUPERSET_PARITY_PROGRESS.md), so each new page has something to show.
+     */
+    private function seedSupersetParity(PlacementCycle $ft): void
+    {
+        // S3: one Excel Template, like the CDC's own "IIT ISM DHANBAD" format.
+        \App\Models\ExportTemplate::create([
+            'name' => 'CDC Standard', 'type' => 'STUDENT_LIST', 'created_by' => $this->adminId,
+            'columns' => [
+                ['key' => 'sno', 'label' => 'S.No.'], ['key' => 'name', 'label' => 'Name'], ['key' => 'roll_no', 'label' => 'Roll No'],
+                ['key' => 'tenth_percent', 'label' => 'Class 10 %'], ['key' => 'cgpa', 'label' => 'Current Course Score'],
+                ['key' => 'applied_at', 'label' => 'Applied At'], ['key' => 'current_stage', 'label' => 'Current Stage'],
+                ['key' => 'application_status', 'label' => 'Application Status'], ['key' => 'ctc_offered', 'label' => 'CTC offered'],
+                ['key' => 'ctc_currency', 'label' => 'CTC Currency'], ['key' => 'ctc_interval', 'label' => 'CTC Interval'],
+                ['key' => 'answers', 'label' => 'Additional Questions'], ['key' => 'resume_label', 'label' => 'Attached Resume'],
+                ['key' => 'resume_link', 'label' => 'Resume Link'], ['key' => 'last_edited', 'label' => 'Last Edited'],
+                ['key' => 'cycle_offers', 'label' => 'Offers (FT 2026-27)', 'cycle_id' => $ft->id],
+            ],
+        ]);
+
+        // S4.5 / S4.6: academic extras for the first few students and two internal notes on the first one.
+        $demoStudents = StudentProfile::query()->orderBy('id')->limit(6)->get();
+        foreach ($demoStudents as $i => $student) {
+            $batch = (int) $student->graduating_batch;
+            $student->update([
+                'current_semester' => 7,
+                'course_start_date' => ($batch - 4).'-07-25',
+                'course_end_date' => $batch.'-05-31',
+                'lateral_entry' => $i === 5,
+                'tenth_board' => $i % 2 === 0 ? 'CBSE' : 'ICSE',
+                'tenth_passing_year' => $batch - 7,
+                'twelfth_board' => $i % 2 === 0 ? 'CBSE' : 'Bihar School Examination Board',
+                'twelfth_passing_year' => $batch - 5,
+            ]);
+        }
+        $pg = StudentProfile::query()->whereIn('programme', [self::MTECH, self::MBA])->orderBy('id')->limit(2)->get();
+        foreach ($pg as $i => $student) {
+            $student->update([
+                'previous_degree' => 'B.Tech', 'previous_degree_score' => $i === 0 ? 8.1 : 76.5, 'previous_degree_score_type' => $i === 0 ? 'cgpa' : 'percentage',
+            ]);
+        }
+        if ($first = $demoStudents->first()) {
+            foreach (['Spoke to the student about pending documents; follow up next week.', 'Asked about branch change; told to raise a request through the portal.'] as $body) {
+                \App\Models\StudentNote::create(['student_profile_id' => $first->id, 'author_id' => $this->adminId, 'body' => $body]);
+            }
+        }
+
+        // S7: one published notice (FT placement) and one published PPO-consent survey with a few responses.
+        $enrolled = StudentProfile::query()->whereHas('cycleEnrollments', fn ($q) => $q->where('placement_cycle_id', $ft->id)->where('status', 'active'))->orderBy('id')->limit(3)->get();
+        $notice = \App\Models\Notice::create([
+            'title' => 'Placement week: reporting instructions',
+            'body' => '<p>All registered students must carry their institute ID card and two printed copies of their resume.</p><p>Report to NLHC by 8:30 AM on interview days.</p>',
+            'published_at' => now()->subHours(6), 'created_by' => $this->adminId,
+        ]);
+        $notice->audiences()->create(['audience_type' => 'cycle', 'audience_filter' => ['placement_cycle_id' => $ft->id]]);
+        if ($enrolled->isNotEmpty()) {
+            \App\Models\NoticeRead::create(['notice_id' => $notice->id, 'student_profile_id' => $enrolled->first()->id, 'read_at' => now()->subHours(2)]);
+        }
+
+        $sdePosting = JobPosting::query()->where('placement_cycle_id', $ft->id)->orderBy('id')->first();
+        $survey = \App\Models\Survey::create([
+            'title' => 'Nimbus Systems || PPO Consent', 'survey_type' => 'ppo_consent',
+            'welcome_text' => '<p>Please tell the CDC whether you accept the pre-placement offer. Your answer is for the CDC\'s records only.</p>',
+            'concluding_text' => '<p>Thank you. The CDC will contact you if anything else is needed.</p>',
+            'status' => 'published', 'allow_edits' => true, 'deadline_at' => now()->addDays(5)->setTime(18, 0),
+            'job_posting_id' => $sdePosting?->id, 'published_at' => now()->subDay(), 'created_by' => $this->adminId,
+        ]);
+        $survey->audiences()->create(['audience_type' => 'cycle', 'audience_filter' => ['placement_cycle_id' => $ft->id]]);
+        $accept = $survey->questions()->create(['qtype' => 'yes_no', 'question' => 'Do you accept the PPO', 'required' => true, 'sort_order' => 1]);
+        $city = $survey->questions()->create(['qtype' => 'dropdown', 'question' => 'Preferred joining location', 'options' => ['Bengaluru', 'Hyderabad', 'Pune'], 'sort_order' => 2]);
+        $rating = $survey->questions()->create(['qtype' => 'rating', 'question' => 'How was the internship experience?', 'settings' => ['max' => 5], 'sort_order' => 3]);
+        $survey->questions()->create(['qtype' => 'text', 'question' => 'Anything the CDC should know?', 'help_text' => 'Optional', 'sort_order' => 4]);
+        foreach ($enrolled as $i => $student) {
+            $survey->responses()->create([
+                'student_profile_id' => $student->id,
+                // Single-submission survey: one response per student, guarded by single_key (fix L21).
+                'single_key' => $survey->allow_multiple ? null : \App\Models\SurveyResponse::singleKey($survey->id, $student->id),
+                'answers' => [(string) $accept->id => $i === 2 ? 'no' : 'yes', (string) $city->id => ['Bengaluru', 'Pune', 'Hyderabad'][$i], (string) $rating->id => 5 - $i],
+                'submitted_at' => now()->subHours(20 - $i * 5),
+            ]);
+        }
+
+        // S8.2 / S8.3: Users directory fields on the demo admin, and a Draft placement students cannot see yet.
+        User::query()->where('email', 'admin@cdc-demo.test')->update([
+            'first_name' => 'Demo', 'last_name' => 'CDC Admin', 'designation' => 'Placement Officer', 'mobile' => '+91 9000000000',
+        ]);
+        PlacementCycle::create([
+            'name' => 'Internship 2027-28 (2029 Passout Batch)', 'type' => 'internship', 'starts_on' => '2027-03-01', 'ends_on' => '2028-02-29',
+            'status' => 'open', 'is_draft' => true, 'allowed_programmes' => [['programme' => self::BTECH, 'batches' => [2029]]],
+            'description' => 'Draft: being set up, not visible to students yet.', 'created_by' => $this->adminId,
+        ]);
+
+        // S5: invitation status. Most demo students have signed in (Accepted); the last four by id are three Sent
+        // and one Revoked, so the Send Invitations page shows every chip.
+        $studentUsers = User::query()->where('role', 'student')->orderBy('id')->pluck('id');
+        User::query()->whereIn('id', $studentUsers)->update([
+            'invited_at' => now()->subDays(20), 'last_invited_at' => now()->subDays(20), 'invite_count' => 1, 'activated_at' => now()->subDays(15),
+        ]);
+        $pending = $studentUsers->slice(-4)->values();
+        User::query()->whereIn('id', $pending)->update(['activated_at' => null, 'last_invited_at' => now()->subDays(2), 'invite_count' => 2]);
+        User::query()->where('id', $pending->last())->update(['invite_revoked_at' => now()->subDay()]);
     }
 
     /** @return list<StudentProfile> */

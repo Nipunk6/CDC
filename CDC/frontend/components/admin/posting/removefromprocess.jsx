@@ -55,7 +55,7 @@ export default function RemoveFromProcess({ posting, application, onDone }) {
             </Alert>
           )}
           <Typography gutterBottom>
-            {application.student_profile?.roll_no} {application.student_profile?.full_name} is placed elsewhere. Their current round will be marked
+            {application.student_profile?.roll_no} {application.student_profile?.full_name} is placed elsewhere. Their current stage will be marked
             &quot;Selected elsewhere via CDC&quot;.
           </Typography>
           <FormControlLabel

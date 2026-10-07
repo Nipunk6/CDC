@@ -124,7 +124,7 @@ export default function AdminResumesPage() {
       <PageHeader
         icon={<DescriptionIcon />}
         title="Resume Verification"
-        subtitle={`${counts.pending ?? 0} pending · ${counts.approved ?? 0} approved · ${counts.rejected ?? 0} rejected`}
+        subtitle={`${counts.pending ?? 0} pending · ${counts.approved ?? 0} verified · ${counts.rejected ?? 0} rejected`}
         backHref="/admin/students"
         backLabel="Students"
       />
@@ -149,12 +149,12 @@ export default function AdminResumesPage() {
           }}
         >
           {statuses.map((value) => (
-            <Tab key={value} value={value} label={`${titleCase(value)} (${counts[value] ?? 0})`} />
+            <Tab key={value} value={value} label={`${value === "approved" ? "Verified" : titleCase(value)} (${counts[value] ?? 0})`} />
           ))}
         </Tabs>
         <TextField
           size="small"
-          label="Search roll no or name"
+          label="Search Roll Number or name"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           onKeyDown={(event) => {
@@ -173,7 +173,7 @@ export default function AdminResumesPage() {
           <Card>
             {resumes.length === 0 && !loading ? (
               <Typography color="text.secondary" sx={{ p: 3 }}>
-                No {status} resumes.
+                No {status === "approved" ? "verified" : status} resumes.
               </Typography>
             ) : (
               <List dense sx={{ maxHeight: { md: 640 }, overflowY: "auto" }}>
@@ -212,7 +212,7 @@ export default function AdminResumesPage() {
                     <Typography variant="body2">
                       Slot {selected.slot}: <strong>{selected.label}</strong>
                     </Typography>
-                    <Chip size="small" variant="outlined" color={statusColor(selected.status)} label={titleCase(selected.status)} />
+                    <Chip size="small" variant="outlined" color={statusColor(selected.status)} label={selected.status === "approved" ? "Verified" : titleCase(selected.status)} />
                   </Stack>
                   {selected.admin_remark && (
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -228,7 +228,7 @@ export default function AdminResumesPage() {
                     disabled={busy || selected.status === "approved"}
                     onClick={() => decide("approved")}
                   >
-                    Approve
+                    Mark as verified
                   </Button>
                   <Button
                     variant="outlined"

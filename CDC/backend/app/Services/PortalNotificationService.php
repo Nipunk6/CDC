@@ -20,7 +20,10 @@ class PortalNotificationService
         ]);
     }
 
-    public function sendLoggedEmail(User $user, Mailable $mailable, string $subject, string $template): void
+    /**
+     * @param  array{job_posting_id?: int|null, kind?: string|null}  $context  extra email_logs columns (Communication Log)
+     */
+    public function sendLoggedEmail(User $user, Mailable $mailable, string $subject, string $template, array $context = []): void
     {
         try {
             Mail::to($user->email)->send($mailable);
@@ -32,7 +35,7 @@ class PortalNotificationService
                 'template' => $template,
                 'status' => 'sent',
                 'sent_at' => now(),
-            ]);
+            ] + $context);
         } catch (\Throwable $exception) {
             EmailLog::create([
                 'user_id' => $user->id,
@@ -41,7 +44,7 @@ class PortalNotificationService
                 'template' => $template,
                 'status' => 'failed',
                 'error_message' => $exception->getMessage(),
-            ]);
+            ] + $context);
         }
     }
 }

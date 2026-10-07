@@ -84,7 +84,7 @@ class CompanyInfController extends Controller
 
         if (isset($validated['form_data']) && is_string($validated['form_data'])) {
             $decoded = json_decode($validated['form_data'], true);
-            $validated['form_data'] = is_array($decoded) ? $decoded : null;
+            $validated['form_data'] = \App\Models\JobPosting::withoutAdminOnlyKeys(is_array($decoded) ? $decoded : null); // companies never set admin-only eligibility keys (fix M2)
         }
 
         // Validate joiningMonth is in the future
@@ -148,7 +148,7 @@ class CompanyInfController extends Controller
 
         if (isset($validated['form_data']) && is_string($validated['form_data'])) {
             $decoded = json_decode($validated['form_data'], true);
-            $validated['form_data'] = is_array($decoded) ? $decoded : null;
+            $validated['form_data'] = \App\Models\JobPosting::withoutAdminOnlyKeys(is_array($decoded) ? $decoded : null); // companies never set admin-only eligibility keys (fix M2)
         }
 
         // Validate joiningMonth is in the future
@@ -216,7 +216,7 @@ class CompanyInfController extends Controller
 
         if (! $isDraft && ! $isUnfloatedForm) {
             return response()->json([
-                'message' => 'This INF has been floated to students and cannot be deleted.',
+                'message' => 'This INF has been opened for applications and cannot be deleted.',
             ], 422);
         }
 
@@ -250,7 +250,7 @@ class CompanyInfController extends Controller
 
         // Parse form_data if it's a JSON string
         if (isset($validated['form_data']) && is_string($validated['form_data'])) {
-            $validated['form_data'] = json_decode($validated['form_data'], true);
+            $validated['form_data'] = \App\Models\JobPosting::withoutAdminOnlyKeys(json_decode($validated['form_data'], true) ?: null); // fix M2
         }
 
         if ($id !== null) {

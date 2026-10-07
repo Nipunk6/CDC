@@ -103,7 +103,7 @@ export default function ProposalsList({ postingId, onDecided }) {
               <Box sx={{ minWidth: 0 }}>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                   <Typography fontWeight={700}>
-                    {titleCase(p.kind)} · {p.round?.name}
+                    {p.kind === "waitlist" ? "On Hold" : titleCase(p.kind)} · {p.round?.name}
                   </Typography>
                   <Chip size="small" variant="outlined" color={statusColor(p.status)} label={titleCase(p.status)} />
                 </Stack>

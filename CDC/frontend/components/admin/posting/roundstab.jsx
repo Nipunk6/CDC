@@ -40,6 +40,8 @@ export const ROUND_TYPES = {
   ppt: "Pre-Placement Talk",
   resume: "Resume Shortlisting",
   written_test: "Written Test",
+  online_test: "Online Test",
+  take_home_assignment: "Take Home Assignment",
   aptitude_test: "Aptitude Test",
   technical_test: "Technical Test",
   group_discussion: "Group Discussion",
@@ -50,7 +52,7 @@ export const ROUND_TYPES = {
   other: "Other",
 };
 
-const blank = { name: "", round_type: "technical_interview", scheduled_at: "", status: "pending", is_final: false };
+const blank = { name: "", round_type: "technical_interview", scheduled_at: "", venue: "", status: "pending", is_final: false };
 
 export default function RoundsTab({ posting, onChanged, onMessage }) {
   const rounds = posting.rounds ?? [];
@@ -79,6 +81,7 @@ export default function RoundsTab({ posting, onChanged, onMessage }) {
       name: dialog.name.trim(),
       round_type: dialog.round_type,
       scheduled_at: fromLocalInput(dialog.scheduled_at),
+      venue: (dialog.venue ?? "").trim() || null,
       is_final: dialog.is_final,
       // Only send a status the admin actually changed, so a stale list cannot undo what publishing set.
       ...(dialog.id && dialog.status !== rounds.find((r) => r.id === dialog.id)?.status ? { status: dialog.status } : {}),
@@ -104,7 +107,7 @@ export default function RoundsTab({ posting, onChanged, onMessage }) {
           <TableHead>
             <TableRow>
               <TableCell>#</TableCell>
-              <TableCell>Round</TableCell>
+              <TableCell>Stage</TableCell>
               <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Type</TableCell>
               <TableCell>Scheduled</TableCell>
               <TableCell>Status</TableCell>
@@ -119,7 +122,18 @@ export default function RoundsTab({ posting, onChanged, onMessage }) {
                   {round.name} {round.is_final && <Chip size="small" color="primary" label="Final" sx={{ ml: 0.5 }} />}
                 </TableCell>
                 <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{ROUND_TYPES[round.round_type] ?? round.round_type}</TableCell>
-                <TableCell>{round.scheduled_at ? formatDateTime(round.scheduled_at) : "—"}</TableCell>
+                <TableCell>
+                  {round.scheduled_at ? formatDateTime(round.scheduled_at) : round.venue ? "—" : (
+                    <Typography variant="caption" color="text.secondary">
+                      Venue and schedule not added yet
+                    </Typography>
+                  )}
+                  {round.venue && (
+                    <Typography variant="caption" color="text.secondary" component="div">
+                      {round.venue}
+                    </Typography>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Chip size="small" variant="outlined" color={statusColor(round.status)} label={titleCase(round.status)} />
                 </TableCell>
@@ -133,11 +147,11 @@ export default function RoundsTab({ posting, onChanged, onMessage }) {
                   <IconButton
                     size="small"
                     disabled={busy}
-                    onClick={() => setDialog({ ...round, scheduled_at: toLocalInput(round.scheduled_at) })}
+                    onClick={() => setDialog({ ...round, scheduled_at: toLocalInput(round.scheduled_at), venue: round.venue ?? "" })}
                   >
                     <EditIcon fontSize="small" />
                   </IconButton>
-                  <Tooltip title="Remove (only rounds without results)">
+                  <Tooltip title="Remove (only stages without results)">
                     <span>
                       <IconButton
                         size="small"
@@ -160,16 +174,16 @@ export default function RoundsTab({ posting, onChanged, onMessage }) {
       </TableContainer>
       <Stack direction="row">
         <Button startIcon={<AddIcon />} onClick={() => setDialog({ ...blank })} disabled={busy}>
-          Add round
+          Add New Stage
         </Button>
       </Stack>
 
       <Dialog open={Boolean(dialog)} onClose={() => !busy && setDialog(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>{dialog?.id ? "Edit round" : "Add round"}</DialogTitle>
+        <DialogTitle>{dialog?.id ? "Edit Stage" : "Add New Stage"}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
-            <TextField label="Round name" value={dialog?.name ?? ""} onChange={(e) => setDialog((d) => ({ ...d, name: e.target.value }))} />
+            <TextField label="Stage name" value={dialog?.name ?? ""} onChange={(e) => setDialog((d) => ({ ...d, name: e.target.value }))} />
             <FormControl fullWidth>
               <InputLabel id="round-type">Type</InputLabel>
               <Select
@@ -194,6 +208,13 @@ export default function RoundsTab({ posting, onChanged, onMessage }) {
               onChange={(e) => setDialog((d) => ({ ...d, scheduled_at: e.target.value }))}
               slotProps={{ inputLabel: { shrink: true } }}
             />
+            <TextField
+              label="Venue"
+              value={dialog?.venue ?? ""}
+              onChange={(e) => setDialog((d) => ({ ...d, venue: e.target.value }))}
+              inputProps={{ maxLength: 255 }}
+              helperText="Shown to applicants in their stage trail and on the calendar."
+            />
             {dialog?.id && (
               <FormControl fullWidth>
                 <InputLabel id="round-status">Status</InputLabel>
@@ -214,11 +235,11 @@ export default function RoundsTab({ posting, onChanged, onMessage }) {
                   onChange={(e) => setDialog((d) => ({ ...d, is_final: e.target.checked }))}
                 />
               }
-              label="This is the final round (offers are announced after it)"
+              label="This is the final stage (offers are announced after it)"
             />
             {dialog?.id && rounds.find((r) => r.id === dialog.id)?.is_final && (
               <Typography variant="caption" color="text.secondary">
-                Every posting needs one final round. To change it, mark another round as final.
+                Every job profile needs one final stage. To change it, mark another stage as final.
               </Typography>
             )}
           </Stack>

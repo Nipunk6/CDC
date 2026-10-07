@@ -16,9 +16,13 @@ class StudentAcademicSyncService
 {
     public const FIELDS = ['current_cgpa', 'ongoing_backlogs', 'total_backlogs'];
 
+    /** Optional S4.6 academic extras, after FIELDS in the sheet. Blank cells keep the current value, like FIELDS. */
+    public const EXTRA_FIELDS = StudentProfile::ACADEMIC_EXTRAS;
+
     public function __construct(
         private readonly AuditService $audit,
-        private readonly PortalNotificationService $notifications
+        private readonly PortalNotificationService $notifications,
+        private readonly StudentAccountService $accounts
     ) {
     }
 
@@ -75,13 +79,30 @@ class StudentAcademicSyncService
                 }
             }
 
-            $validator = Validator::make(array_merge($student->only(self::FIELDS), $values), [
+            $extras = [];
+            foreach (self::EXTRA_FIELDS as $field) {
+                if (array_key_exists($field, $row) && trim((string) $row[$field]) !== '') {
+                    $extras[$field] = trim((string) $row[$field]);
+                }
+            }
+            $extras = $this->accounts->normalise($extras);
+
+            // Cross-field checks need the stored partner value when the sheet leaves it blank.
+            $context = [];
+            if (isset($extras['course_end_date']) && ! isset($extras['course_start_date'])) {
+                $context['course_start_date'] = $student->course_start_date?->format('Y-m-d');
+            }
+            if (isset($extras['previous_degree_score']) && ! isset($extras['previous_degree_score_type'])) {
+                $context['previous_degree_score_type'] = $student->previous_degree_score_type;
+            }
+
+            $validator = Validator::make(array_merge($student->only(self::FIELDS), $values, $context, $extras), [
                 'current_cgpa' => ['nullable', 'numeric', 'min:0', 'max:10'],
                 'ongoing_backlogs' => ['required', 'integer', 'min:0', 'max:100'],
                 'total_backlogs' => ['required', 'integer', 'min:0', 'max:200', 'gte:ongoing_backlogs'],
-            ], [
+            ] + StudentAccountService::academicExtraRules(), [
                 'total_backlogs.gte' => 'Total backlogs cannot be fewer than ongoing backlogs.',
-            ]);
+            ] + StudentAccountService::messages());
 
             if ($validator->fails()) {
                 $field = array_key_first($validator->errors()->toArray());
@@ -90,8 +111,9 @@ class StudentAcademicSyncService
                 continue;
             }
 
-            $before = $student->only(self::FIELDS);
-            $student->fill($values);
+            $tracked = array_merge(self::FIELDS, array_keys($extras));
+            $before = $student->only($tracked);
+            $student->fill($values + $extras);
 
             if (! $student->isDirty()) {
                 $report['unchanged']++;
@@ -102,7 +124,7 @@ class StudentAcademicSyncService
             $student->save();
             $report['updated']++;
 
-            $this->audit->logAs($admin, $ip, 'student.academics_sync', $student, $before, $student->only(self::FIELDS));
+            $this->audit->logAs($admin, $ip, 'student.academics_sync', $student, $before, $student->only($tracked));
             $this->notifications->createInAppNotification(
                 $student->user,
                 'Academic record updated',

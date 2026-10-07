@@ -34,8 +34,12 @@ import NotificationsIcon from "@mui/icons-material/NotificationsNone";
 import PersonIcon from "@mui/icons-material/PersonOutline";
 import LogoutIcon from "@mui/icons-material/Logout";
 import BlockIcon from "@mui/icons-material/Block";
+import CampaignIcon from "@mui/icons-material/Campaign";
+import PollIcon from "@mui/icons-material/Poll";
 
 import { SESSION_EXPIRED_EVENT, SUSPENDED_EVENT, studentApi } from "@/lib/studentapi";
+import BrandLogo from "@/components/shared/brandlogo";
+import { useBranding } from "@/lib/branding";
 
 const DRAWER_WIDTH = 260;
 
@@ -44,6 +48,8 @@ const navItems = [
   { label: "Job Profiles", href: "/student/postings", icon: <WorkIcon /> },
   { label: "My Applications", href: "/student/applications", icon: <AssignmentIcon /> },
   { label: "My Resumes", href: "/student/resumes", icon: <DescriptionIcon /> },
+  { label: "Notices", href: "/student/notices", icon: <CampaignIcon /> },
+  { label: "Surveys", href: "/student/surveys", icon: <PollIcon /> },
   { label: "Events", href: "/student/events", icon: <EventIcon /> },
   { label: "Calendar", href: "/student/calendar", icon: <CalendarMonthIcon /> },
   { label: "Notifications", href: "/student/notifications", icon: <NotificationsIcon /> },
@@ -68,6 +74,7 @@ export default function StudentShell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [suspended, setSuspended] = useState(false);
+  const branding = useBranding();
 
   // Any student API call that meets a suspended account or a dead token lands here (QA F-020).
   useEffect(() => {
@@ -115,13 +122,13 @@ export default function StudentShell({ children }) {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 2 }}>
-          <img src="/images/centenary-badge.png" alt="IIT ISM" style={{ width: 32, height: 32, objectFit: "contain" }} />
-          <Box>
+          <BrandLogo branding={branding} alt="IIT ISM" />
+          <Box sx={{ minWidth: 0 }}>
             <Typography fontWeight={700} lineHeight={1.2}>
               CDC Placement Portal
             </Typography>
-            <Typography variant="caption" sx={{ opacity: 0.85 }}>
-              IIT (ISM) Dhanbad
+            <Typography variant="caption" component="div" sx={{ opacity: 0.85, overflowWrap: "anywhere" }}>
+              {branding?.display_name ?? "IIT (ISM) Dhanbad"}
             </Typography>
           </Box>
         </Box>
@@ -183,7 +190,7 @@ export default function StudentShell({ children }) {
           <ListItemIcon sx={{ minWidth: 40, color: "secondary.main" }}>
             <LogoutIcon />
           </ListItemIcon>
-          <ListItemText primary="Sign Out" primaryTypographyProps={{ fontWeight: 600 }} />
+          <ListItemText primary="Logout" primaryTypographyProps={{ fontWeight: 600 }} />
         </ListItemButton>
       </List>
     </Box>
@@ -203,7 +210,7 @@ export default function StudentShell({ children }) {
             Your account has been suspended by the CDC. Contact the CDC office to restore access.
           </Typography>
           <Button variant="contained" onClick={() => void signOut({ callbackUrl: "/auth/login/student" })}>
-            Sign out
+            Logout
           </Button>
         </Paper>
       </Box>

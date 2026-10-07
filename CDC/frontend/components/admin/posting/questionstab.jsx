@@ -26,10 +26,10 @@ export default function QuestionsTab({ posting, onChanged, onMessage }) {
     setError(null);
     try {
       await adminApi(`/admin/postings/${posting.id}`, { method: "PATCH", body: JSON.stringify({ questions: cleaned }) });
-      onMessage?.("Questions saved.");
+      onMessage?.("Additional questions saved.");
       await onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save questions.");
+      setError(e instanceof Error ? e.message : "Failed to save additional questions.");
     } finally {
       setBusy(false);
     }
@@ -37,7 +37,7 @@ export default function QuestionsTab({ posting, onChanged, onMessage }) {
 
   return (
     <Stack spacing={2}>
-      {locked && <Alert severity="info">Questions are frozen after the application deadline.</Alert>}
+      {locked && <Alert severity="info">Additional questions are frozen after the application deadline.</Alert>}
       {!locked && posting.stats?.applied > 0 && (
         <Alert severity="warning">
           {posting.stats.applied} student(s) have already applied. Removing a question also hides their answers to it.
@@ -47,7 +47,7 @@ export default function QuestionsTab({ posting, onChanged, onMessage }) {
       <QuestionBuilder value={questions} onChange={setQuestions} disabled={locked || busy} />
       <Box>
         <Button variant="contained" onClick={save} disabled={locked || busy}>
-          Save Questions
+          Save Additional Questions
         </Button>
       </Box>
     </Stack>

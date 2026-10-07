@@ -12,9 +12,9 @@ export default function AdminProposalsPage() {
       <PageHeader
         icon={<PlaylistAddCheckIcon />}
         title="Company Proposals"
-        subtitle="Shortlists, waitlists and addenda proposed by companies. Approving creates drafts; publish the round to notify students."
+        subtitle="Shortlists, on-hold lists and addenda proposed by companies. Approving creates drafts; publish the stage shortlist to notify students."
         backHref="/admin/postings"
-        backLabel="Postings"
+        backLabel="Job Profiles"
       />
       <Card>
         <CardContent>

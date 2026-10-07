@@ -36,6 +36,7 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { adminApi } from "@/lib/adminapi";
+import PendingRequestsBanner from "@/components/admin/pendingrequestsbanner";
 
 type DashboardData = {
   stats: {
@@ -192,6 +193,8 @@ export default function AdminPage() {
           </Stack>
         </Stack>
       </Paper>
+
+      <PendingRequestsBanner sx={{ mb: 3 }} />
 
       {/* Pending Alert */}
       {(stats?.pending_reviews ?? 0) > 0 && (

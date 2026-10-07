@@ -299,7 +299,7 @@ class S6NotificationsTest extends TestCase
         Sanctum::actingAs($this->admin);
 
         return $this->postJson('/api/admin/students', array_merge([
-            'roll_no' => $roll, 'full_name' => 'Asha Verma', 'institute_email' => strtolower($roll).'@students.cdc-qa.test',
+            'roll_no' => $roll, 'full_name' => 'Asha Verma', 'institute_email' => strtolower($roll).'@iitism.ac.in',
             'programme' => self::BTECH, 'branch' => self::CSE, 'graduating_batch' => 2027, 'gender' => 'female',
             'current_cgpa' => 8.4, 'tenth_percent' => 90, 'twelfth_percent' => 90, 'personal_email' => strtolower($roll).'@personal-mail.test',
         ], $extra));
@@ -319,7 +319,7 @@ class S6NotificationsTest extends TestCase
         $header = 'roll_no,full_name,institute_email,programme,branch,graduating_batch,gender,current_cgpa,ongoing_backlogs,total_backlogs,tenth_percent,twelfth_percent,date_of_birth,personal_email,phone,category,pwd,home_state';
         $rows = [];
         foreach (['23JE0201' => 'Meera Das', '23JE0202' => 'Karan Shah'] as $roll => $name) {
-            $rows[] = sprintf('%s,%s,%s,"%s",%s,2027,male,8.0,0,0,90,90,,%s,,,no,Bihar', $roll, $name, strtolower($roll).'@students.cdc-qa.test', self::BTECH, self::CSE, strtolower($roll).'@personal-mail.test');
+            $rows[] = sprintf('%s,%s,%s,"%s",%s,2027,male,8.0,0,0,90,90,,%s,,,no,Bihar', $roll, $name, strtolower($roll).'@iitism.ac.in', self::BTECH, self::CSE, strtolower($roll).'@personal-mail.test');
         }
         Sanctum::actingAs($this->admin);
         $this->post('/api/admin/students/import', ['file' => UploadedFile::fake()->createWithContent('students.csv', $header."\n".implode("\n", $rows))], ['Accept' => 'application/json'])
@@ -693,7 +693,10 @@ class S6NotificationsTest extends TestCase
         }
         $this->assertSame([], $hits, 'a reminder implementation exists');
 
+        // The only scheduled task is "Schedule For Later" opening job profiles (Superset parity S6.2, D112); it sends
+        // the normal new-opening mail once, never a reminder. Anything else scheduled is still a failure.
         $console = (string) file_get_contents(base_path('routes/console.php'));
+        $console = preg_replace("/Schedule::command\\('placement:open-scheduled'\\)->everyMinute\\(\\)->withoutOverlapping\\(\\);/", '', $console);
         $this->assertDoesNotMatchRegularExpression('/Schedule::|->daily|->hourly|->everyMinute|->cron\(/', $console);
         $this->assertStringNotContainsString('withSchedule', (string) file_get_contents(base_path('bootstrap/app.php')));
     }

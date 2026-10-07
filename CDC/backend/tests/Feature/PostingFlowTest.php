@@ -349,7 +349,7 @@ class PostingFlowTest extends TestCase
         Sanctum::actingAs($student->user);
         $this->postJson("/api/student/postings/{$posting->id}/apply", ['resume_id' => $resume->id])
             ->assertStatus(422)
-            ->assertJsonPath('message', 'This placement cycle is closed, so it no longer accepts applications.');
+            ->assertJsonPath('message', 'This placement is closed, so it no longer accepts applications.');
         $this->getJson("/api/student/postings/{$posting->id}")->assertJsonPath('posting.accepts_applications', false);
 
         // Once the posting is cancelled, the form can go back to review.

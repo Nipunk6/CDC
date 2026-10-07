@@ -63,7 +63,7 @@ class FixF010ReplacementOnCompletedDriveTest extends TestCase
         // Company: a shortlist is refused on a completed drive, a replacement request is accepted.
         Sanctum::actingAs($hr);
         $propose = fn (string $kind) => $this->postJson("/api/company/postings/{$posting->id}/rounds/{$final->id}/proposals", ['kind' => $kind, 'entries' => [['roll_no' => '22JE0002']]]);
-        $propose('shortlist')->assertStatus(422)->assertJsonPath('message', 'This drive is completed. You can still send a replacement request or an addendum.');
+        $propose('shortlist')->assertStatus(422)->assertJsonPath('message', 'This job profile is completed. You can still send a replacement request or an addendum.');
         $propose('replacement_request')->assertCreated();
 
         // CDC: approve (22JE0002 was published "not selected", so Re-add is the way back in), then offer.

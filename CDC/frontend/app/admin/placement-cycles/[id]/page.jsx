@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSession } from "next-auth/react";
 import {
   Alert,
@@ -15,6 +16,7 @@ import {
   Divider,
   IconButton,
   LinearProgress,
+  Link as MuiLink,
   Pagination,
   Paper,
   Stack,
@@ -36,16 +38,22 @@ import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import GroupsIcon from "@mui/icons-material/Groups";
 import LockIcon from "@mui/icons-material/Lock";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
-import SearchIcon from "@mui/icons-material/Search";
+import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
+import PublishIcon from "@mui/icons-material/Publish";
 
-import { adminApi, adminDownload } from "@/lib/adminapi";
-import DownloadIcon from "@mui/icons-material/Download";
+import { adminApi } from "@/lib/adminapi";
+import { rememberPlacement } from "@/lib/recentplacements";
 import CyclePostings from "@/components/admin/cyclepostings";
+import TemplateDownloadButton from "@/components/admin/templatedownloadbutton";
 import StudentBlocksPanel from "@/components/admin/studentblockspanel";
+import StudentFilterPanel from "@/components/admin/studentfilterpanel";
+import useCatalogue from "@/lib/usecatalogue";
+import { filtersFromParams, filtersToQuery, hasFilters } from "@/lib/studentfilters";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -59,20 +67,41 @@ const formatDate = (value) => {
 
 const dash = (value) => (value === null || value === undefined || value === "" ? "—" : value);
 
+const emptyMeta = { current_page: 1, last_page: 1, per_page: 50, total: 0 };
+
 export default function AdminPlacementCycleDetailPage({ params }) {
   const { id } = use(params);
+
+  return (
+    <Suspense fallback={<LinearProgress />}>
+      <PlacementCycleDetail id={id} />
+    </Suspense>
+  );
+}
+
+// The enrolled list's filters and page live in the URL, like /admin/students, and "Download as Excel" exports the
+// filtered list (M5).
+function PlacementCycleDetail({ id }) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const queryString = params.toString();
+  const filters = useMemo(() => filtersFromParams(new URLSearchParams(queryString)), [queryString]);
+  const page = Math.max(1, Number(new URLSearchParams(queryString).get("page")) || 1);
+  const apiFilters = filtersToQuery(filters, { api: true });
 
   const [cycle, setCycle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [tab, setTab] = useState(0);
+  // A shared or reloaded filtered link opens on the enrolled list.
+  const [tab, setTab] = useState(() => (queryString ? 1 : 0));
 
-  const [enrollments, setEnrollments] = useState([]);
-  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, per_page: 50, total: 0 });
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
+  const catalogue = useCatalogue(adminApi);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [listing, setListing] = useState({ key: null, enrollments: [], meta: emptyMeta });
+  const requestKey = `${queryString}#${reloadTick}`;
+  const enrollmentsLoading = listing.key !== requestKey;
+  const { enrollments, meta } = listing;
 
   const [rollInput, setRollInput] = useState("");
   const [file, setFile] = useState(null);
@@ -84,45 +113,69 @@ export default function AdminPlacementCycleDetailPage({ params }) {
       const response = await adminApi(`/admin/placement-cycles/${id}`);
       setCycle(response.placement_cycle ?? null);
       setError(null);
+      if (response.placement_cycle) rememberPlacement(response.placement_cycle.id); // "Recently Visited" (S8.3)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load this placement cycle.");
+      setError(e instanceof Error ? e.message : "Failed to load this placement.");
     } finally {
       setLoading(false);
     }
   }, [id]);
 
-  const loadEnrollments = useCallback(
-    async (targetPage = 1, term = "") => {
-      setEnrollmentsLoading(true);
-      try {
-        const query = new URLSearchParams({ page: String(targetPage) });
-        if (term.trim()) query.set("search", term.trim());
-
-        const response = await adminApi(`/admin/placement-cycles/${id}/enrollments?${query.toString()}`);
-        setEnrollments(response.enrollments ?? []);
-        setMeta(response.meta ?? { current_page: 1, last_page: 1, per_page: 50, total: 0 });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load enrolled students.");
-      } finally {
-        setEnrollmentsLoading(false);
-      }
-    },
-    [id]
-  );
-
   useEffect(() => {
     void loadCycle();
-    void loadEnrollments(1, "");
-  }, [loadCycle, loadEnrollments]);
+  }, [loadCycle]);
 
-  const handleSearch = async () => {
-    setPage(1);
-    await loadEnrollments(1, search);
-  };
+  useEffect(() => {
+    let cancelled = false;
+    adminApi(`/admin/placement-cycles/${id}/enrollments?${filtersToQuery(filters, { api: true, extra: { page } })}`)
+      .then((response) => {
+        if (cancelled) return;
+        setListing({ key: requestKey, enrollments: response.enrollments ?? [], meta: response.meta ?? emptyMeta });
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setListing((prev) => ({ ...prev, key: requestKey }));
+        setError(e instanceof Error ? e.message : "Failed to load enrolled students.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, filters, page, requestKey]);
 
-  const handlePageChange = async (_event, nextPage) => {
-    setPage(nextPage);
-    await loadEnrollments(nextPage, search);
+  const navigate = useCallback(
+    (next, targetPage = 1) => {
+      const query = filtersToQuery(next, { extra: { page: targetPage > 1 ? targetPage : "" } });
+      router.replace(query ? `/admin/placement-cycles/${id}?${query}` : `/admin/placement-cycles/${id}`, { scroll: false });
+    },
+    [router, id]
+  );
+
+  const reloadEnrollments = () => setReloadTick((tick) => tick + 1);
+
+  const handleFilters = (next) => navigate(next, 1);
+
+  const handlePageChange = (_event, nextPage) => navigate(filters, nextPage);
+
+  // S4.8: suspend / reactivate one enrolment. A suspended student stays listed but cannot apply in this placement.
+  const handleEnrolmentStatus = async (enrollment) => {
+    const suspend = enrollment.status === "active";
+    const label = enrollment.student_profile?.roll_no ?? `student #${enrollment.student_profile_id}`;
+    if (suspend && !window.confirm(`Suspend ${label}'s enrolment? They will not be able to apply to this placement's job profiles until reactivated.`)) {
+      return;
+    }
+    try {
+      const response = await adminApi(`/admin/placement-cycles/${id}/enrollments/${enrollment.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: suspend ? "suspended" : "active" }),
+      });
+      setSuccess(response.message);
+      setListing((prev) => ({
+        ...prev,
+        enrollments: prev.enrollments.map((e) => (e.id === enrollment.id ? { ...e, status: response.enrollment?.status ?? e.status } : e)),
+      }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update the enrolment.");
+    }
   };
 
   const handleCloseCycle = async () => {
@@ -130,10 +183,22 @@ export default function AdminPlacementCycleDetailPage({ params }) {
 
     try {
       await adminApi(`/admin/placement-cycles/${id}/close`, { method: "PATCH" });
-      setSuccess("Placement cycle closed.");
+      setSuccess("Placement closed.");
       await loadCycle();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to close the cycle.");
+      setError(e instanceof Error ? e.message : "Failed to close the placement.");
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!window.confirm(`Publish "${cycle?.name}"? Its enrolled students will be able to see it, and job profiles can be opened for applications in it.`)) return;
+
+    try {
+      const response = await adminApi(`/admin/placement-cycles/${id}/publish`, { method: "PATCH" });
+      setSuccess(response.message ?? "Placement published.");
+      await loadCycle();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to publish the placement.");
     }
   };
 
@@ -186,8 +251,9 @@ export default function AdminPlacementCycleDetailPage({ params }) {
       setReport(payload);
       setRollInput("");
       setFile(null);
-      await Promise.all([loadCycle(), loadEnrollments(1, search)]);
-      setPage(1);
+      await loadCycle();
+      if (page > 1) navigate(filters, 1);
+      reloadEnrollments();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Enrolment failed.");
     } finally {
@@ -197,12 +263,13 @@ export default function AdminPlacementCycleDetailPage({ params }) {
 
   const handleRemove = async (enrollment) => {
     const label = enrollment.student_profile?.roll_no ?? `student #${enrollment.student_profile_id}`;
-    if (!window.confirm(`Remove ${label} from this cycle?`)) return;
+    if (!window.confirm(`Remove ${label} from this placement?`)) return;
 
     try {
       await adminApi(`/admin/placement-cycles/${id}/enroll/${enrollment.student_profile_id}`, { method: "DELETE" });
-      setSuccess("Student removed from this cycle.");
-      await Promise.all([loadCycle(), loadEnrollments(page, search)]);
+      setSuccess("Student removed from this placement.");
+      await loadCycle();
+      reloadEnrollments();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to remove the student.");
     }
@@ -216,10 +283,10 @@ export default function AdminPlacementCycleDetailPage({ params }) {
     return (
       <Box>
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error ?? "Placement cycle not found."}
+          {error ?? "Placement not found."}
         </Alert>
         <Button component={Link} href="/admin/placement-cycles" startIcon={<ArrowBackIcon />}>
-          Back to Placement Cycles
+          Back to Placements
         </Button>
       </Box>
     );
@@ -227,7 +294,7 @@ export default function AdminPlacementCycleDetailPage({ params }) {
 
   const stats = [
     { icon: <GroupsIcon />, label: "Enrolled students", value: cycle.enrolled_students_count ?? 0 },
-    { icon: <WorkOutlineIcon />, label: "Postings floated", value: cycle.postings_count ?? 0 },
+    { icon: <WorkOutlineIcon />, label: "Job profiles opened", value: cycle.postings_count ?? 0 },
     { icon: <EmojiEventsIcon />, label: "Offers made", value: cycle.offers_count ?? 0 },
   ];
 
@@ -258,6 +325,7 @@ export default function AdminPlacementCycleDetailPage({ params }) {
                 {cycle.name}
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                {cycle.is_draft && <Chip size="small" color="warning" label="Draft" />}
                 <Chip
                   size="small"
                   label={cycle.type === "fulltime" ? "Full Time" : "Internship"}
@@ -275,17 +343,20 @@ export default function AdminPlacementCycleDetailPage({ params }) {
             </Box>
           </Stack>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<DownloadIcon />}
-              onClick={() => adminDownload(`/admin/placement-cycles/${id}/students/export`, `cycle-${id}-students.xlsx`).catch((e) => setError(e.message))}
-            >
-              Export Students
-            </Button>
+            <TemplateDownloadButton
+              label="Download as Excel"
+              path={`/admin/placement-cycles/${id}/students/export${apiFilters ? `?${apiFilters}` : ""}`}
+              fileName={`cycle-${id}-students.xlsx`}
+              onError={setError}
+            />
+            {cycle.is_draft && (
+              <Button variant="contained" color="warning" startIcon={<PublishIcon />} onClick={handlePublish}>
+                Publish placement
+              </Button>
+            )}
             {cycle.status === "open" && (
               <Button variant="contained" color="secondary" startIcon={<LockIcon />} onClick={handleCloseCycle}>
-                Close Cycle
+                Close Placement
               </Button>
             )}
             <Button
@@ -299,7 +370,7 @@ export default function AdminPlacementCycleDetailPage({ params }) {
                 "&:hover": { borderColor: "white", bgcolor: alpha("#fff", 0.1) },
               }}
             >
-              All Cycles
+              All Placements
             </Button>
           </Stack>
         </Stack>
@@ -320,7 +391,7 @@ export default function AdminPlacementCycleDetailPage({ params }) {
         <Tabs value={tab} onChange={(_event, next) => setTab(next)} variant="scrollable" allowScrollButtonsMobile>
           <Tab label="Overview" />
           <Tab label={`Enrolled Students (${cycle.enrolled_students_count ?? 0})`} />
-          <Tab label="Postings" />
+          <Tab label="Job Profiles" />
           <Tab label="Blocks" />
         </Tabs>
       </Paper>
@@ -356,7 +427,7 @@ export default function AdminPlacementCycleDetailPage({ params }) {
               </Typography>
               <Divider sx={{ mb: 2 }} />
               {(cycle.allowed_programmes ?? []).length === 0 ? (
-                <Typography color="text.secondary">No programmes recorded for this cycle.</Typography>
+                <Typography color="text.secondary">No programmes recorded for this placement.</Typography>
               ) : (
                 <Stack spacing={1.5}>
                   {(cycle.allowed_programmes ?? []).map((row, index) => (
@@ -461,7 +532,7 @@ export default function AdminPlacementCycleDetailPage({ params }) {
                         <TableHead>
                           <TableRow>
                             <TableCell>Row</TableCell>
-                            <TableCell>Roll No</TableCell>
+                            <TableCell>Roll Number</TableCell>
                             <TableCell>Reason</TableCell>
                           </TableRow>
                         </TableHead>
@@ -484,38 +555,27 @@ export default function AdminPlacementCycleDetailPage({ params }) {
 
           <Card>
             <CardContent>
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={2}
-                alignItems={{ sm: "center" }}
-                justifyContent="space-between"
-                sx={{ mb: 2 }}
-              >
-                <Typography variant="h6" fontWeight={700} sx={{ textAlign: "left" }}>
-                  Enrolled Students ({meta.total})
-                </Typography>
-                <Stack direction="row" spacing={1}>
-                  <TextField
-                    size="small"
-                    placeholder="Roll no, name, branch..."
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") void handleSearch();
-                    }}
-                  />
-                  <Button variant="outlined" startIcon={<SearchIcon />} onClick={handleSearch}>
-                    Search
-                  </Button>
-                </Stack>
-              </Stack>
+              <Typography variant="h6" fontWeight={700} sx={{ textAlign: "left", mb: 2 }}>
+                {hasFilters(filters) ? `${meta.total} filtered students` : `Enrolled Students (${meta.total})`}
+              </Typography>
+              <StudentFilterPanel
+                key={filtersToQuery(filters)}
+                initial={filters}
+                onApply={handleFilters}
+                catalogue={catalogue}
+                statusLabel="Enrolment"
+                statusOptions={[
+                  ["active", "Enrolled"],
+                  ["suspended", "Suspended"],
+                ]}
+              />
               <Divider sx={{ mb: 2 }} />
 
               {enrollmentsLoading ? (
                 <LinearProgress />
               ) : enrollments.length === 0 ? (
                 <Typography color="text.secondary">
-                  No students enrolled yet. Paste roll numbers above to enrol them.
+                  {hasFilters(filters) ? "Could not find any students" : "No students enrolled yet. Paste roll numbers above to enrol them."}
                 </Typography>
               ) : (
                 <>
@@ -523,10 +583,10 @@ export default function AdminPlacementCycleDetailPage({ params }) {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>Roll No</TableCell>
+                          <TableCell>Roll Number</TableCell>
                           <TableCell>Name</TableCell>
-                          <TableCell>Programme</TableCell>
-                          <TableCell>Branch</TableCell>
+                          <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Programme</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Branch</TableCell>
                           <TableCell>Batch</TableCell>
                           <TableCell>Status</TableCell>
                           <TableCell align="right">Actions</TableCell>
@@ -535,21 +595,38 @@ export default function AdminPlacementCycleDetailPage({ params }) {
                       <TableBody>
                         {enrollments.map((enrollment) => (
                           <TableRow key={enrollment.id} hover>
-                            <TableCell>{dash(enrollment.student_profile?.roll_no)}</TableCell>
-                            <TableCell>{dash(enrollment.student_profile?.full_name)}</TableCell>
-                            <TableCell>{dash(enrollment.student_profile?.programme)}</TableCell>
-                            <TableCell>{dash(enrollment.student_profile?.branch)}</TableCell>
+                            <TableCell sx={{ whiteSpace: "nowrap" }}>{dash(enrollment.student_profile?.roll_no)}</TableCell>
+                            <TableCell>
+                              <MuiLink component={Link} href={`/admin/students/${enrollment.student_profile_id}`} underline="hover" fontWeight={600}>
+                                {dash(enrollment.student_profile?.full_name)}
+                              </MuiLink>
+                            </TableCell>
+                            <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{dash(enrollment.student_profile?.programme)}</TableCell>
+                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{dash(enrollment.student_profile?.branch)}</TableCell>
                             <TableCell>{dash(enrollment.student_profile?.graduating_batch)}</TableCell>
                             <TableCell>
                               <Chip
                                 size="small"
                                 variant="outlined"
                                 color={enrollment.status === "active" ? "success" : "warning"}
-                                label={enrollment.status}
+                                label={enrollment.status === "active" ? "Enrolled" : "Suspended"}
                               />
                             </TableCell>
-                            <TableCell align="right">
-                              <Tooltip title="Remove from cycle">
+                            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                              <Tooltip title={enrollment.status === "active" ? "Suspend enrolment" : "Reactivate enrolment"}>
+                                <IconButton
+                                  size="small"
+                                  color={enrollment.status === "active" ? "warning" : "success"}
+                                  onClick={() => handleEnrolmentStatus(enrollment)}
+                                >
+                                  {enrollment.status === "active" ? (
+                                    <PauseCircleOutlineIcon fontSize="small" />
+                                  ) : (
+                                    <PlayCircleOutlineIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Remove from placement">
                                 <IconButton size="small" color="error" onClick={() => handleRemove(enrollment)}>
                                   <PersonRemoveIcon fontSize="small" />
                                 </IconButton>
@@ -561,11 +638,14 @@ export default function AdminPlacementCycleDetailPage({ params }) {
                     </Table>
                   </TableContainer>
 
-                  {meta.last_page > 1 && (
-                    <Stack alignItems="center" sx={{ mt: 2 }}>
-                      <Pagination count={meta.last_page} page={page} onChange={handlePageChange} color="primary" />
-                    </Stack>
-                  )}
+                  <Box sx={{ mt: 2, display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 1, alignItems: "center", justifyContent: "space-between" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Showing Page {meta.current_page} of {meta.last_page} ({meta.total} records)
+                    </Typography>
+                    {meta.last_page > 1 && (
+                      <Pagination count={meta.last_page} page={page} onChange={handlePageChange} color="primary" size="small" />
+                    )}
+                  </Box>
                 </>
               )}
             </CardContent>

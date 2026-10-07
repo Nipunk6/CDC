@@ -114,7 +114,7 @@ const studentFeatures = [
   {
     icon: <WorkOutlineIcon sx={{ fontSize: 28 }} />,
     title: "Job & Internship Profiles",
-    desc: "Browse every drive floated for your batch and see your eligibility instantly",
+    desc: "Browse every job profile opened for your batch and see your eligibility instantly",
   },
   {
     icon: <DescriptionIcon sx={{ fontSize: 28 }} />,
@@ -124,7 +124,7 @@ const studentFeatures = [
   {
     icon: <SchoolIcon sx={{ fontSize: 28 }} />,
     title: "Live Selection Trail",
-    desc: "Track shortlists, rounds and final results as CDC publishes them",
+    desc: "Track shortlists, stages and final results as CDC publishes them",
   },
   {
     icon: <EventAvailableIcon sx={{ fontSize: 28 }} />,
@@ -333,7 +333,7 @@ function LoginForm({ type }: { type: string }) {
               {isAdmin
                 ? "Manage all recruitment processes, JNF/INF reviews, and institutional configurations from a single secure dashboard."
                 : isStudent
-                  ? "Your placement season, organised. Browse drives, apply with verified resumes and follow every round from one dashboard."
+                  ? "Your placement season, organised. Browse job profiles, apply with verified resumes and follow every stage from one dashboard."
                   : "Connect with India's premier engineering talent. Submit JNFs and INFs seamlessly for campus placements and internships."}
             </Typography>
           </Box>

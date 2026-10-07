@@ -214,9 +214,12 @@ type InfFormProProps = {
   initialData?: Partial<InfFormData> & { id?: number };
   onSaved?: (id: number) => void;
   onCancel?: () => void;
+  // Admin "Add New Job" (S6.1) reuses the wizard with adminApi and /admin/form-builder/{company}.
+  api?: <T>(path: string, init?: RequestInit) => Promise<T>;
+  apiPrefix?: string;
 };
 
-export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormProProps) {
+export default function InfFormPro({ initialData, onSaved, onCancel, api = companyApi, apiPrefix = "/company" }: InfFormProProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const [formData, setFormData] = useState<InfFormData>(() => {
@@ -269,8 +272,8 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
         status: "draft",
       };
 
-      const response = await companyApi<{ inf: { id: number } }>(
-        "/company/infs/autosave",
+      const response = await api<{ inf: { id: number } }>(
+        `${apiPrefix}/infs/autosave`,
         { method: "POST", body: JSON.stringify(payload) }
       );
       setDraftId(response.inf.id);
@@ -307,7 +310,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
   useEffect(() => {
     const fetchCompanyProfile = async () => {
       try {
-        const response = await companyApi<{
+        const response = await api<{
           company: {
             name: string;
             website: string | null;
@@ -326,7 +329,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
             hr_name?: string | null;
             hr_designation?: string | null;
           };
-        }>("/company/profile");
+        }>(`${apiPrefix}/profile`);
 
         setFormData((prev) => {
           return {
@@ -371,7 +374,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
     };
 
     fetchCompanyProfile();
-  }, []);
+  }, [api, apiPrefix]);
 
   // Auto-save debounce
   const autoSave = useCallback(async () => {
@@ -393,8 +396,8 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
         status: "draft",
       };
 
-      const response = await companyApi<{ inf: { id: number } }>(
-        "/company/infs/autosave",
+      const response = await api<{ inf: { id: number } }>(
+        `${apiPrefix}/infs/autosave`,
         { method: "POST", body: JSON.stringify(payload) }
       );
       setDraftId(response.inf.id);
@@ -410,7 +413,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
     } finally {
       setSaving(false);
     }
-  }, [formData, draftId, submitting, submitted]);
+  }, [formData, draftId, submitting, submitted, api, apiPrefix]);
 
   // Debounced auto-save
   useEffect(() => {
@@ -425,7 +428,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
   useEffect(() => {
     const fetchCustomBranches = async () => {
       try {
-        const response = await companyApi<{
+        const response = await api<{
           programme_branches: ProgrammeBranchGroup[];
           branch_states: ProgrammeBranchStateGroup[];
         }>("/programme-branches");
@@ -444,7 +447,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
     };
 
     fetchCustomBranches();
-  }, []);
+  }, [api]);
 
   const updateFormData = <K extends keyof InfFormData>(field: K, value: InfFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -501,10 +504,10 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
         status: "submitted",
       };
 
-      const path = draftId ? `/company/infs/${draftId}` : "/company/infs";
+      const path = draftId ? `${apiPrefix}/infs/${draftId}` : `${apiPrefix}/infs`;
       const method = draftId ? "PUT" : "POST";
 
-      const response = await companyApi<{ inf: { id: number } }>(path, {
+      const response = await api<{ inf: { id: number } }>(path, {
         method,
         body: JSON.stringify(payload),
       });
@@ -571,9 +574,9 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           <DialogContentText>
-            You have selected graduating batch <strong>{formData.graduatingBatch}</strong>.
+            You have selected passout batch <strong>{formData.graduatingBatch}</strong>.
             <br /><br />
-            The graduating batch for this INF is locked and cannot be modified. If you need to hire for a different batch, you will need to create a new INF.
+            The passout batch for this INF is locked and cannot be modified. If you need to hire for a different batch, you will need to create a new INF.
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -611,7 +614,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
             {formData.graduatingBatch && (
               <Chip
                 icon={<SchoolIcon style={{ color: "white" }} />}
-                label={`Graduating Batch of ${formData.graduatingBatch}`}
+                label={`Passout Batch of ${formData.graduatingBatch}`}
                 sx={{
                   bgcolor: "rgba(255, 255, 255, 0.2)",
                   color: "white",
@@ -652,7 +655,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
             borderColor: "info.light",
           }}
         >
-          You are currently Hiring for Graduating Batch <strong>{formData.graduatingBatch}</strong>. This choice is locked for this INF. If you need to hire for a different batch, you will need to create a new INF.
+          You are currently Hiring for Passout Batch <strong>{formData.graduatingBatch}</strong>. This choice is locked for this INF. If you need to hire for a different batch, you will need to create a new INF.
         </Alert>
       )}
 
@@ -990,7 +993,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
                 <TextField
                   fullWidth
                   type="number"
-                  label="Minimum 10th % (optional)"
+                  label="Minimum Class X Percentage (optional)"
                   value={formData.minTenthPercent ?? ""}
                   onChange={(e) => updateFormData("minTenthPercent", e.target.value)}
                   inputProps={{ min: 0, max: 100, step: 0.01 }}
@@ -1000,7 +1003,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
                 <TextField
                   fullWidth
                   type="number"
-                  label="Minimum 12th % (optional)"
+                  label="Minimum Class XII Percentage (optional)"
                   value={formData.minTwelfthPercent ?? ""}
                   onChange={(e) => updateFormData("minTwelfthPercent", e.target.value)}
                   inputProps={{ min: 0, max: 100, step: 0.01 }}
@@ -1051,7 +1054,7 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
           <Stack spacing={3}>
             <FormSection
               title="Selection Process"
-              subtitle="Configure your selection process - tests, interviews, and rounds"
+              subtitle="Configure your selection process - tests, interviews, and stages"
               icon={<AssignmentIcon />}
               required
             >
@@ -1074,6 +1077,8 @@ export default function InfFormPro({ initialData, onSaved, onCancel }: InfFormPr
             <DeclarationChecklist
               formType="inf"
               draftId={draftId}
+              api={api}
+              apiPrefix={apiPrefix}
               declarations={formData.declarations}
               onDeclarationsChange={(v) => updateFormData("declarations", v)}
             />

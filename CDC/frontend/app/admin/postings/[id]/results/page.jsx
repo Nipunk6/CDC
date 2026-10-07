@@ -32,12 +32,18 @@ import {
   Typography,
 } from "@mui/material";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 import BlockingRules from "@/components/shared/blockingrules";
+import { EditOfferDialog, RevokeOfferDialog, UploadCtcsDialog } from "@/components/admin/offerdialogs";
 import PageHeader from "@/components/shared/pageheader";
+import StudentQuickView from "@/components/admin/studentquickview";
 import { adminApi } from "@/lib/adminapi";
 import { formatMoney } from "@/lib/format";
 import { BLOCK_SCOPE_LABEL } from "@/lib/offerpolicy";
+
+// A student's name opens the quick-view drawer (Superset parity S4.3).
+const nameButtonSx = { border: 0, p: 0, bgcolor: "transparent", color: "primary.main", cursor: "pointer", textAlign: "left", font: "inherit", fontWeight: 600 };
 
 const scopeLabel = (scope) => (scope ? `Blocks ${BLOCK_SCOPE_LABEL[scope].toLowerCase()}` : "No block");
 
@@ -68,6 +74,9 @@ export default function AdminResultsPage({ params }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [dialogError, setDialogError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [offerDialog, setOfferDialog] = useState(null); // { kind: "edit" | "revoke", item }
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [quickView, setQuickView] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -76,7 +85,8 @@ export default function AdminResultsPage({ params }) {
       const next = {};
       [...response.selected, ...response.waitlisted].forEach((item) => {
         if (!item.offer) {
-          next[item.application_id] = { ...rowFrom(item, response.offer_types), include: item.result === "selected" };
+          // A published selection without an offer (its offer was revoked, S2) is not re-offered unless ticked again.
+          next[item.application_id] = { ...rowFrom(item, response.offer_types), include: item.result === "selected" && !item.published };
         }
       });
       setRows(next);
@@ -151,11 +161,14 @@ export default function AdminResultsPage({ params }) {
         </TableCell>
         <TableCell>
           <Typography variant="body2" fontWeight={600}>
-            <Link href={`/admin/students/${s.id}`}>{s.roll_no}</Link> {s.full_name}
+            <Link href={`/admin/students/${s.id}`}>{s.roll_no}</Link>{" "}
+            <Typography component="button" type="button" variant="body2" onClick={() => setQuickView(s.id)} sx={nameButtonSx}>
+              {s.full_name}
+            </Typography>
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {s.branch} · CGPA {s.current_cgpa ?? "—"}
-            {item.result === "waitlisted" ? " · waitlisted" : ""}
+            {item.result === "waitlisted" ? " · on hold" : ""}
           </Typography>
           <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
             {item.placed_elsewhere_flag && <Chip size="small" color="error" label="🚩 Placed elsewhere" />}
@@ -166,9 +179,21 @@ export default function AdminResultsPage({ params }) {
         </TableCell>
         {item.offer ? (
           <TableCell colSpan={3}>
-            {data.offer_types.find((t) => t.value === item.offer.offer_type)?.label ?? item.offer.offer_type}
-            {item.offer.ctc_annual ? ` · ${formatMoney(item.offer.ctc_annual, item.offer.currency)} p.a.` : ""}
-            {item.offer.stipend_monthly ? ` · ${formatMoney(item.offer.stipend_monthly, item.offer.currency)}/month` : ""}
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }}>
+              <Typography variant="body2">
+                {data.offer_types.find((t) => t.value === item.offer.offer_type)?.label ?? item.offer.offer_type}
+                {item.offer.ctc_annual ? ` · ${formatMoney(item.offer.ctc_annual, item.offer.currency)} (YEAR)` : ""}
+                {item.offer.stipend_monthly ? ` · ${formatMoney(item.offer.stipend_monthly, item.offer.currency)} (MONTH)` : ""}
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button size="small" variant="outlined" onClick={() => setOfferDialog({ kind: "edit", item })}>
+                  Edit
+                </Button>
+                <Button size="small" variant="outlined" color="error" onClick={() => setOfferDialog({ kind: "revoke", item })}>
+                  Revoke
+                </Button>
+              </Stack>
+            </Stack>
           </TableCell>
         ) : (
           <>
@@ -188,7 +213,8 @@ export default function AdminResultsPage({ params }) {
                 <TextField
                   size="small"
                   type="number"
-                  label={`CTC / year (${data.currency ?? "INR"})`}
+                  label={`CTC Offered (${data.currency ?? "INR"})`}
+                  helperText="CTC Interval: YEAR"
                   disabled={!row?.include}
                   value={row?.ctc_annual ?? ""}
                   onChange={(e) => update(item.application_id, { ctc_annual: e.target.value })}
@@ -197,7 +223,8 @@ export default function AdminResultsPage({ params }) {
                   <TextField
                     size="small"
                     type="number"
-                    label={`Stipend / month (${data.currency ?? "INR"})`}
+                    label={`CTC Offered (${data.currency ?? "INR"})`}
+                    helperText="CTC Interval: MONTH"
                     disabled={!row?.include}
                     value={row?.stipend_monthly ?? ""}
                     onChange={(e) => update(item.application_id, { stipend_monthly: e.target.value })}
@@ -239,10 +266,10 @@ export default function AdminResultsPage({ params }) {
     <>
       <PageHeader
         icon={<EmojiEventsIcon />}
-        title={`Results — ${data.posting.company} · ${data.posting.title}`}
-        subtitle={`${data.posting.offer_label} · Final round: ${data.final_round.name}${data.posting.vacancies ? ` · ${data.posting.vacancies} vacancies` : ""}`}
+        title={`Shortlist for Offer — ${data.posting.company} · ${data.posting.title}`}
+        subtitle={`${data.posting.offer_label} · Final stage: ${data.final_round.name}${data.posting.vacancies ? ` · ${data.posting.vacancies} vacancies` : ""}`}
         backHref={`/admin/postings/${id}`}
-        backLabel="Back to Posting"
+        backLabel="Back to Job Profile"
       />
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -266,13 +293,13 @@ export default function AdminResultsPage({ params }) {
       )}
       {data.selected.length === 0 && data.waitlisted.length === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          No one is selected in the final round yet. Enter final-round selections in the posting&apos;s Pipeline tab (they stay drafts), then return here.
+          No one is selected in the final stage yet. Enter final-stage selections in the job profile&apos;s Progress Grid tab (they stay drafts), then return here.
         </Alert>
       )}
       {data.open_places > 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          <AlertTitle>Waitlist</AlertTitle>
-          {data.open_places} place(s) are still open against the vacancies. Tick any waitlisted candidates below to give them an offer.
+          <AlertTitle>On Hold</AlertTitle>
+          {data.open_places} place(s) are still open against the vacancies. Tick any on-hold candidates below to give them an offer.
         </Alert>
       )}
 
@@ -280,9 +307,16 @@ export default function AdminResultsPage({ params }) {
 
       <Card>
         <CardContent>
-          <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-            Final selections
-          </Typography>
+          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} spacing={1} sx={{ mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight={700}>
+              Shortlist for Offer
+            </Typography>
+            {[...data.selected, ...data.waitlisted].some((i) => i.offer) && (
+              <Button size="small" variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setUploadOpen(true)}>
+                Upload CTCs
+              </Button>
+            )}
+          </Stack>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -290,7 +324,7 @@ export default function AdminResultsPage({ params }) {
                   <TableCell padding="checkbox">Offer</TableCell>
                   <TableCell>Student</TableCell>
                   <TableCell>Offer type</TableCell>
-                  <TableCell>Compensation</TableCell>
+                  <TableCell>CTC Offered</TableCell>
                   <TableCell>Block (suggested per policy)</TableCell>
                 </TableRow>
               </TableHead>
@@ -300,7 +334,7 @@ export default function AdminResultsPage({ params }) {
                   <TableRow>
                     <TableCell colSpan={5} sx={{ bgcolor: "grey.50" }}>
                       <Typography variant="body2" fontWeight={700}>
-                        Waitlisted (tick to promote)
+                        On Hold (tick to promote)
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -325,6 +359,45 @@ export default function AdminResultsPage({ params }) {
         </CardContent>
       </Card>
 
+      <StudentQuickView studentId={quickView} onClose={() => setQuickView(null)} />
+
+      {offerDialog?.kind === "edit" && (
+        <EditOfferDialog
+          offer={offerDialog.item.offer}
+          student={offerDialog.item.student}
+          offerTypes={data.offer_types}
+          onClose={() => setOfferDialog(null)}
+          onSaved={(message) => {
+            setOfferDialog(null);
+            setSuccess(message);
+            void load();
+          }}
+        />
+      )}
+      {offerDialog?.kind === "revoke" && (
+        <RevokeOfferDialog
+          offer={offerDialog.item.offer}
+          student={offerDialog.item.student}
+          onClose={() => setOfferDialog(null)}
+          onDone={(message) => {
+            setOfferDialog(null);
+            setSuccess(message);
+            void load();
+          }}
+        />
+      )}
+      {uploadOpen && (
+        <UploadCtcsDialog
+          postingId={id}
+          onClose={() => setUploadOpen(false)}
+          onDone={(message) => {
+            setUploadOpen(false);
+            setSuccess(message);
+            void load();
+          }}
+        />
+      )}
+
       <Dialog open={confirmOpen} onClose={() => !busy && setConfirmOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Publish final results?</DialogTitle>
         <DialogContent>
@@ -337,8 +410,8 @@ export default function AdminResultsPage({ params }) {
             <strong>{included.length}</strong> offer(s) · <strong>{blocks}</strong> student(s) blocked · about <strong>{regrets}</strong> regret mail(s)
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Offers are emailed to the selected students, everyone else in the final round is told they were not selected, blocked students&apos; other
-            live applications in the cycles their block reaches are flagged as placed elsewhere, and the posting is marked completed. This cannot be undone from here
+            Offers are emailed to the selected students, everyone else in the final stage is told they were not selected, blocked students&apos; other
+            live applications in the placements their block reaches are flagged as placed elsewhere, and the job profile is marked completed. This cannot be undone from here
             (blocks can be lifted later).
           </Typography>
         </DialogContent>
@@ -347,7 +420,7 @@ export default function AdminResultsPage({ params }) {
             Cancel
           </Button>
           <Button variant="contained" onClick={publish} disabled={busy}>
-            {busy ? "Publishing..." : "Publish & notify"}
+            {busy ? "Publishing..." : "Continue"}
           </Button>
         </DialogActions>
       </Dialog>

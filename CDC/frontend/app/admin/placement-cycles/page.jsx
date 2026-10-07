@@ -18,6 +18,7 @@ import {
   Divider,
   FormControl,
   IconButton,
+  InputAdornment,
   InputLabel,
   LinearProgress,
   MenuItem,
@@ -38,8 +39,12 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import LockIcon from "@mui/icons-material/Lock";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import SearchIcon from "@mui/icons-material/Search";
+import PublishIcon from "@mui/icons-material/Publish";
+import HistoryIcon from "@mui/icons-material/History";
 
 import { adminApi } from "@/lib/adminapi";
+import { useRecentPlacementIds } from "@/lib/recentplacements";
 import { defaultProgrammes } from "@/components/forms/shared";
 
 const programmeOptions = defaultProgrammes.map((programme) => programme.programme);
@@ -66,6 +71,10 @@ const formatDate = (value) => {
     : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+// Previous Placements (S8.3): closed, or its end date has passed (IST calendar day).
+const todayIst = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+const isPrevious = (cycle) => cycle.status !== "open" || (cycle.ends_on && cycle.ends_on < todayIst());
+
 export default function AdminPlacementCyclesPage() {
   const [cycles, setCycles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +85,8 @@ export default function AdminPlacementCyclesPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const [form, setForm] = useState(blankForm());
+  const [search, setSearch] = useState("");
+  const recentIds = useRecentPlacementIds();
 
   const loadCycles = async () => {
     setLoading(true);
@@ -84,7 +95,7 @@ export default function AdminPlacementCyclesPage() {
       setCycles(response.placement_cycles ?? []);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load placement cycles.");
+      setError(e instanceof Error ? e.message : "Failed to load placements.");
     } finally {
       setLoading(false);
     }
@@ -104,6 +115,17 @@ export default function AdminPlacementCyclesPage() {
         { open: 0, students: 0 }
       ),
     [cycles]
+  );
+
+  const [current, previous] = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const matching = cycles.filter((cycle) => !term || cycle.name.toLowerCase().includes(term));
+    return [matching.filter((cycle) => !isPrevious(cycle)), matching.filter(isPrevious)];
+  }, [cycles, search]);
+
+  const recent = useMemo(
+    () => recentIds.map((id) => cycles.find((cycle) => cycle.id === id)).filter(Boolean),
+    [recentIds, cycles]
   );
 
   const openDialog = () => {
@@ -131,11 +153,11 @@ export default function AdminPlacementCyclesPage() {
       allowed_programmes: prev.allowed_programmes.filter((_, rowIndex) => rowIndex !== index),
     }));
 
-  const handleCreate = async () => {
+  const handleCreate = async (asDraft = false) => {
     const rows = form.allowed_programmes.filter((row) => row.programme && row.batches.length > 0);
 
     if (!form.name.trim()) {
-      setFormError("Enter a name for this cycle.");
+      setFormError("Enter a name for this placement.");
       return;
     }
     if (!form.starts_on || !form.ends_on) {
@@ -147,7 +169,7 @@ export default function AdminPlacementCyclesPage() {
       return;
     }
     if (rows.length === 0) {
-      setFormError("Add at least one programme with a graduating batch.");
+      setFormError("Add at least one programme with a passout batch.");
       return;
     }
 
@@ -164,20 +186,21 @@ export default function AdminPlacementCyclesPage() {
           ends_on: form.ends_on,
           description: form.description.trim() || null,
           allowed_programmes: rows,
+          is_draft: asDraft,
         }),
       });
       setDialogOpen(false);
-      setSuccess("Placement cycle created.");
+      setSuccess(asDraft ? "Placement saved as a draft. Students cannot see it until you publish it." : "Placement created.");
       await loadCycles();
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : "Failed to create the placement cycle.");
+      setFormError(e instanceof Error ? e.message : "Failed to create the placement.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleClose = async (cycle) => {
-    if (!window.confirm(`Close "${cycle.name}"? Students can no longer be enrolled into a closed cycle from the UI.`)) {
+    if (!window.confirm(`Close "${cycle.name}"? Students can no longer be enrolled into a closed placement from the UI.`)) {
       return;
     }
 
@@ -186,9 +209,104 @@ export default function AdminPlacementCyclesPage() {
       setSuccess(`"${cycle.name}" is now closed.`);
       await loadCycles();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to close the cycle.");
+      setError(e instanceof Error ? e.message : "Failed to close the placement.");
     }
   };
+
+  const handlePublish = async (cycle) => {
+    if (!window.confirm(`Publish "${cycle.name}"? Its enrolled students will be able to see it, and job profiles can be opened for applications in it.`)) {
+      return;
+    }
+
+    try {
+      const response = await adminApi(`/admin/placement-cycles/${cycle.id}/publish`, { method: "PATCH" });
+      setSuccess(response.message ?? `"${cycle.name}" is now published.`);
+      await loadCycles();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to publish the placement.");
+    }
+  };
+
+  const renderCycle = (cycle) => (
+            <Card key={cycle.id}>
+              <CardActionArea component={Link} href={`/admin/placement-cycles/${cycle.id}`}>
+                <CardContent>
+                  <Stack
+                    direction={{ xs: "column", md: "row" }}
+                    justifyContent="space-between"
+                    alignItems={{ md: "center" }}
+                    spacing={2}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
+                        <Typography variant="h6" fontWeight={700} sx={{ textAlign: "left", overflowWrap: "anywhere" }}>
+                          {cycle.name}
+                        </Typography>
+                        {cycle.is_draft && <Chip size="small" color="warning" label="Draft" />}
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          color={cycle.type === "fulltime" ? "primary" : "secondary"}
+                          label={cycle.type === "fulltime" ? "Full Time" : "Internship"}
+                        />
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          color={cycle.status === "open" ? "success" : "default"}
+                          label={cycle.status === "open" ? "Open" : "Closed"}
+                        />
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatDate(cycle.starts_on)} → {formatDate(cycle.ends_on)} ·{" "}
+                        {(cycle.allowed_programmes ?? []).length} programme(s)
+                      </Typography>
+                    </Box>
+
+                    <Stack direction="row" spacing={3}>
+                      {[
+                        { icon: <GroupsIcon fontSize="small" />, label: "Students", value: cycle.enrolled_students_count },
+                        { icon: <WorkOutlineIcon fontSize="small" />, label: "Job Profiles", value: cycle.postings_count },
+                        { icon: <EmojiEventsIcon fontSize="small" />, label: "Offers", value: cycle.offers_count },
+                      ].map((stat) => (
+                        <Box key={stat.label} sx={{ textAlign: "center", minWidth: 68 }}>
+                          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center" color="text.secondary">
+                            {stat.icon}
+                            <Typography variant="h6" fontWeight={700} color="text.primary">
+                              {stat.value ?? 0}
+                            </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            {stat.label}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              </CardActionArea>
+              {(cycle.status === "open" || cycle.is_draft) && (
+                <>
+                  <Divider />
+                  <Stack direction="row" justifyContent="flex-end" spacing={1} flexWrap="wrap" useFlexGap sx={{ px: 2, py: 1 }}>
+                    {cycle.is_draft && (
+                      <Tooltip title="Make this placement visible to its enrolled students">
+                        <Button size="small" color="primary" startIcon={<PublishIcon />} onClick={() => handlePublish(cycle)}>
+                          Publish placement
+                        </Button>
+                      </Tooltip>
+                    )}
+                    {cycle.status === "open" && (
+                      <Tooltip title="Close this placement">
+                        <Button size="small" color="inherit" startIcon={<LockIcon />} onClick={() => handleClose(cycle)}>
+                          Close placement
+                        </Button>
+                      </Tooltip>
+                    )}
+                  </Stack>
+                </>
+              )}
+            </Card>
+  );
 
   return (
     <Box>
@@ -214,16 +332,16 @@ export default function AdminPlacementCyclesPage() {
             </Avatar>
             <Box>
               <Typography variant="h5" fontWeight={700}>
-                Placement Cycles
+                Placements
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {cycles.length} cycle(s) · {totals.open} open · {totals.students} enrolment(s)
+                {loading ? "Loading placements…" : `${cycles.length} placement(s) · ${totals.open} open · ${totals.students} enrolment(s)`}
               </Typography>
             </Box>
           </Stack>
           <Stack direction="row" spacing={1}>
             <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openDialog}>
-              Add Placement Cycle
+              Add placement process
             </Button>
             <Button
               component={Link}
@@ -259,98 +377,86 @@ export default function AdminPlacementCyclesPage() {
         <Paper sx={{ p: 6, textAlign: "center" }}>
           <EventRepeatIcon sx={{ fontSize: 56, color: "text.disabled", mb: 1 }} />
           <Typography variant="h6" gutterBottom>
-            No placement cycles yet
+            No placements yet
           </Typography>
           <Typography color="text.secondary" sx={{ mb: 3, textAlign: "center" }}>
-            Every drive, enrolment and offer hangs off a placement cycle. Create the first one to get started.
+            Every job profile, enrolment and offer hangs off a placement. Create the first one to get started.
           </Typography>
           <Button variant="contained" startIcon={<AddIcon />} onClick={openDialog}>
-            Add Placement Cycle
+            Add placement process
           </Button>
         </Paper>
       ) : (
-        <Stack spacing={2}>
-          {cycles.map((cycle) => (
-            <Card key={cycle.id}>
-              <CardActionArea component={Link} href={`/admin/placement-cycles/${cycle.id}`}>
-                <CardContent>
-                  <Stack
-                    direction={{ xs: "column", md: "row" }}
-                    justifyContent="space-between"
-                    alignItems={{ md: "center" }}
-                    spacing={2}
-                  >
-                    <Box sx={{ minWidth: 0 }}>
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ textAlign: "left" }}>
-                          {cycle.name}
-                        </Typography>
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          color={cycle.type === "fulltime" ? "primary" : "secondary"}
-                          label={cycle.type === "fulltime" ? "Full Time" : "Internship"}
-                        />
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          color={cycle.status === "open" ? "success" : "default"}
-                          label={cycle.status === "open" ? "Open" : "Closed"}
-                        />
-                      </Stack>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatDate(cycle.starts_on)} → {formatDate(cycle.ends_on)} ·{" "}
-                        {(cycle.allowed_programmes ?? []).length} programme(s)
-                      </Typography>
-                    </Box>
+        <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 300px" }, alignItems: "start" }}>
+          <Box sx={{ minWidth: 0 }}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Search Placements"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              sx={{ mb: 2, bgcolor: "background.paper" }}
+              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+            />
+            {current.length === 0 && previous.length === 0 && (
+              <Typography color="text.secondary" sx={{ py: 2 }}>
+                No placements match &quot;{search.trim()}&quot;.
+              </Typography>
+            )}
+            <Stack spacing={2}>{current.map(renderCycle)}</Stack>
+            {previous.length > 0 && (
+              <>
+                <Typography variant="subtitle1" fontWeight={700} color="text.secondary" sx={{ mt: current.length > 0 ? 4 : 0, mb: 1.5 }}>
+                  Previous Placements
+                </Typography>
+                <Stack spacing={2}>{previous.map(renderCycle)}</Stack>
+              </>
+            )}
+          </Box>
 
-                    <Stack direction="row" spacing={3}>
-                      {[
-                        { icon: <GroupsIcon fontSize="small" />, label: "Students", value: cycle.enrolled_students_count },
-                        { icon: <WorkOutlineIcon fontSize="small" />, label: "Postings", value: cycle.postings_count },
-                        { icon: <EmojiEventsIcon fontSize="small" />, label: "Offers", value: cycle.offers_count },
-                      ].map((stat) => (
-                        <Box key={stat.label} sx={{ textAlign: "center", minWidth: 68 }}>
-                          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center" color="text.secondary">
-                            {stat.icon}
-                            <Typography variant="h6" fontWeight={700} color="text.primary">
-                              {stat.value ?? 0}
-                            </Typography>
-                          </Stack>
-                          <Typography variant="caption" color="text.secondary">
-                            {stat.label}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Stack>
-                  </Stack>
-                </CardContent>
-              </CardActionArea>
-              {cycle.status === "open" && (
-                <>
-                  <Divider />
-                  <Stack direction="row" justifyContent="flex-end" sx={{ px: 2, py: 1 }}>
-                    <Tooltip title="Close this cycle">
-                      <Button size="small" color="inherit" startIcon={<LockIcon />} onClick={() => handleClose(cycle)}>
-                        Close cycle
-                      </Button>
-                    </Tooltip>
-                  </Stack>
-                </>
-              )}
-            </Card>
-          ))}
-        </Stack>
+          <Paper variant="outlined" sx={{ p: 2, minWidth: 0 }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <HistoryIcon fontSize="small" color="action" />
+              <Typography variant="subtitle1" fontWeight={700}>
+                Recently Visited
+              </Typography>
+            </Stack>
+            {recent.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Placements you open appear here.
+              </Typography>
+            ) : (
+              <Stack divider={<Divider flexItem />}>
+                {recent.map((cycle) => (
+                  <Box
+                    key={cycle.id}
+                    component={Link}
+                    href={`/admin/placement-cycles/${cycle.id}`}
+                    sx={{ py: 1, color: "text.primary", textDecoration: "none", "&:hover": { color: "primary.main" } }}
+                  >
+                    <Typography variant="body2" fontWeight={600} sx={{ overflowWrap: "anywhere" }}>
+                      {cycle.name}
+                      {cycle.is_draft ? " [DRAFT]" : ""}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {formatDate(cycle.starts_on)} → {formatDate(cycle.ends_on)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+        </Box>
       )}
 
       <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Add Placement Cycle</DialogTitle>
+        <DialogTitle>Add placement process</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2.5} sx={{ pt: 1 }}>
             {formError && <Alert severity="error">{formError}</Alert>}
 
             <TextField
-              label="Cycle name"
+              label="Placement name"
               fullWidth
               required
               placeholder="Full Time 2026-27"
@@ -405,7 +511,7 @@ export default function AdminPlacementCyclesPage() {
                 Allowed programmes &amp; batches
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
-                Which programmes and graduating batches this cycle covers.
+                Which programmes and passout batches this placement covers.
               </Typography>
 
               <Stack spacing={1.5}>
@@ -470,8 +576,11 @@ export default function AdminPlacementCyclesPage() {
           <Button onClick={() => setDialogOpen(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button variant="contained" onClick={handleCreate} disabled={saving}>
-            {saving ? "Creating..." : "Create Cycle"}
+          <Button variant="outlined" onClick={() => handleCreate(true)} disabled={saving}>
+            Save as draft
+          </Button>
+          <Button variant="contained" onClick={() => handleCreate(false)} disabled={saving}>
+            {saving ? "Creating..." : "Create Placement"}
           </Button>
         </DialogActions>
       </Dialog>

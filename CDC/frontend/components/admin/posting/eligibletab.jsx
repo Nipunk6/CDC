@@ -22,7 +22,12 @@ import {
 } from "@mui/material";
 
 import { adminApi } from "@/lib/adminapi";
+import StudentQuickView from "@/components/admin/studentquickview";
+import TemplateDownloadButton from "@/components/admin/templatedownloadbutton";
 import { shortProgramme } from "@/lib/usecatalogue";
+
+// A student's name opens the quick-view drawer (Superset parity S4.3).
+const nameButtonSx = { border: 0, p: 0, bgcolor: "transparent", color: "primary.main", cursor: "pointer", textAlign: "left", font: "inherit" };
 
 /**
  * "Eligible – Applied / Not applied" (req 20, QA F-009): every student currently eligible for the posting,
@@ -35,6 +40,7 @@ export default function EligibleTab({ posting }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [quickView, setQuickView] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,9 +68,20 @@ export default function EligibleTab({ posting }) {
   return (
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
-      <Typography variant="body2" color="text.secondary">
-        Students who are eligible for this posting right now (enrolled, meeting the cut-offs and not blocked).
-      </Typography>
+      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} spacing={1}>
+        <Typography variant="body2" color="text.secondary">
+          Students who are eligible for this job profile right now (enrolled, meeting the cut-offs and not blocked).
+        </Typography>
+        <TemplateDownloadButton
+          label="Download Eligible List"
+          path={`/admin/postings/${posting.id}/eligible/export`}
+          fileName={`posting-${posting.id}-eligible.xlsx`}
+          onError={setError}
+          variant="outlined"
+          color="primary"
+          size="small"
+        />
+      </Stack>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
         <Tabs
           value={status}
@@ -81,7 +98,7 @@ export default function EligibleTab({ posting }) {
         </Tabs>
         <TextField
           size="small"
-          label="Search roll no or name"
+          label="Search Roll Number or name"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -94,7 +111,7 @@ export default function EligibleTab({ posting }) {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Roll no</TableCell>
+              <TableCell>Roll Number</TableCell>
               <TableCell>Name</TableCell>
               <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Programme · Branch</TableCell>
               <TableCell>CGPA</TableCell>
@@ -108,7 +125,11 @@ export default function EligibleTab({ posting }) {
                 <TableCell>
                   <Link href={`/admin/students/${s.id}`}>{s.roll_no}</Link>
                 </TableCell>
-                <TableCell>{s.full_name}</TableCell>
+                <TableCell>
+                  <Typography component="button" type="button" variant="body2" onClick={() => setQuickView(s.id)} sx={nameButtonSx}>
+                    {s.full_name}
+                  </Typography>
+                </TableCell>
                 <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
                   {shortProgramme(s.programme)} · {s.branch}
                 </TableCell>
@@ -131,6 +152,7 @@ export default function EligibleTab({ posting }) {
           </TableBody>
         </Table>
       </TableContainer>
+      <StudentQuickView studentId={quickView} onClose={() => setQuickView(null)} />
       {data?.meta?.last_page > 1 && (
         <Box sx={{ display: "flex", justifyContent: "center" }}>
           <Pagination count={data.meta.last_page} page={page} onChange={(_e, v) => setPage(v)} color="primary" />
