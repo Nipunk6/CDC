@@ -58,22 +58,28 @@ class VerifyFixLeadTest extends TestCase
     {
         $company = Company::create(['name' => 'Acme', 'hr_name' => 'HR', 'hr_email' => 'hr@acme.test']);
         $cycle = PlacementCycle::create(['name' => 'FT', 'type' => 'fulltime', 'starts_on' => '2026-07-01', 'ends_on' => '2027-06-30', 'status' => 'open', 'allowed_programmes' => []]);
-        $make = function (string $title, array $categories) use ($company, $cycle) {
-            $jnf = Jnf::create(['company_id' => $company->id, 'job_title' => $title, 'job_description' => 'x', 'status' => 'accepted', 'form_data' => ['allowedStudentCategories' => $categories]]);
+        // $formCategories = what the company's form carried (null = no key). Before the fix the snapshot copied the
+        // form's list whenever the form carried one, so a snapshot equal to the form value is the company's (D127).
+        $make = function (string $title, array $categories, ?array $formCategories) use ($company, $cycle) {
+            $formData = $formCategories === null ? ['jobTitle' => $title] : ['allowedStudentCategories' => $formCategories];
+            $jnf = Jnf::create(['company_id' => $company->id, 'job_title' => $title, 'job_description' => 'x', 'status' => 'accepted', 'form_data' => $formData]);
 
             return JobPosting::create([
                 'postable_type' => Jnf::class, 'postable_id' => $jnf->id, 'placement_cycle_id' => $cycle->id, 'application_deadline' => now()->addDay(),
                 'status' => 'open', 'offer_type' => 'fulltime', 'floated_at' => now(), 'eligibility_snapshot' => ['genderFilter' => 'all', 'allowedStudentCategories' => $categories],
             ]);
         };
-        $copied = $make('Copied from the company', [7]);
-        $chosen = $make('Chosen by the CDC', [5]);
-        AuditLog::create(['action' => 'posting.float', 'subject_type' => JobPosting::class, 'subject_id' => $chosen->id, 'after' => ['allowed_student_categories' => [5]]]);
+        $copied = $make('Copied from the company', [7], [7]);
+        // An audit row that merely echoes the company's value must not save it (the pre-fix float audit read it back).
+        AuditLog::create(['action' => 'posting.float', 'subject_type' => JobPosting::class, 'subject_id' => $copied->id, 'after' => ['allowed_student_categories' => [7]]]);
+        $chosen = $make('Chosen by the CDC', [5], null);
+        $chosenOverForm = $make('CDC value differs from the form', [5], [8]);
 
         (require database_path('migrations/2026_10_07_000037_strip_company_supplied_student_categories.php'))->up();
 
         $this->assertArrayNotHasKey('allowedStudentCategories', $copied->fresh()->eligibility_snapshot);
         $this->assertSame([5], $chosen->fresh()->eligibility_snapshot['allowedStudentCategories']);
+        $this->assertSame([5], $chosenOverForm->fresh()->eligibility_snapshot['allowedStudentCategories']);
         $this->assertSame(0, DB::table('jnfs')->where('form_data', 'like', '%allowedStudentCategories%')->count());
     }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Alert,
@@ -83,7 +83,9 @@ export default function StudentInvitationsPage() {
   const requestKey = `${query(filters, page)}#${reloadTick}`;
   const loading = result.key !== requestKey;
   const { students, meta, counts } = result;
-  const pending = counts.sent + counts.revoked;
+  // "Resend to all pending" covers Sent invitations only; revoked ones are re-sent only when selected (D126).
+  const pending = counts.sent;
+  const statusById = useRef(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +93,7 @@ export default function StudentInvitationsPage() {
     adminApi(`/admin/students/invitations${qs ? `?${qs}` : ""}`)
       .then((response) => {
         if (cancelled) return;
+        (response.students ?? []).forEach((s) => statusById.current.set(s.id, s.invitation_status));
         setResult({
           key: requestKey,
           students: response.students ?? [],
@@ -142,12 +145,15 @@ export default function StudentInvitationsPage() {
     }
   };
 
-  const resendSelected = () =>
+  const resendSelected = () => {
+    const revoked = selected.filter((id) => statusById.current.get(id) === "revoked").length;
     run(
       "/admin/students/invitations/resend",
       { student_ids: selected },
-      `Send the invitation again to ${selected.length} student(s)? Each gets a new set-password link by email.`
+      `Send the invitation again to ${selected.length} student(s)? Each gets a new set-password link by email.` +
+        (revoked > 0 ? ` ${revoked} of them were revoked; resending gives them a new link and un-revokes them.` : "")
     );
+  };
   const revokeSelected = () =>
     run(
       "/admin/students/invitations/revoke",
@@ -158,7 +164,7 @@ export default function StudentInvitationsPage() {
     run(
       "/admin/students/invitations/resend",
       { all_pending: true, batches: filters.batches, search: filters.search.trim() || undefined },
-      `Send the invitation again to all ${pending} pending student(s)${filters.batches.length || filters.search.trim() ? " matching the Batches and search filters" : ""}? Students who have already accepted are skipped.`
+      `Send the invitation again to all ${pending} pending student(s)${filters.batches.length || filters.search.trim() ? " matching the Batches and search filters" : ""}? Students who have already accepted are skipped, and revoked invitations are not included (select those students to re-invite them).`
     );
 
   return (
@@ -267,7 +273,7 @@ export default function StudentInvitationsPage() {
               ))}
             </Stack>
           )}
-          <Tooltip title="Every Sent or Revoked student in the Batches and search filters; accepted students are skipped">
+          <Tooltip title="Every student with a Sent invitation in the Batches and search filters. Accepted students are skipped and revoked invitations are not included; select a revoked student to re-invite them.">
             <span>
               <Button size="small" variant="outlined" startIcon={<SendIcon />} disabled={busy || pending === 0} onClick={resendAllPending}>
                 Resend to all pending ({pending})

@@ -260,7 +260,8 @@ class S5S6VerifyTest extends TestCase
         $checkNoAccepted();
 
         Mail::fake();
-        $this->postJson('/api/admin/students/invitations/resend', ['all_pending' => true])->assertOk()->assertJsonPath('sent', 2);
+        // Owner decision 2026-10-07 (D126): "all pending" excludes Revoked invitations, so only the Sent student is mailed.
+        $this->postJson('/api/admin/students/invitations/resend', ['all_pending' => true])->assertOk()->assertJsonPath('sent', 1)->assertJsonPath('skipped_revoked', 1);
         $checkNoAccepted();
 
         Mail::fake();

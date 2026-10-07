@@ -1301,8 +1301,8 @@ class AdminFormReviewController extends Controller
                 'globalCgpa' => 'Minimum CGPA',
                 'genderFilter' => 'Gender Filter',
                 'slpRequirement' => 'SLP Requirement',
-                'minTenthPercent' => 'Minimum 10th %',
-                'minTwelfthPercent' => 'Minimum 12th %',
+                'minTenthPercent' => 'Minimum Class X Percentage',
+                'minTwelfthPercent' => 'Minimum Class XII Percentage',
                 'currency' => 'Currency',
             ];
         } else {
@@ -1320,8 +1320,8 @@ class AdminFormReviewController extends Controller
                 'globalCgpa' => 'Minimum CGPA',
                 'genderFilter' => 'Gender Filter',
                 'slpRequirement' => 'SLP Requirement',
-                'minTenthPercent' => 'Minimum 10th %',
-                'minTwelfthPercent' => 'Minimum 12th %',
+                'minTenthPercent' => 'Minimum Class X Percentage',
+                'minTwelfthPercent' => 'Minimum Class XII Percentage',
                 'currency' => 'Currency',
             ];
         }

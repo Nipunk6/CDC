@@ -486,4 +486,40 @@ class StudentInvitationTest extends TestCase
         }
         $this->assertNull($target->user->fresh()->invite_revoked_at);
     }
+
+    /** D126 (owner, 2026-10-07): "Resend to all pending" never re-invites a revoked student; an explicit selection still does. */
+    public function test_resend_all_pending_excludes_revoked_but_explicit_selection_unrevokes(): void
+    {
+        Mail::fake();
+        $this->actingAsAdmin();
+        $this->student('24JE0101', 'accepted');
+        $sent = $this->student('24JE0102', 'sent');
+        $revoked = $this->student('24JE0103', 'revoked');
+
+        $this->postJson('/api/admin/students/invitations/resend', ['all_pending' => true])
+            ->assertOk()->assertJsonPath('sent', 1)->assertJsonPath('skipped', 1)->assertJsonPath('skipped_revoked', 1);
+        Mail::assertQueued(StudentInvitationMail::class, 1);
+        Mail::assertQueued(StudentInvitationMail::class, fn ($m) => $m->hasTo('24je0102@iitism.ac.in'));
+        Mail::assertNotQueued(StudentInvitationMail::class, fn ($m) => $m->hasTo('24je0103@iitism.ac.in'));
+        $this->assertNotNull($revoked->user->fresh()->invite_revoked_at, 'all_pending must not un-revoke');
+
+        $log = AuditLog::where('action', 'student.invite_resend_bulk')->latest('id')->first();
+        $this->assertSame('all_pending', $log->after['mode']);
+        $this->assertSame(1, $log->after['skipped_revoked_count']);
+        $this->assertSame(['24JE0102'], $log->after['roll_nos']);
+
+        // Only revoked students left in the filter: nothing to send, and the message says why.
+        Mail::fake();
+        $response = $this->postJson('/api/admin/students/invitations/resend', ['all_pending' => true, 'search' => '24JE0103'])->assertStatus(422);
+        $this->assertStringContainsString('revoked', $response->json('message'));
+        Mail::assertNothingQueued();
+
+        // Explicit selection re-invites and un-revokes.
+        Mail::fake();
+        $this->postJson('/api/admin/students/invitations/resend', ['student_ids' => [$revoked->id]])
+            ->assertOk()->assertJsonPath('sent', 1)->assertJsonPath('skipped_revoked', 0);
+        Mail::assertQueued(StudentInvitationMail::class, fn ($m) => $m->hasTo('24je0103@iitism.ac.in'));
+        $this->assertNull($revoked->user->fresh()->invite_revoked_at);
+        $this->assertSame(2, $sent->user->fresh()->invite_count, 'the Sent student was re-invited once by all_pending');
+    }
 }

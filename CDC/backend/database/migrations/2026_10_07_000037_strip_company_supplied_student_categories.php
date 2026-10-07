@@ -5,10 +5,16 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Fix M2: `allowedStudentCategories` must come only from the CDC. Before the fix, opening a job profile copied the key
- * from the company-written form_data into the eligibility snapshot. Rule: keep a posting's snapshot value only when the
- * audit log shows an admin set exactly that list — the `posting.float` row's `after.allowed_student_categories`, or the
- * latest `posting.eligibility_update` row's `after.criteria.allowedStudentCategories`; otherwise drop the key. The key
- * is also removed from every JNF/INF form_data (it is never read from there any more). Idempotent; no down migration.
+ * from the company-written form_data into the eligibility snapshot, and the company's value won over the admin's
+ * choice. Rule (D127): when the posting's JNF/INF form_data carries the key and the snapshot holds the same list
+ * (normalised ids), the restriction came from the company: drop it (the CDC can set categories again with Edit
+ * eligibility). Any other snapshot value can only have come from the CDC: keep it. Audit rows are not used, because
+ * before the fix they echoed the snapshot (i.e. the company's value) and prove nothing. Afterwards the key is removed
+ * from every JNF/INF form_data (it is never read from there any more). Idempotent; no down migration.
+ *
+ * Edited after it first ran (exception to "never edit a run migration", D127): data-only, ran only on the local dev
+ * database (0 affected postings, 0 forms with the key, verified 2026-10-07), not yet run in production. It has to be
+ * this migration because it is the only step that still sees the form keys before stripping them.
  */
 return new class extends Migration
 {
@@ -20,43 +26,28 @@ return new class extends Migration
 
             return $ids;
         };
+        $tables = ['App\\Models\\Jnf' => 'jnfs', 'App\\Models\\Inf' => 'infs'];
 
-        DB::table('job_postings')->orderBy('id')->chunkById(200, function ($postings) use ($normalise): void {
+        DB::table('job_postings')->orderBy('id')->chunkById(200, function ($postings) use ($normalise, $tables): void {
             foreach ($postings as $posting) {
                 $snapshot = json_decode((string) $posting->eligibility_snapshot, true);
                 if (! is_array($snapshot) || ! array_key_exists('allowedStudentCategories', $snapshot)) {
                     continue;
                 }
 
+                $table = $tables[$posting->postable_type] ?? null;
+                $formData = $table ? json_decode((string) DB::table($table)->where('id', $posting->postable_id)->value('form_data'), true) : null;
                 $current = $normalise($snapshot['allowedStudentCategories']);
-                $logs = DB::table('audit_logs')
-                    ->where('subject_type', 'App\\Models\\JobPosting')
-                    ->where('subject_id', $posting->id)
-                    ->whereIn('action', ['posting.float', 'posting.eligibility_update'])
-                    ->orderByDesc('id')
-                    ->get(['action', 'after']);
 
-                $adminValue = null;
-                foreach ($logs as $log) {
-                    $after = json_decode((string) $log->after, true) ?: [];
-                    if ($log->action === 'posting.eligibility_update' && isset($after['criteria']) && array_key_exists('allowedStudentCategories', $after['criteria'])) {
-                        $adminValue = $normalise($after['criteria']['allowedStudentCategories']);
-                        break;
-                    }
-                    if ($log->action === 'posting.float' && array_key_exists('allowed_student_categories', $after)) {
-                        $adminValue = $normalise($after['allowed_student_categories']);
-                        break;
-                    }
-                }
+                $companySupplied = is_array($formData)
+                    && array_key_exists('allowedStudentCategories', $formData)
+                    && $normalise($formData['allowedStudentCategories']) === $current;
 
-                if ($adminValue !== null && $adminValue === $current && $current !== []) {
+                if (! $companySupplied && $current !== []) {
                     continue; // set by the CDC: keep
                 }
 
                 unset($snapshot['allowedStudentCategories']);
-                if ($adminValue) {
-                    $snapshot['allowedStudentCategories'] = $adminValue;
-                }
                 DB::table('job_postings')->where('id', $posting->id)->update(['eligibility_snapshot' => json_encode($snapshot)]);
             }
         });

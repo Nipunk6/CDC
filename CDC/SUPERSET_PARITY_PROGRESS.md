@@ -11,10 +11,10 @@ Plan: SUPERSET_PARITY_MASTER_PROMPT.md (repo root). Analyses: superset_video_ana
 - Scheduler: "Schedule For Later" needs `php artisan schedule:work` locally (only with MAIL_MAILER=log — the backend .env uses SMTP) and a cron `* * * * * php artisan schedule:run` in production.
 - Local demo admin: admin@cdc-demo.test / Admin@2026 (in the seeder docblock). For an API check, student 23JE0104 on the local DB was given the demo password Student@2026.
 - Nothing is committed (owner commits).
-- NEXT ACTION: Implement L15 with the owner's answer (asked 2026-10-07), re-run StudentInvitationTest + the suite, then report. Everything else in VERIFICATION FIXES is done.
+- NEXT ACTION: Owner review and commit of the final fixes (L15, M2 clean-up rule, L1 labels). All parity items are done.
 
 ## BLOCKED / QUESTIONS FOR OWNER
-- L15 (asked 2026-10-07): should "Resend to all pending" exclude Revoked students (recommended) or keep including them with the count shown? BLOCKED on a probe conflict: the recommended "Exclude" option contradicts the verifiers' probe `tests/Feature/ParityVerify/S5S6VerifyTest::test_s5_bulk_resend_never_mails_accepted_students_in_any_mode` (line 263 expects "all pending" to send 2, one of them a Revoked student) and `StudentInvitationTest::test_bulk_resend_never_mails_accepted_students`. I built "Exclude", saw both fail, and reverted it, because a probe may not be changed without the owner. If the owner chooses Exclude, the probe's expected count at line 263 changes from 2 to 1 (with the owner's OK); if Include, only the confirm dialog gains the revoked count. Current code = the old behaviour (Include, without the count).
+- L15: ANSWERED 2026-10-07 — exclude Revoked (D126). Original note: BLOCKED on a probe conflict: the recommended "Exclude" option contradicts the verifiers' probe `tests/Feature/ParityVerify/S5S6VerifyTest::test_s5_bulk_resend_never_mails_accepted_students_in_any_mode` (line 263 expects "all pending" to send 2, one of them a Revoked student) and `StudentInvitationTest::test_bulk_resend_never_mails_accepted_students`. I built "Exclude", saw both fail, and reverted it, because a probe may not be changed without the owner. If the owner chooses Exclude, the probe's expected count at line 263 changes from 2 to 1 (with the owner's OK); if Include, only the confirm dialog gains the revoked count. Current code = the old behaviour (Include, without the count).
 - None blocking. Items for the owner's eye (not questions): survey Type values General / PPO Consent / Feedback are our wording (the video never showed Superset's); the student pages (Notices, Surveys) were checked through the API and by the S7 builder at 375/1024, not by eye with a student login in the shared browser (the browser holds the owner's admin session, which was not signed out).
 
 ## MILESTONE CHECKLIST
@@ -49,7 +49,8 @@ Source: owner FIX PROMPT; evidence CDC/qa/PARITY_VERIFICATION_REPORT.md + CDC/qa
 - [x] L12 [addendum] in template stage columns (D122f) — `VerifyFixOffersShortlistTest`.
 - [x] L13 Placement Matrix placing offers only (D121e) — `ReportsTest`.
 - [x] L14 hub tabs render Branch Manager + Excel Templates; drawer duplicate removed; old URL redirects (D121f).
-- [ ] L15 Resend to all pending vs Revoked — BLOCKED: owner answer needed; the recommended option conflicts with probe S5S6 `test_s5_bulk_resend_never_mails_accepted_students_in_any_mode` (see BLOCKED).
+- [x] L15 Resend to all pending excludes Revoked (owner: exclude, D126) — probe S5S6 expectation changed with the owner's OK; `StudentInvitationTest::test_resend_all_pending_excludes_revoked_but_explicit_selection_unrevokes`.
+- [x] Re-check follow-ups (2026-10-07, SUPERSET_PARITY_FINAL_FIX_PROMPT.md): M2 clean-up rule corrected in 000037 (D127; probes `RecheckHighMediumTest::test_m2_cleanup_*`); L1 change-summary labels (D128; probe `RecheckLowTest::test_l1_*`).
 - [x] L16 apply to a scheduled job profile → 404 (D121b) — probe `test_s6_apply_to_a_scheduled_job_profile_is_404_like_its_detail`.
 - [x] L17 shared status label on student card + company pages (D121c).
 - [x] L18 import "Current Course Name" (D123c) — `VerifyFixStudentListsTest`.

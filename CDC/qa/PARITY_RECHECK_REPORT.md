@@ -54,3 +54,17 @@ Three small things remain:
 ## 5. Notes
 - Live checks created one draft survey, which was deleted again. Reconcile was opened but not confirmed. No other data changed. The backend log has no errors. The only console error comes from the test tool's injected script.
 - Nothing is committed.
+
+## 6. Final fixes (2026-10-07, after the owner's answer)
+Done following `SUPERSET_PARITY_FINAL_FIX_PROMPT.md`. Every remaining item is now fixed:
+
+| Item | Status | Proof |
+|---|---|---|
+| L15: "Resend to all pending" vs Revoked | **FIXED** (owner: exclude Revoked, D126) | Revoked students are skipped and reported. An explicit selection still re-invites and un-revokes them. The page count shows Sent only (2874 on the local data, matching the database). Regression test plus the owner-approved probe update. |
+| M2: clean-up rule | **FIXED** (D127) | `000037` drops a snapshot value that equals the company form's value and keeps any other value. Both `RecheckHighMediumTest::test_m2_cleanup_*` probes pass. The fixer's test fixture was corrected. |
+| L1: change-summary labels | **FIXED** (D128) | "Minimum Class X / XII Percentage". `RecheckLowTest::test_l1_*` passes. |
+
+**Final result:**
+- **Backend suite:** 673 tests, **14 failures**. These are exactly the pre-existing baseline tests, which reproduce earlier QA and security findings on purpose. All ParityVerify probes pass.
+- **Frontend:** `npm run lint` has 0 errors; `npm run build` passes. No backend log errors.
+- **Not committed.**

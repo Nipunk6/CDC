@@ -68,7 +68,9 @@ class AdminStudentInvitationController extends Controller
 
     /**
      * "Re - Send Invites": the selected students, or every pending one (`all_pending`, within the Batches + search
-     * filters). Accepted students are skipped. One audit row for the batch (D25 pattern).
+     * filters). Accepted students are skipped. `all_pending` also skips Revoked students (owner decision, D126): a
+     * revoked invitation is re-sent only when the admin selects that student explicitly, which un-revokes it.
+     * One audit row for the batch (D25 pattern).
      */
     public function resend(Request $request): JsonResponse
     {
@@ -85,10 +87,16 @@ class AdminStudentInvitationController extends Controller
 
         $sent = [];
         $skipped = 0;
-        $query->with('user')->chunkById(500, function (Collection $students) use (&$sent, &$skipped): void {
+        $skippedRevoked = 0;
+        $query->with('user')->chunkById(500, function (Collection $students) use (&$sent, &$skipped, &$skippedRevoked, $allPending): void {
             foreach ($students as $student) {
                 if (! $student->user || $student->user->activated_at !== null) {
                     $skipped++;
+
+                    continue;
+                }
+                if ($allPending && $student->user->invite_revoked_at !== null) {
+                    $skippedRevoked++;
 
                     continue;
                 }
@@ -99,9 +107,11 @@ class AdminStudentInvitationController extends Controller
 
         if ($sent === []) {
             return response()->json([
-                'message' => $skipped > 0
-                    ? 'No invitation sent: the selected students have already activated their accounts.'
-                    : 'No pending invitations to resend.',
+                'message' => match (true) {
+                    $skipped > 0 && ! $allPending => 'No invitation sent: the selected students have already activated their accounts.',
+                    $skippedRevoked > 0 => sprintf('No pending invitations to resend. %d revoked invitation(s) were not included; select those students to re-invite them.', $skippedRevoked),
+                    default => 'No pending invitations to resend.',
+                },
             ], 422);
         }
 
@@ -110,18 +120,21 @@ class AdminStudentInvitationController extends Controller
             'filters' => $allPending ? StudentDirectoryFilters::active(Arr::except($validated, ['all_pending', 'student_ids'])) : null,
             'sent_count' => count($sent),
             'skipped_accepted_count' => $skipped,
+            'skipped_revoked_count' => $skippedRevoked,
             'roll_nos' => array_slice($sent, 0, 100),
             'roll_nos_truncated' => count($sent) > 100,
         ]);
 
         return response()->json([
             'message' => sprintf(
-                'Invitation sent again to %d student(s).%s',
+                'Invitation sent again to %d student(s).%s%s',
                 count($sent),
-                $skipped > 0 ? sprintf(' %d already accepted, skipped.', $skipped) : ''
+                $skipped > 0 ? sprintf(' %d already accepted, skipped.', $skipped) : '',
+                $skippedRevoked > 0 ? sprintf(' %d revoked, skipped.', $skippedRevoked) : ''
             ),
             'sent' => count($sent),
             'skipped' => $skipped,
+            'skipped_revoked' => $skippedRevoked,
         ]);
     }
 
