@@ -7,7 +7,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - Last completed: P-1.1 to P-1.8 (P3-D8 to P3-D15)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P-1.12b SEC-015 session lifetime + sign out on 401
+- NEXT ACTION: P-1.12c SEC-016 API hardening headers
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
@@ -63,3 +63,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P-1.10 SEC-007 verification link from APP_URL; TrustHosts with TRUSTED_HOSTS (P3-D19)
 - 2026-10-10 · P-1.11 CompanySeeder password from DEMO_COMPANY_PASSWORD or random (P3-D20)
 - 2026-10-10 · P-1.12a SEC-014 single-use verification link, 24 h verified window (P3-D21)
+- 2026-10-10 · P-1.12b SEC-015 session = 7-day token lifetime; sign out on 401 in admin/company helpers; Mail tab UI checked (P3-D22)

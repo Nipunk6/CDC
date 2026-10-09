@@ -1,6 +1,7 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { signedClientIpHeaders } from "@/lib/signedclientip";
+import { API_TOKEN_LIFETIME_SECONDS, apiTokenExpired } from "@/lib/sessionlifetime";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "") ?? "http://localhost:8000";
 
@@ -21,6 +22,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   session: {
     strategy: "jwt",
+    // SEC-015: never longer than the 7-day API token (the default would be 30 days).
+    maxAge: API_TOKEN_LIFETIME_SECONDS,
   },
   pages: {
     signIn: "/auth/login",
@@ -94,6 +97,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.companyId = user.companyId;
         token.rollNo = user.rollNo;
         token.accessToken = user.accessToken;
+        token.accessTokenIssuedAt = Date.now();
+      }
+
+      // SEC-015: the session is rolling, so it would outlive the API token it carries. End it when the token ends.
+      if (apiTokenExpired(token.accessTokenIssuedAt)) {
+        return null;
       }
 
       return token;
