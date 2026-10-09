@@ -40,6 +40,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import DescriptionIcon from "@mui/icons-material/Description";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import { safeCallbackUrl } from "@/lib/safecallbackurl";
 
 const apiBase =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
@@ -140,7 +141,8 @@ type PageProps = {
 function LoginForm({ type }: { type: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "";
+  // SEC-005: only a same-site path is honoured after login (see lib/safecallbackurl.js).
+  const callbackUrl = searchParams.get("callbackUrl");
 
   // Validate the type parameter
   const variant: LoginVariant = type === "admin" ? "admin" : type === "student" ? "student" : "recruiter";
@@ -192,16 +194,16 @@ function LoginForm({ type }: { type: string }) {
     const role = session?.user?.role;
 
     if (role === "admin") {
-      router.replace(callbackUrl || "/admin");
+      router.replace(safeCallbackUrl(callbackUrl, "/admin"));
       return;
     }
 
     if (role === "student") {
-      router.replace(callbackUrl || "/student");
+      router.replace(safeCallbackUrl(callbackUrl, "/student"));
       return;
     }
 
-    router.replace(callbackUrl || "/company");
+    router.replace(safeCallbackUrl(callbackUrl, "/company"));
   };
 
   const handleForgotPassword = async () => {

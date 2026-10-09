@@ -10,7 +10,8 @@
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test tests/e2e/smoke.spec.ts",
     "test:e2e:student": "playwright test tests/e2e/student-portal.spec.js --project=chromium",
-    "test:perf": "playwright test tests/performance/navigation.perf.spec.ts"
+    "test:perf": "playwright test tests/performance/navigation.perf.spec.ts",
+    "test:unit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests-unit/**/*.test.mjs\""
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",

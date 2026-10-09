@@ -3,18 +3,21 @@
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Box, CircularProgress } from "@mui/material";
+import { safeCallbackUrl } from "@/lib/safecallbackurl";
 
 function LoginRedirectHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const callbackUrl = searchParams.get("callbackUrl") || "";
-    const queryStr = searchParams.toString();
-    const query = queryStr ? `?${queryStr}` : "";
+    // SEC-005: forward only a safe same-site callbackUrl, never the raw query string.
+    const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"), "");
+    const query = callbackUrl ? `?${new URLSearchParams({ callbackUrl }).toString()}` : "";
 
-    if (callbackUrl.toLowerCase().includes("/admin")) {
+    if (callbackUrl.startsWith("/admin")) {
       router.replace(`/auth/login/admin${query}`);
+    } else if (callbackUrl.startsWith("/student")) {
+      router.replace(`/auth/login/student${query}`);
     } else {
       router.replace(`/auth/login/recruiter${query}`);
     }

@@ -23,6 +23,16 @@ test.describe("Student portal smoke", () => {
     await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
   });
 
+  test("a callbackUrl to another site is ignored after login (SEC-005)", async ({ page, baseURL }) => {
+    test.skip(!student.roll || !student.password, "E2E_STUDENT_ROLL / E2E_STUDENT_PASSWORD not set");
+    await page.goto(`/auth/login/student?callbackUrl=${encodeURIComponent("https://evil.example/steal")}`);
+    await page.getByLabel("Roll Number").fill(student.roll);
+    await page.getByLabel("Password", { exact: true }).fill(student.password);
+    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.waitForURL((url) => url.pathname.startsWith("/student"), { timeout: 30000 });
+    expect(new URL(page.url()).origin).toBe(new URL(baseURL ?? "http://127.0.0.1:3000").origin);
+  });
+
   test("student signs in, browses job profiles and opens one", async ({ page }) => {
     test.skip(!student.roll || !student.password, "E2E_STUDENT_ROLL / E2E_STUDENT_PASSWORD not set");
     await signIn(page, "student", "Roll Number", student.roll, student.password);
