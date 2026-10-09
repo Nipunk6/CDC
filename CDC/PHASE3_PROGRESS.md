@@ -7,7 +7,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - Last completed: P-1.1 to P-1.8 (P3-D8 to P3-D15)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P-1.12e SEC-022 + F-040 (ownership before validation, one 404 body, no policy-documents show)
+- NEXT ACTION: P-1.13 QA leftovers — F-027 and F-035 first (no offer to a student who already holds an offer or an active "all" block in that cycle)
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
@@ -28,7 +28,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P-1.9 SEC-004 no svg logos
   - [x] P-1.10 SEC-007 verification link from config; trustHosts() from env
   - [x] P-1.11 CompanySeeder hard-coded password removed
-  - [ ] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
+  - [x] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
   - [ ] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
   - [ ] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
 - [ ] P0 Foundations, login IP log, settings, scheduler
@@ -66,3 +66,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P-1.12b SEC-015 session = 7-day token lifetime; sign out on 401 in admin/company helpers; Mail tab UI checked (P3-D22)
 - 2026-10-10 · P-1.12c SEC-016 SecurityHeaders middleware (P3-D23)
 - 2026-10-10 · P-1.12d SEC-019 https-only policy links, guarded download/viewer URLs (P3-D24)
+- 2026-10-10 · P-1.12e SEC-022 + F-040 ownership before validation, one 404 body, policy-documents without show, blank status (P3-D25); qa-open down to 10

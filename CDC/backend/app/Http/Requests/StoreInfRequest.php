@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Inf;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
 class StoreInfRequest extends FormRequest
@@ -12,6 +14,14 @@ class StoreInfRequest extends FormRequest
      */
     public function authorize(): bool
     {
+        // SEC-022: a company editing another company's INF gets the same 404 as for a missing one, before any
+        // validation runs (validation first answered 422 and so revealed which ids exist). Admins edit any company's.
+        $form = $this->route('inf');
+        $user = $this->user();
+        if ($form instanceof Inf && $user?->role === 'company' && (int) $form->company_id !== (int) $user->company_id) {
+            throw new HttpResponseException(response()->json(['message' => 'INF not found.'], 404));
+        }
+
         return true;
     }
 

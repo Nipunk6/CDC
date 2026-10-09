@@ -302,7 +302,8 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->prefix('admin')->gr
         Route::put('/infs/{inf}', [AdminFormBuilderController::class, 'updateInf']);
     });
 
-    Route::apiResource('/policy-documents', PolicyDocumentController::class);
+    // SEC-022 / F-040: the controller has no show(); the admin list carries every field.
+    Route::apiResource('/policy-documents', PolicyDocumentController::class)->except('show');
 });
 
 Route::middleware(['auth:sanctum', 'active', 'role:company'])->get('/company/ping', function () {
