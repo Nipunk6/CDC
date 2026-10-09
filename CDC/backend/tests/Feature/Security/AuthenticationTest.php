@@ -3,12 +3,15 @@
 namespace Tests\Feature\Security;
 
 use App\Mail\PasswordResetLinkMail;
+use App\Mail\RecruiterEmailVerificationMail;
 use App\Mail\StudentInvitationMail;
 use App\Models\Company;
 use App\Models\RecruiterEmailVerification;
 use App\Models\StudentProfile;
 use App\Models\User;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Middleware\TrustHosts;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -256,6 +259,36 @@ class AuthenticationTest extends TestCase
         RecruiterEmailVerification::create(['email' => 'hr@twice.test', 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(30)]);
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertSee('verified successfully');
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertDontSee('verified successfully');
+    }
+
+    /** SEC-007 (P-1.10): the emailed link is built from APP_URL, never from the Host / X-Forwarded-Host headers. */
+    public function test_A3_9_verification_link_uses_configured_origin(): void
+    {
+        config(['app.url' => 'https://api.cdc.test', 'services.recruiter_email.dns_check' => false]);
+
+        $this->withHeaders(['Host' => 'evil.example', 'X-Forwarded-Host' => 'evil.example', 'X-Forwarded-Proto' => 'https'])
+            ->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'hr@newco.qa.test', 'name' => 'Asha'])
+            ->assertOk();
+
+        Mail::assertSent(RecruiterEmailVerificationMail::class, fn (RecruiterEmailVerificationMail $m) => str_starts_with($m->verifyUrl, 'https://api.cdc.test/api/auth/company/recruiter-email/verify?token=')
+            && ! str_contains($m->verifyUrl, 'evil'));
+    }
+
+    /** SEC-007 (P-1.10): Laravel's TrustHosts runs globally; trusted hosts are APP_URL's host (+ subdomains) and the exact names in TRUSTED_HOSTS. */
+    public function test_A3_9_trusted_hosts_come_from_config_and_are_exact(): void
+    {
+        $this->assertContains(TrustHosts::class, app(HttpKernel::class)->getGlobalMiddleware());
+
+        config(['app.url' => 'https://api.cdc.test', 'app.trusted_hosts' => ['portal.cdc.test']]);
+        $patterns = app(TrustHosts::class)->hosts();
+        // Symfony's Request::setTrustedHosts() wraps every pattern as {pattern}i.
+        $trusted = fn (string $host): bool => collect($patterns)->contains(fn (?string $p) => $p !== null && preg_match('{'.$p.'}i', $host) === 1);
+
+        $this->assertTrue($trusted('api.cdc.test'));
+        $this->assertTrue($trusted('portal.cdc.test'));
+        $this->assertFalse($trusted('evil.example'));
+        $this->assertFalse($trusted('portal.cdc.test.evil.example'), 'configured names are anchored, not substrings');
+        $this->assertFalse($trusted('xportal.cdc.test'));
     }
 
     // ---------------------------------------------------------------- A3.10 super-admin protection

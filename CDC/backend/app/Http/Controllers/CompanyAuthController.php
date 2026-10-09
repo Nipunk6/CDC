@@ -218,7 +218,8 @@ class CompanyAuthController extends Controller
             ]
         );
 
-        $apiOrigin = rtrim($request->getSchemeAndHttpHost(), '/');
+        // SEC-007: from APP_URL, never from the request's Host / X-Forwarded-Host headers.
+        $apiOrigin = rtrim((string) config('app.url'), '/');
         $verifyUrl = sprintf(
             '%s/api/auth/company/recruiter-email/verify?token=%s',
             $apiOrigin,

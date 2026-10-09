@@ -18,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // first, so rate limits, logs and audits all see the same IP.
         $middleware->prepend(\App\Http\Middleware\TrustSignedClientIp::class);
 
+        // SEC-007: reject requests for any other Host. Read from config at request time; each name is matched exactly.
+        $middleware->trustHosts(at: fn (): array => array_map(
+            fn (string $host): string => '^'.preg_quote($host).'$',
+            (array) config('app.trusted_hosts', [])
+        ));
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'active' => \App\Http\Middleware\EnsureUserIsActive::class,

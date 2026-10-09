@@ -83,6 +83,7 @@ Open `backend/.env` and set these values. Everything else can stay as it is in t
 | `APP_URL` | `http://127.0.0.1:8000` | The backend address. |
 | `FRONTEND_URL` | `http://127.0.0.1:3000` | Used in email links. |
 | `FRONTEND_URLS` | `http://127.0.0.1:3000,http://localhost:3000` | Origins allowed by CORS. |
+| `TRUSTED_HOSTS` | *(empty)* | Optional. Extra host names the API may be reached by, besides the one in `APP_URL` (comma-separated). Only checked in production. |
 | `DB_CONNECTION` | `mysql` | MySQL only. |
 | `DB_HOST` / `DB_PORT` | `127.0.0.1` / `3306` | |
 | `DB_DATABASE` | `iitism_placement` | The database from step 3. |
