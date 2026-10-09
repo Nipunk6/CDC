@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "path";
+import { contentSecurityPolicy } from "./lib/csp.js";
 
 const securityHeaders = [
   {
@@ -23,6 +24,17 @@ const securityHeaders = [
     value: "max-age=31536000; includeSubDomains",
   },
 ];
+
+// SEC-009: every page gets the CSP. PDF responses (static .pdf files and /api/proxy-pdf) are left out: when the PDF
+// response itself carries this policy, Chrome's built-in viewer shows a blank frame in the resume and policy-document
+// iframes (checked in Chrome 152). A PDF has no page script for the policy to protect.
+const contentSecurityPolicyHeader = {
+  key: "Content-Security-Policy",
+  value: contentSecurityPolicy({
+    apiUrl: process.env.NEXT_PUBLIC_API_URL,
+    dev: process.env.NODE_ENV === "development",
+  }),
+};
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -50,6 +62,10 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/((?!api/proxy-pdf|.*\\.pdf).*)",
+        headers: [contentSecurityPolicyHeader],
       },
     ];
   },
