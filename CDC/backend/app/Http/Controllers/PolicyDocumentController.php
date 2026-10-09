@@ -9,6 +9,7 @@ use App\Services\FileUploadService;
 use App\Services\PortalNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class PolicyDocumentController extends Controller
 {
@@ -38,7 +39,8 @@ class PolicyDocumentController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:pdf,link'],
-            'url' => ['required_if:type,link', 'nullable', 'string'],
+            // SEC-019: companies open this link, so only a real https URL (no javascript:, data:, file:, http:).
+            'url' => ['required_if:type,link', 'nullable', 'string', 'max:2048', 'url:https'],
             'file' => ['required_if:type,pdf', 'nullable', 'file', 'mimes:pdf', 'max:5120'],
             'is_visible_jnf' => ['boolean'],
             'is_visible_inf' => ['boolean'],
@@ -76,7 +78,8 @@ class PolicyDocumentController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:pdf,link'],
-            'url' => ['required_if:type,link', 'nullable', 'string'],
+            // SEC-019: companies open this link, so only a real https URL (no javascript:, data:, file:, http:).
+            'url' => ['required_if:type,link', 'nullable', 'string', 'max:2048', 'url:https'],
             'file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
             'is_visible_jnf' => ['boolean'],
             'is_visible_inf' => ['boolean'],
@@ -90,6 +93,9 @@ class PolicyDocumentController extends Controller
         } elseif ($validated['type'] === 'pdf' && $request->hasFile('file')) {
             $uploaded = $this->fileUploadService->uploadPolicyFile($request->file('file'));
             $url = $uploaded['url'];
+        } elseif ($policyDocument->type !== 'pdf') {
+            // SEC-019: a link turned into a PDF needs the PDF; never keep the old link as the PDF's address.
+            throw ValidationException::withMessages(['file' => 'Upload the PDF file for this document.']);
         }
 
         $policyDocument->update([
