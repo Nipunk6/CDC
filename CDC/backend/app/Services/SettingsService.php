@@ -13,6 +13,9 @@ class SettingsService
     /** Defaults used when a key has never been written. */
     public const DEFAULTS = [
         'mail_mode' => 'queued',
+        // P-1.2: most recipients (To + every BCC) portal mail may use per IST day; 0 = no cap. 1800 leaves headroom
+        // under a typical 2,000/day mailbox limit; the admin sets the real value for the production mail account.
+        'mail_daily_recipient_cap' => 1800,
         // Account (S8.1): the institute display name and the account logo ({path, mime} on the private disk).
         'institute_name' => null,
         'account_logo' => null,
