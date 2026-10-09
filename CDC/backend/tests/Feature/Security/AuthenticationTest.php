@@ -247,18 +247,29 @@ class AuthenticationTest extends TestCase
         $this->assertNull(RecruiterEmailVerification::where('email', 'hr@late.test')->value('verified_at'));
     }
 
-    /**
-     * SEC finding (Low): a verification link keeps working after it was used, until it expires.
-     *
-     * Known open finding SEC-014: fails on purpose until fixed (group qa-open; remove the tag when fixed).
-     */
-    #[Group('qa-open')]
+    /** SEC-014 (P-1.12): a verification link works once; the address stays verified. */
     public function test_A3_9_verification_link_is_single_use(): void
     {
         $token = Str::random(64);
         RecruiterEmailVerification::create(['email' => 'hr@twice.test', 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(30)]);
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertSee('verified successfully');
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertDontSee('verified successfully');
+        $this->assertNotNull(RecruiterEmailVerification::where('email', 'hr@twice.test')->value('verified_at'));
+    }
+
+    /** SEC-014 / Phase 1 B7 (P-1.12): once verified, the address stays verified for 24 hours, not just the link's 30 minutes. */
+    public function test_A3_9_verified_address_outlives_the_link_lifetime(): void
+    {
+        config(['services.recruiter_email.dns_check' => false]);
+        $token = Str::random(64);
+        RecruiterEmailVerification::create(['email' => 'hr@slow.qa.test', 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(30)]);
+        $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertSee('verified successfully');
+
+        $this->travel(2)->hours();
+        $this->getJson('/api/auth/company/recruiter-email/verification-status?email=hr@slow.qa.test')->assertOk()->assertJson(['verified' => true]);
+
+        $this->travel(23)->hours();
+        $this->getJson('/api/auth/company/recruiter-email/verification-status?email=hr@slow.qa.test')->assertOk()->assertJson(['verified' => false]);
     }
 
     /** SEC-007 (P-1.10): the emailed link is built from APP_URL, never from the Host / X-Forwarded-Host headers. */

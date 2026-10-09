@@ -22,6 +22,9 @@ use Throwable;
 
 class CompanyAuthController extends Controller
 {
+    /** How long a verified recruiter address stays good for registration after the link is clicked (SEC-014, B7). */
+    private const VERIFIED_EMAIL_VALID_HOURS = 24;
+
     public function __construct(private readonly PortalNotificationService $notificationService)
     {
     }
@@ -296,11 +299,14 @@ class CompanyAuthController extends Controller
             );
         }
 
-        if ($verification->verified_at === null) {
-            $verification->update([
-                'verified_at' => now(),
-            ]);
-        }
+        // SEC-014: the link works once. Its hash is replaced by the hash of a random value nobody holds, so a second
+        // click finds nothing. Phase 1 B7: from now on `expires_at` is the end of the registration window, not the
+        // link's 30 minutes, so a recruiter who takes a while over the form is still verified.
+        $verification->update([
+            'token_hash' => hash('sha256', Str::random(64)),
+            'verified_at' => $verification->verified_at ?? now(),
+            'expires_at' => now()->addHours(self::VERIFIED_EMAIL_VALID_HOURS),
+        ]);
 
         return $this->renderRecruiterVerificationResult(
             status: 'success',
