@@ -7,7 +7,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - Last completed: P-1.1 to P-1.8 (P3-D8 to P3-D15)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P-1.9 SEC-004 (no svg company logos)
+- NEXT ACTION: P-1.10 SEC-007 (verification link from config; trustHosts from env)
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
@@ -25,7 +25,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P-1.6 SEC-009 baseline CSP (no unsafe-eval) + SEC-018 local pdf.js worker
   - [x] P-1.7 SEC-001 next ≥ 16.3.8, next-auth latest v5; remove axios, date-fns, @mui/x-data-grid, smalot/pdfparser
   - [x] P-1.8 SEC-011 composer update laravel/framework symfony/mime symfony/mailer
-  - [ ] P-1.9 SEC-004 no svg logos
+  - [x] P-1.9 SEC-004 no svg logos
   - [ ] P-1.10 SEC-007 verification link from config; trustHosts() from env
   - [ ] P-1.11 CompanySeeder hard-coded password removed
   - [ ] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
@@ -59,3 +59,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-09 · afb252d P-1.8 SEC-011 Laravel 12.69.3, symfony/mime + mailer 7.4.19 (P3-D14)
 - 2026-10-09 · P-1.6 SEC-009 baseline CSP + SEC-018 local pdf.js worker (P3-D15)
 - 2026-10-10 · f77a561 pushed; PR #1 (phase3 → main) opened; master prompt update and owner decisions logged (P3-D16, P3-D17)
+- 2026-10-10 · P-1.9 SEC-004 no SVG company logos (P3-D18)

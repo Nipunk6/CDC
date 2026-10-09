@@ -1189,7 +1189,7 @@ function RegisterForm() {
                     <input
                       hidden
                       type="file"
-                      accept=".jpg,.jpeg,.png,.webp,.svg"
+                      accept=".jpg,.jpeg,.png,.webp"
                       {...register("company_logo")}
                     />
                   </Button>

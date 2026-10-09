@@ -131,7 +131,7 @@ class CompanyProfileController extends Controller
         }
 
         $request->validate([
-            'company_logo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
+            'company_logo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
         $logoPath = $request->file('company_logo')?->store('company-logos', 'public');

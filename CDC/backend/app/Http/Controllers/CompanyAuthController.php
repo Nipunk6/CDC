@@ -38,7 +38,7 @@ class CompanyAuthController extends Controller
             'postal_address' => ['nullable', 'string', 'max:1000'],
             'employee_count' => ['nullable', 'integer', 'min:1', 'max:10000000'],
             'sector' => ['required', 'string', 'max:255'],
-            'company_logo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
+            'company_logo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
 
             'recruiter_name' => ['required', 'string', 'max:255', "regex:/^[\\pL\\s'.-]+$/u"],
             'recruiter_designation' => ['required', 'string', 'max:255'],
