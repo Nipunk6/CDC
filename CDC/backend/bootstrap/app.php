@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // SEC-008: trust the client IP forwarded by the Next.js server only when its signature verifies. Global and
+        // first, so rate limits, logs and audits all see the same IP.
+        $middleware->prepend(\App\Http\Middleware\TrustSignedClientIp::class);
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'active' => \App\Http\Middleware\EnsureUserIsActive::class,

@@ -165,6 +165,8 @@ NEXTAUTH_SECRET=<paste a new random secret here>
 | `NEXT_PUBLIC_API_URL` | The backend API address. It must end with `/api`. |
 | `NEXTAUTH_URL` | The address you open the frontend on. |
 | `NEXTAUTH_SECRET` | The key that protects login sessions. **Generate a new one for every laptop**; never copy the owner's. |
+| `INTERNAL_PROXY_SECRET` | Optional locally. A shared secret the Next.js server uses to sign the real client IP for Laravel (login limits and logs). If you set it, put the **same** value in `backend/.env`. Generate with `openssl rand -hex 32`. |
+| `CLIENT_IP_PROXY_HOPS` | Optional, default `1`. How many reverse proxies in front of Next.js add to `X-Forwarded-For`. |
 
 Generate a secret with this command:
 

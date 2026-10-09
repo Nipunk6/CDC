@@ -235,7 +235,7 @@ class PermissionMatrixTest extends TestCase
         // Same IP, different user: is the bucket per user (expected) or per IP?
         $otherUser = $this->hit('GET', '/api/student/profile', $t2, [], false);
 
-        // 2) Login brute force (no dedicated login limiter exists; only the generic `api` bucket, keyed by IP for guests).
+        // 2) Login brute force against one account from one IP: the per-account backoff answers 429 after 5 failures.
         Cache::flush();
         $loginStatuses = [];
         for ($i = 1; $i <= 61; $i++) {
@@ -1034,7 +1034,7 @@ class PermissionMatrixTest extends TestCase
         $l[] = '- `AppServiceProvider`: `RateLimiter::for(\'api\')` → `Limit::perMinute(60)->by($request->user()?->id ?? $request->ip())`.';
         $l[] = '- `AppServiceProvider`: `RateLimiter::for(\'signed-files\')` → `Limit::perMinute(600)->by($request->ip())`.';
         $l[] = '- `routes/api.php`: every `api/*` route except `/api/resumes/signed/{resume}` sits in `throttle:api`; the signed resume route uses `throttle:signed-files` + `signed`.';
-        $l[] = '- `POST /api/auth/login` has a per-account `login` limiter (10/min per roll number / email, QA F-016) on top of the generic `api` bucket (60/min per IP for guests). `/forgot-password`, `/reset-password`, company registration and alumni outreach share the `api` bucket only. The password broker separately throttles reset-link mails per email (`auth.passwords.users.throttle` = 60 s).';
+        $l[] = '- `POST /api/auth/login` has its own `login-ip` bucket (600/min per client IP; the IP is the signed one forwarded by the Next.js server, SEC-008) and a short per-account backoff in `LoginThrottleService` (5 free failures per account+IP, then 1, 2, 4 … s capped at 60 s; 5+ failing IPs make every IP wait, capped at 30 s). `/forgot-password`, `/reset-password`, company registration and alumni outreach share the `api` bucket. The password broker separately throttles reset-link mails per email (`auth.passwords.users.throttle` = 60 s).';
         $l[] = '- Middleware priority runs `auth:sanctum` before `throttle`, so authenticated routes are keyed by user id; unauthenticated callers on protected routes get 401 before the limiter counts them.';
         $l[] = '';
         $l[] = '## Results';

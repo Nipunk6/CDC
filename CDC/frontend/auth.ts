@@ -1,5 +1,6 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { signedClientIpHeaders } from "@/lib/signedclientip";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "") ?? "http://localhost:8000";
 
@@ -33,12 +34,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
         loginType: { label: "Login Type", type: "text" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const response = await fetch(`${apiBaseUrl}/api/auth/login`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
+            // SEC-008: the real client IP, signed, so Laravel's login limits and logs are per user, not per server.
+            ...(await signedClientIpHeaders(request?.headers)),
           },
           body: JSON.stringify({
             ...(credentials.rollNo

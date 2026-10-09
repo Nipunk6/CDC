@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Models\StudentProfile;
 use App\Models\User;
+use App\Services\LoginThrottleService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,10 @@ use Throwable;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly LoginThrottleService $throttle)
+    {
+    }
+
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -29,13 +34,26 @@ class AuthController extends Controller
             'roll_no.required_without' => 'Enter your roll number.',
         ]);
 
+        // Per-account backoff (SEC-008): checked before the password, so guesses during a backoff are never tried.
+        $identifier = (string) ($validated['roll_no'] ?? $validated['email']);
+        $wait = $this->throttle->retryAfter($identifier, (string) $request->ip());
+        if ($wait !== null) {
+            return response()->json([
+                'message' => sprintf('Too many attempts. Try again in %d second%s.', $wait, $wait === 1 ? '' : 's'),
+            ], 429)->header('Retry-After', (string) $wait);
+        }
+
         $user = $this->resolveLoginUser($validated);
 
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
+            $this->throttle->recordFailure($identifier, (string) $request->ip());
+
             return response()->json([
                 'message' => 'Invalid credentials.',
             ], 422);
         }
+
+        $this->throttle->recordSuccess($identifier, (string) $request->ip());
 
         if ($user->is_active === false) {
             return response()->json([

@@ -61,9 +61,11 @@ Route::middleware('throttle:signed-files')->group(function () {
     Route::get('/branding/logo', [\App\Http\Controllers\BrandingController::class, 'logo']);
 });
 
+// Login has its own 600/min per-IP bucket instead of the 60/min `api` one (SEC-008 / QA N-1).
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login-ip');
+
 Route::middleware('throttle:api')->group(function () {
 Route::prefix('auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
     Route::post('/company/register', [CompanyAuthController::class, 'register']);
