@@ -7,7 +7,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - Last completed: P-1.1 to P-1.8 (P3-D8 to P3-D15)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P-1.11 remove the hard-coded password from CompanySeeder
+- NEXT ACTION: P-1.12 Lows: SEC-014 single-use verification link
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
@@ -27,7 +27,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P-1.8 SEC-011 composer update laravel/framework symfony/mime symfony/mailer
   - [x] P-1.9 SEC-004 no svg logos
   - [x] P-1.10 SEC-007 verification link from config; trustHosts() from env
-  - [ ] P-1.11 CompanySeeder hard-coded password removed
+  - [x] P-1.11 CompanySeeder hard-coded password removed
   - [ ] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
   - [ ] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
   - [ ] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
@@ -61,3 +61,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · f77a561 pushed; PR #1 (phase3 → main) opened; master prompt update and owner decisions logged (P3-D16, P3-D17)
 - 2026-10-10 · P-1.9 SEC-004 no SVG company logos (P3-D18)
 - 2026-10-10 · P-1.10 SEC-007 verification link from APP_URL; TrustHosts with TRUSTED_HOSTS (P3-D19)
+- 2026-10-10 · P-1.11 CompanySeeder password from DEMO_COMPANY_PASSWORD or random (P3-D20)
