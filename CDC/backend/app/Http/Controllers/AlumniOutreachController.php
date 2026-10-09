@@ -6,6 +6,7 @@ use App\Mail\AlumniOutreachConfirmationMail;
 use App\Models\AlumniOutreachSubmission;
 use App\Models\User;
 use App\Services\PortalNotificationService;
+use App\Support\MailCooldown;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -70,11 +71,14 @@ class AlumniOutreachController extends Controller
                 );
             });
 
-        // Send confirmation email to the alumni
-        try {
-            Mail::to($submission->email)->send(new AlumniOutreachConfirmationMail($submission));
-        } catch (\Throwable) {
-            // Silently fail — do not block the success response if mail transport fails
+        // Confirmation email to the alumni: at most one per address per 10 minutes (SEC-010), so the public form
+        // cannot be used to flood someone's inbox. The submission itself is always kept.
+        if (MailCooldown::attempt('alumni-confirmation', (string) $submission->email)) {
+            try {
+                Mail::to($submission->email)->send(new AlumniOutreachConfirmationMail($submission));
+            } catch (\Throwable) {
+                // Silently fail — do not block the success response if mail transport fails
+            }
         }
 
         return response()->json([

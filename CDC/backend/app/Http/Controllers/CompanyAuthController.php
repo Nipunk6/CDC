@@ -9,6 +9,7 @@ use App\Models\EmailLog;
 use App\Models\RecruiterEmailVerification;
 use App\Models\User;
 use App\Services\PortalNotificationService;
+use App\Support\MailCooldown;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -181,13 +182,28 @@ class CompanyAuthController extends Controller
         ]);
 
         $validated = $request->validate([
-            'email' => ['required', 'string', 'email:rfc,dns', 'max:255', 'unique:users,email', 'unique:companies,hr_email'],
+            'email' => ['required', 'string', $this->recruiterEmailRule(), 'max:255', 'unique:users,email', 'unique:companies,hr_email'],
             'name' => ['nullable', 'string', 'max:255'],
         ], [
             'email.unique' => 'The email has already been registered.',
         ]);
 
         $email = $this->normalizeEmail($validated['email']);
+
+        // SEC-010: one link per address per 10 minutes. Checked before the token is rotated, so a repeat request
+        // cannot invalidate the link that was already sent.
+        if (! MailCooldown::attempt('recruiter-verification', $email)) {
+            $wait = max(1, MailCooldown::remaining('recruiter-verification', $email));
+
+            return response()->json([
+                'message' => sprintf(
+                    'A verification link was sent to this address recently. Check your inbox (and spam folder), or request a new link in %d minute%s.',
+                    (int) ceil($wait / 60),
+                    (int) ceil($wait / 60) === 1 ? '' : 's'
+                ),
+            ], 429)->header('Retry-After', (string) $wait);
+        }
+
         $name = trim((string) ($validated['name'] ?? 'Recruiter'));
         $ttlMinutes = max((int) env('COMPANY_RECRUITER_VERIFY_TTL_MINUTES', 30), 5);
         $expiresAt = now()->addMinutes($ttlMinutes);
@@ -224,6 +240,8 @@ class CompanyAuthController extends Controller
                 'sent_at' => now(),
             ]);
         } catch (Throwable $exception) {
+            MailCooldown::release('recruiter-verification', $email); // the send failed: let them try again now
+
             Log::error('Recruiter verification email delivery failed.', [
                 'email' => $email,
                 'error' => $exception->getMessage(),
@@ -293,7 +311,7 @@ class CompanyAuthController extends Controller
     public function recruiterEmailVerificationStatus(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'string', 'email:rfc,dns', 'max:255'],
+            'email' => ['required', 'string', $this->recruiterEmailRule(), 'max:255'],
         ]);
 
         $email = $this->normalizeEmail($validated['email']);
@@ -345,5 +363,11 @@ class CompanyAuthController extends Controller
             'message' => $message,
             'returnUrl' => $returnUrl,
         ]);
+    }
+
+    /** `email:rfc,dns` normally; tests turn the DNS part off (config services.recruiter_email.dns_check). */
+    private function recruiterEmailRule(): string
+    {
+        return config('services.recruiter_email.dns_check', true) ? 'email:rfc,dns' : 'email:rfc';
     }
 }
