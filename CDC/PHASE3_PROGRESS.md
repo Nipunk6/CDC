@@ -3,14 +3,15 @@ Spec: PHASE3 MASTER PROMPT v1.0 (owner's notes 08-10-2026). Branch: `phase3`. De
 Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run build`, `npm run lint`, `npx tsc --noEmit` (from CDC/frontend). Restore `CDC/qa/evidence CDC/security/evidence` after test runs.
 
 ## CURRENT STATE
-- Working on: P-1 Hardening
+- Working on: P-1 Hardening (order: P-1 finish + owner merge → P0 → PU → P1 …, P3-D16)
 - Last completed: P-1.1 to P-1.8 (P3-D8 to P3-D15)
 - Half-done: nothing
 - Pending commands: none
 - NEXT ACTION: P-1.9 SEC-004 (no svg company logos)
 
 ## BLOCKED / QUESTIONS FOR OWNER
-- OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6). Not needed for P-1 or P0.
+- OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
+- SEC-002 secret rotation: owner's answer had both template options; still Open (P3-D17).
 
 ## MILESTONE CHECKLIST
 - [x] Housekeeping: 3 commits on main, branch phase3 (P3-D2)
@@ -28,8 +29,10 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [ ] P-1.10 SEC-007 verification link from config; trustHosts() from env
   - [ ] P-1.11 CompanySeeder hard-coded password removed
   - [ ] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
-  - [ ] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, stop and report
+  - [ ] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
+  - [ ] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
 - [ ] P0 Foundations, login IP log, settings, scheduler
+- [ ] PU Unified UI: left-sidebar AppShell for every portal (frontend-design plugin first; DESIGN_BRIEF.md; Inter via next/font; restyled pageheader.jsx; lib/statuscolors.js replaces 8 getStatusColor copies; before/after screenshots) (P3-D16, P3-D17)
 - [ ] P1 CKEditor 5 + HTML sanitisation (🛑 OD-16)
 - [ ] P2 MIS data, pre-registration, secondary degrees (HTTP driver 🛑 OD-1)
 - [ ] P3 Eligibility & offer rules
@@ -55,3 +58,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-09 · 97c9cf7 P-1.7 SEC-001 next 16.3.8, next-auth beta.32, unused packages removed (P3-D13)
 - 2026-10-09 · afb252d P-1.8 SEC-011 Laravel 12.69.3, symfony/mime + mailer 7.4.19 (P3-D14)
 - 2026-10-09 · P-1.6 SEC-009 baseline CSP + SEC-018 local pdf.js worker (P3-D15)
+- 2026-10-10 · f77a561 pushed; PR #1 (phase3 → main) opened; master prompt update and owner decisions logged (P3-D16, P3-D17)
