@@ -19,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Support\CsvSafe;
 
 class AdminFormReviewController extends Controller
 {
@@ -1720,7 +1721,8 @@ class AdminFormReviewController extends Controller
             }
 
             fputcsv($output, $headers);
-            fputcsv($output, $row);
+            // SEC-006: every value cell is formula-safe, whichever path built it (same column order as before).
+            fputcsv($output, array_map(fn ($cell): string => CsvSafe::cell((string) $cell), $row));
             fclose($output);
         }, $fileName, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -1728,7 +1730,13 @@ class AdminFormReviewController extends Controller
         ]);
     }
 
+    /** One CSV cell, formula-safe (SEC-006): the raw value with a leading apostrophe when it starts like a formula. */
     private function csvValue(mixed $value): string
+    {
+        return CsvSafe::cell($this->csvRawValue($value));
+    }
+
+    private function csvRawValue(mixed $value): string
     {
         if ($value === null) {
             return '';
@@ -1748,7 +1756,7 @@ class AdminFormReviewController extends Controller
             }
 
             if (array_is_list($value)) {
-                return implode('; ', array_map(fn ($item): string => $this->csvValue($item), $value));
+                return implode('; ', array_map(fn ($item): string => $this->csvRawValue($item), $value));
             }
 
             return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
