@@ -838,7 +838,10 @@ class S5ResultsBlockingTest extends TestCase
      * Extra (T5.8 race): two publishes in flight for the same student (double-click / two admins). Both pass the
      * pre-transaction "already has an offer" check; the loser hits the UNIQUE index inside the transaction.
      * Simulated by committing the competing offer row right before this request's own insert.
+     *
+     * Known open finding QA F-017: fails on purpose until fixed (group qa-open; remove the tag when fixed).
      */
+    #[Group('qa-open')]
     public function test_T5_8_x_concurrent_double_publish_loser_gets_clean_4xx_not_500(): void
     {
         $google = $this->floatPosting('jnf', $this->ft, 'Google');

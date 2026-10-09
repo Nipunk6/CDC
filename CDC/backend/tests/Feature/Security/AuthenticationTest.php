@@ -51,7 +51,12 @@ class AuthenticationTest extends TestCase
 
     // ---------------------------------------------------------------- A3.1 / A3.2 enumeration
 
-    /** SEC finding (timing oracle): an unknown account must cost the same as a known one with a wrong password. */
+    /**
+     * SEC finding (timing oracle): an unknown account must cost the same as a known one with a wrong password.
+     *
+     * Known open finding SEC-003: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_A3_1_failed_login_timing_does_not_reveal_whether_the_account_exists(): void
     {
         // Factory first (it caches its own cost-4 hash in a static), then production cost for this account only.
@@ -77,7 +82,12 @@ class AuthenticationTest extends TestCase
         $this->assertLessThan(50, $gap, sprintf('known accounts answer %.0f ms slower than unknown ones (bcrypt only runs for existing users)', $gap));
     }
 
-    /** SEC finding: the second reset request for an existing account answers 429, an unknown account never does. */
+    /**
+     * SEC finding: the second reset request for an existing account answers 429, an unknown account never does.
+     *
+     * Known open finding SEC-003: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_A3_2_forgot_password_responses_are_identical_for_existing_and_unknown_accounts(): void
     {
         StudentProfile::factory()->create(['roll_no' => '22JE0002']);
@@ -100,7 +110,12 @@ class AuthenticationTest extends TestCase
         }
     }
 
-    /** SEC finding (Low): no compromised-password or personal-information check. */
+    /**
+     * SEC finding (Low): no compromised-password or personal-information check.
+     *
+     * Known open finding SEC-012: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_A3_4_common_or_personal_passwords_are_rejected(): void
     {
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0003', 'full_name' => 'Asha Verma']);
@@ -229,7 +244,12 @@ class AuthenticationTest extends TestCase
         $this->assertNull(RecruiterEmailVerification::where('email', 'hr@late.test')->value('verified_at'));
     }
 
-    /** SEC finding (Low): a verification link keeps working after it was used, until it expires. */
+    /**
+     * SEC finding (Low): a verification link keeps working after it was used, until it expires.
+     *
+     * Known open finding SEC-014: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_A3_9_verification_link_is_single_use(): void
     {
         $token = Str::random(64);

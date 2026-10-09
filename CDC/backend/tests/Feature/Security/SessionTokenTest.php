@@ -85,7 +85,10 @@ class SessionTokenTest extends TestCase
     /**
      * SEC finding (Low): the resume link a company receives (applicant list/export) keeps opening the resume for
      * 30 days after the student withdrew — the signed URL is a bearer credential not tied to the application.
+     *
+     * Known open finding SEC-013: fails on purpose until fixed (group qa-open; remove the tag when fixed).
      */
+    #[Group('qa-open')]
     public function test_T4_8_resume_link_handed_to_a_company_dies_when_the_application_is_withdrawn(): void
     {
         Storage::fake('local');

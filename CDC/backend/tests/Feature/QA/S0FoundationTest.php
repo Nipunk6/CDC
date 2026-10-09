@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -247,7 +248,12 @@ class S0FoundationTest extends TestCase
         $this->assertSame(0, Inf::whereIn('status', ['accepted', 'under_review', 'rejected'])->count());
     }
 
-    /** Extra probe found while reading the controller: a null/blank status must be a 4xx, never a 500. */
+    /**
+     * Extra probe found while reading the controller: a null/blank status must be a 4xx, never a 500.
+     *
+     * Known open finding QA F-040: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_T0_4b_extra_blank_status_is_a_validation_error_not_a_server_error(): void
     {
         Mail::fake();

@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -766,6 +767,8 @@ class S6NotificationsTest extends TestCase
     // T6.13 — in-app notification per student-facing trigger
     // ============================================================================================
 
+    /** Known open finding QA F-041: fails on purpose until fixed (group qa-open; remove the tag when fixed). */
+    #[Group('qa-open')]
     public function test_T6_13_in_app_notification_for_every_student_facing_trigger(): void
     {
         $missing = [];

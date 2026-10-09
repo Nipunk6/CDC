@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\Group;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
@@ -478,7 +479,12 @@ class S1StudentAccountsTest extends TestCase
         }
     }
 
-    /** Extra probe: an unrecognised pwd value must not silently become "No". */
+    /**
+     * Extra probe: an unrecognised pwd value must not silently become "No".
+     *
+     * Known open finding QA F-037: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_T1_1c_unrecognised_pwd_value_is_not_silently_coerced(): void
     {
         Mail::fake();
@@ -613,6 +619,8 @@ class S1StudentAccountsTest extends TestCase
 
     // ------------------------------------------------------------------ T1.4a
 
+    /** Known open finding QA F-021: fails on purpose until fixed (group qa-open; remove the tag when fixed). */
+    #[Group('qa-open')]
     public function test_T1_4a_previous_cycle_data_visible_to_student_and_admin(): void
     {
         Mail::fake();
