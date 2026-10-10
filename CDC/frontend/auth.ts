@@ -17,6 +17,10 @@ class StudentOnlyError extends CredentialsSignin {
   code = "student_only";
 }
 
+class MentorOnlyError extends CredentialsSignin {
+  code = "mentor_only";
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Self-hosted (not Vercel): without this, `next start` rejects every request with UntrustedHost.
   trustHost: true,
@@ -75,6 +79,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (loginType === "student" && user.role !== "student") {
           throw new StudentOnlyError();
         }
+        if (loginType === "mentor" && user.role !== "mentor") {
+          throw new MentorOnlyError();
+        }
 
         return {
           id: String(user.id),
@@ -110,7 +117,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub ?? "";
-        session.user.role = token.role as "admin" | "company" | "student";
+        session.user.role = token.role as "admin" | "company" | "student" | "mentor";
         session.user.isSuperAdmin = Boolean(token.isSuperAdmin);
         session.user.companyId = token.companyId as number | null;
         session.user.rollNo = (token.rollNo as string | null | undefined) ?? null;

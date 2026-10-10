@@ -8,13 +8,14 @@ export default auth((req) => {
   const isAdminRoute = pathname.startsWith("/admin");
   const isCompanyRoute = pathname.startsWith("/company") && !isPublicCompanyRegisterRoute;
   const isStudentRoute = pathname.startsWith("/student");
+  const isMentorRoute = pathname.startsWith("/mentor");
   // Fail closed: treat anything without a user as signed-out (Auth.js returns an error object on misconfiguration).
   const session = req.auth?.user ? req.auth : null;
   const role = session?.user?.role;
 
-  if ((isAdminRoute || isCompanyRoute || isStudentRoute) && !session) {
-    // The /auth/login redirector only knows admin vs recruiter, so students go straight to their page.
-    const loginUrl = new URL(isStudentRoute ? "/auth/login/student" : "/auth/login", req.url);
+  if ((isAdminRoute || isCompanyRoute || isStudentRoute || isMentorRoute) && !session) {
+    // The /auth/login redirector only knows admin vs recruiter, so students and mentors go straight to their page.
+    const loginUrl = new URL(isStudentRoute ? "/auth/login/student" : isMentorRoute ? "/auth/login/mentor" : "/auth/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -31,8 +32,12 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
+  if (isMentorRoute && role !== "mentor") {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+
   if (isAuthRoute && session) {
-    const destination = role === "admin" ? "/admin" : role === "student" ? "/student" : "/company";
+    const destination = role === "admin" ? "/admin" : role === "student" ? "/student" : role === "mentor" ? "/mentor" : "/company";
     return NextResponse.redirect(new URL(destination, req.url));
   }
 
@@ -40,5 +45,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/auth/:path*", "/admin/:path*", "/company/:path*", "/student/:path*"],
+  matcher: ["/auth/:path*", "/admin/:path*", "/company/:path*", "/student/:path*", "/mentor/:path*"],
 };

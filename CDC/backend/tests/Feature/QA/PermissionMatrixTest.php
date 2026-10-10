@@ -51,7 +51,7 @@ class PermissionMatrixTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const ACTORS = ['guest', 'STU', 'STU_SUSP', 'CO_A', 'CO_B', 'ADMIN'];
+    private const ACTORS = ['guest', 'STU', 'STU_SUSP', 'CO_A', 'CO_B', 'ADMIN', 'MENTOR'];
 
     private const ACTOR_ROLE = [
         'guest' => null,
@@ -61,6 +61,7 @@ class PermissionMatrixTest extends TestCase
         'CO_B' => 'company',
         'ADMIN' => 'admin',
         'SUPER' => 'admin',
+        'MENTOR' => 'mentor', // Phase 3 P0.2: no mentor routes yet, so a mentor is refused everywhere role-gated
     ];
 
     private const BTECH = StudentProfileFactory::BTECH;
@@ -282,6 +283,7 @@ class PermissionMatrixTest extends TestCase
         $this->users['ADMIN'] = User::factory()->create(['role' => 'admin', 'name' => 'QA Admin A', 'email' => 'qa-admin-a@cdc.test', 'is_super_admin' => false]);
         $this->users['ADMIN_B'] = User::factory()->create(['role' => 'admin', 'name' => 'QA Admin B', 'email' => 'qa-admin-b@cdc.test', 'is_super_admin' => false]);
         $this->users['SUPER'] = User::factory()->create(['role' => 'admin', 'name' => 'QA Super', 'email' => 'qa-super@cdc.test', 'is_super_admin' => true]);
+        $this->users['MENTOR'] = User::factory()->create(['role' => 'mentor', 'name' => 'QA Mentor', 'email' => 'qa-mentor@cdc.test']);
 
         $alpha = Company::create(['name' => 'QA Alpha Corp', 'hr_name' => 'Alpha HR', 'hr_email' => 'hr@alpha.test']);
         $beta = Company::create(['name' => 'QA Beta Ltd', 'hr_name' => 'Beta HR', 'hr_email' => 'hr@beta.test']);
@@ -324,7 +326,7 @@ class PermissionMatrixTest extends TestCase
 
         // --- Tokens (created before any savepoint, so they survive every rollback) --------------------------------
         $this->tokens['guest'] = null;
-        foreach (['STU', 'STU_SUSP', 'CO_A', 'CO_B', 'ADMIN', 'SUPER'] as $actor) {
+        foreach (['STU', 'STU_SUSP', 'CO_A', 'CO_B', 'ADMIN', 'SUPER', 'MENTOR'] as $actor) {
             $this->tokens[$actor] = $this->users[$actor]->createToken('qa')->plainTextToken;
         }
         // Probe-only tokens: one past Sanctum's 7-day expiration, one revoked (row deleted).
@@ -414,7 +416,7 @@ class PermissionMatrixTest extends TestCase
         ])->id;
 
         // --- Notifications (one per actor, plus STU_OTHER's), audit log, policy doc, custom branch ------------------
-        $notifTitles = ['STU' => 'Eligible notice', 'STU_SUSP' => 'Suspended notice', 'CO_A' => 'ALPHA-NOTIF-MARKER', 'CO_B' => 'Beta notice', 'ADMIN' => 'Admin notice', 'STU_OTHER' => 'OTHER-NOTIF-MARKER'];
+        $notifTitles = ['STU' => 'Eligible notice', 'STU_SUSP' => 'Suspended notice', 'CO_A' => 'ALPHA-NOTIF-MARKER', 'CO_B' => 'Beta notice', 'ADMIN' => 'Admin notice', 'MENTOR' => 'Mentor notice', 'STU_OTHER' => 'OTHER-NOTIF-MARKER'];
         foreach ($notifTitles as $key => $title) {
             $this->ids['notif'][$key] = PortalNotification::create(['user_id' => $this->users[$key]->id, 'title' => $title, 'message' => 'QA', 'type' => 'info'])->id;
         }
@@ -664,6 +666,7 @@ class PermissionMatrixTest extends TestCase
         $markers = match ($actor) {
             'STU' => self::STU_OTHER_MARKERS,
             'CO_B' => self::COMPANY_A_MARKERS,
+            'MENTOR' => array_merge(self::STU_OTHER_MARKERS, self::COMPANY_A_MARKERS),
             default => [],
         };
         foreach ($markers as $marker) {
@@ -872,7 +875,7 @@ class PermissionMatrixTest extends TestCase
         $l[] = '## Summary';
         $l[] = '';
         $l[] = sprintf('- Routes × methods enumerated (`api/*`, HEAD skipped): **%d**', count($rows));
-        $l[] = sprintf('- Matrix cells executed: **%d** (6 actors), skipped: **%d**', $matrixCells, count($skipped));
+        $l[] = sprintf('- Matrix cells executed: **%d** (%d actors), skipped: **%d**', $matrixCells, count(self::ACTORS), count($skipped));
         $l[] = sprintf('- Extra cross-tenant / edge probes: **%d**', count($probes));
         $l[] = sprintf('- Total requests judged: **%d**', $cellCount);
         $l[] = sprintf('- Violations: **%d** %s', count($violations), $bySeverity === [] ? '' : '('.implode(', ', array_map(fn ($k, $v) => "{$k}: {$v}", array_keys($bySeverity), $bySeverity)).')');
