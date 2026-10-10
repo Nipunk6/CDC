@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\CycleEnrollment;
 use App\Models\JobPosting;
+use App\Models\Offer;
 use App\Models\PlacementBlock;
 use App\Models\PlacementCycle;
 use App\Models\StudentProfile;
@@ -118,6 +119,53 @@ final class BlockingPolicy
     }
 
     /**
+     * Why this student must not be given an offer for this posting, or null when an offer is allowed (owner rule,
+     * QA F-027 / F-035): they already hold an offer in the posting's placement cycle, or an active block in that cycle
+     * applies to the posting — a debarment or an "all" block always, an internships-only block for an internship
+     * posting (the same rule EligibilityService uses for applying). Admins lift the block or revoke the offer first.
+     */
+    public function offerRefusal(StudentProfile $student, JobPosting $posting, ?int $exceptApplicationId = null): ?string
+    {
+        $held = Offer::query()
+            ->where('student_profile_id', $student->id)
+            ->where('placement_cycle_id', $posting->placement_cycle_id)
+            ->when($exceptApplicationId, fn ($q) => $q->where('application_id', '!=', $exceptApplicationId))
+            ->with('company')
+            ->orderBy('id')
+            ->first();
+
+        if ($held) {
+            return sprintf(
+                '%s already holds an offer in this placement cycle (%s). Revoke that offer first if this is intended.',
+                $student->roll_no,
+                $held->company?->name ?? 'another company'
+            );
+        }
+
+        $block = PlacementBlock::query()
+            ->where('student_profile_id', $student->id)
+            ->where('placement_cycle_id', $posting->placement_cycle_id)
+            ->where('active', true)
+            ->orderBy('id')
+            ->get()
+            ->first(fn (PlacementBlock $b) => $b->reason === 'debarred'
+                || $b->scope === 'all'
+                || ($b->scope === 'internships_only' && $posting->postingType() === 'internship'));
+
+        if ($block) {
+            $why = match ($block->reason) {
+                'debarred' => 'debarred',
+                'offer' => 'an earlier offer',
+                default => 'blocked by the CDC',
+            };
+
+            return sprintf('%s is blocked in this placement cycle (%s). Lift the block first if this is intended.', $student->roll_no, $why);
+        }
+
+        return null;
+    }
+
+    /**
      * Spec B3/Q3.7: the student's other live applications in a cycle a new block covers get the placed-elsewhere flag.
      */
     public function flagLiveApplications(int $studentId, int $cycleId, string $scope, ?int $exceptApplicationId = null): int
@@ -141,6 +189,42 @@ final class BlockingPolicy
         }
 
         return $others->count();
+    }
+
+    /**
+     * After blocks were lifted in some cycles: a live application keeps its placed-elsewhere flag only if an active
+     * block in its cycle still covers it ("all" covers everything, "internships_only" covers internship postings).
+     *
+     * @param  list<int>  $cycleIds
+     */
+    public function reconcileFlags(int $studentId, array $cycleIds): int
+    {
+        $cleared = 0;
+        foreach ($cycleIds as $cycleId) {
+            $scopes = PlacementBlock::query()
+                ->where('student_profile_id', $studentId)
+                ->where('placement_cycle_id', $cycleId)
+                ->where('active', true)
+                ->pluck('scope')
+                ->unique();
+            if ($scopes->contains('all')) {
+                continue;
+            }
+
+            Application::query()
+                ->with('jobPosting')
+                ->where('student_profile_id', $studentId)
+                ->where('placed_elsewhere_flag', true)
+                ->whereHas('jobPosting', fn ($q) => $q->where('placement_cycle_id', $cycleId))
+                ->get()
+                ->reject(fn (Application $a) => $scopes->contains('internships_only') && $a->jobPosting->postingType() === 'internship')
+                ->each(function (Application $a) use (&$cleared): void {
+                    $a->update(['placed_elsewhere_flag' => false]);
+                    $cleared++;
+                });
+        }
+
+        return $cleared;
     }
 
     /** Sentence for the offer mail. */

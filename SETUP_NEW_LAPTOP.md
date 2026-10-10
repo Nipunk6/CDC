@@ -83,6 +83,7 @@ Open `backend/.env` and set these values. Everything else can stay as it is in t
 | `APP_URL` | `http://127.0.0.1:8000` | The backend address. |
 | `FRONTEND_URL` | `http://127.0.0.1:3000` | Used in email links. |
 | `FRONTEND_URLS` | `http://127.0.0.1:3000,http://localhost:3000` | Origins allowed by CORS. |
+| `TRUSTED_HOSTS` | *(empty)* | Optional. Extra host names the API may be reached by, besides the one in `APP_URL` (comma-separated). Only checked in production. |
 | `DB_CONNECTION` | `mysql` | MySQL only. |
 | `DB_HOST` / `DB_PORT` | `127.0.0.1` / `3306` | |
 | `DB_DATABASE` | `iitism_placement` | The database from step 3. |
@@ -165,6 +166,8 @@ NEXTAUTH_SECRET=<paste a new random secret here>
 | `NEXT_PUBLIC_API_URL` | The backend API address. It must end with `/api`. |
 | `NEXTAUTH_URL` | The address you open the frontend on. |
 | `NEXTAUTH_SECRET` | The key that protects login sessions. **Generate a new one for every laptop**; never copy the owner's. |
+| `INTERNAL_PROXY_SECRET` | Optional locally. A shared secret the Next.js server uses to sign the real client IP for Laravel (login limits and logs). If you set it, put the **same** value in `backend/.env`. Generate with `openssl rand -hex 32`. |
+| `CLIENT_IP_PROXY_HOPS` | Optional, default `1`. How many reverse proxies in front of Next.js add to `X-Forwarded-For`. |
 
 Generate a secret with this command:
 

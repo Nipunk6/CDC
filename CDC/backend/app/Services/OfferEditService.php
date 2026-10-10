@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Mail\PortalNoticeMail;
-use App\Models\Application;
 use App\Models\AuditLog;
 use App\Models\Offer;
 use App\Models\PlacementBlock;
@@ -97,7 +96,7 @@ class OfferEditService
                     $created->push($block);
                     $set += $this->policy->flagLiveApplications($offer->student_profile_id, $target['placement_cycle_id'], $target['scope'], $offer->application_id);
                 }
-                $cleared = $this->reconcileFlags($offer->student_profile_id, $lifted->pluck('placement_cycle_id')->unique()->all());
+                $cleared = $this->policy->reconcileFlags($offer->student_profile_id, $lifted->pluck('placement_cycle_id')->unique()->all());
             }
 
             return [
@@ -127,7 +126,7 @@ class OfferEditService
             $lifted = $this->liftBlocks($this->activeBlocks($offer), $admin);
             $studentId = $offer->student_profile_id;
             $offer->delete();
-            $cleared = $this->reconcileFlags($studentId, $lifted->pluck('placement_cycle_id')->unique()->all());
+            $cleared = $this->policy->reconcileFlags($studentId, $lifted->pluck('placement_cycle_id')->unique()->all());
 
             return ['before' => $before, 'lifted' => $lifted, 'flags_cleared' => $cleared];
         });
@@ -252,42 +251,6 @@ class OfferEditService
         }
 
         return $blocks;
-    }
-
-    /**
-     * After blocks were lifted in some cycles: a live application keeps its placed-elsewhere flag only if an active
-     * block in its cycle still covers it ("all" covers everything, "internships_only" covers internship postings).
-     *
-     * @param  list<int>  $cycleIds
-     */
-    private function reconcileFlags(int $studentId, array $cycleIds): int
-    {
-        $cleared = 0;
-        foreach ($cycleIds as $cycleId) {
-            $scopes = PlacementBlock::query()
-                ->where('student_profile_id', $studentId)
-                ->where('placement_cycle_id', $cycleId)
-                ->where('active', true)
-                ->pluck('scope')
-                ->unique();
-            if ($scopes->contains('all')) {
-                continue;
-            }
-
-            Application::query()
-                ->with('jobPosting')
-                ->where('student_profile_id', $studentId)
-                ->where('placed_elsewhere_flag', true)
-                ->whereHas('jobPosting', fn ($q) => $q->where('placement_cycle_id', $cycleId))
-                ->get()
-                ->reject(fn (Application $a) => $scopes->contains('internships_only') && $a->jobPosting->postingType() === 'internship')
-                ->each(function (Application $a) use (&$cleared): void {
-                    $a->update(['placed_elsewhere_flag' => false]);
-                    $cleared++;
-                });
-        }
-
-        return $cleared;
     }
 
     /**

@@ -203,15 +203,24 @@ function AccountTab({ initialName, onMessage, onError }) {
   );
 }
 
-function MailTab({ settings, onSaved, onError }) {
+function MailTab({ settings, quota, onSaved, onError }) {
   const [mailMode, setMailMode] = useState(settings?.mail_mode ?? "queued");
+  const savedCap = String(settings?.mail_daily_recipient_cap ?? "");
+  const [cap, setCap] = useState(savedCap);
   const [busy, setBusy] = useState(false);
+
+  const capNumber = Number(cap);
+  const capValid = cap.trim() !== "" && Number.isInteger(capNumber) && capNumber >= 0 && capNumber <= 100000;
+  const changed = mailMode !== settings.mail_mode || cap !== savedCap;
 
   const save = async () => {
     setBusy(true);
     try {
-      const response = await adminApi("/admin/settings", { method: "PATCH", body: JSON.stringify({ mail_mode: mailMode }) });
-      onSaved(response.settings, response.message);
+      const response = await adminApi("/admin/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ mail_mode: mailMode, mail_daily_recipient_cap: capNumber }),
+      });
+      onSaved(response.settings, response.message, response.mail_quota);
     } catch (e) {
       onError(e instanceof Error ? e.message : "Failed to save settings.");
     } finally {
@@ -255,8 +264,44 @@ function MailTab({ settings, onSaved, onError }) {
           />
         </RadioGroup>
       </FormControl>
+
+      <Typography variant="h6" fontWeight={700} sx={{ mt: 3 }}>
+        Daily recipient limit
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Every address on an email counts, including each student in BCC and the portal&apos;s own To address. When
+        today&apos;s limit is used up, the remaining emails wait until 00:05 IST the next day; nothing is dropped. Set
+        this to the sending mailbox&apos;s daily limit, with some headroom. 0 means no limit.
+      </Typography>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
+        <TextField
+          label="Recipients per day"
+          type="number"
+          size="small"
+          value={cap}
+          onChange={(e) => setCap(e.target.value)}
+          error={!capValid}
+          helperText={capValid ? " " : "Enter a whole number from 0 to 100000."}
+          slotProps={{ htmlInput: { min: 0, max: 100000, step: 1 } }}
+          sx={{ width: { xs: "100%", sm: 220 } }}
+        />
+        {quota && (
+          <Paper variant="outlined" sx={{ px: 2, py: 1.5, flex: 1 }}>
+            <Typography variant="body2" fontWeight={600}>
+              Today ({quota.date}): {quota.used} used
+              {quota.cap > 0 ? ` of ${quota.cap} · ${quota.remaining} remaining` : " · no limit"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {quota.deferred > 0
+                ? `${quota.deferred} recipient(s) are waiting for later days because earlier days were full.`
+                : "No emails are waiting for a later day."}
+            </Typography>
+          </Paper>
+        )}
+      </Stack>
+
       <Stack direction="row" sx={{ mt: 2 }}>
-        <Button variant="contained" onClick={save} disabled={busy || mailMode === settings.mail_mode}>
+        <Button variant="contained" onClick={save} disabled={busy || !changed || !capValid}>
           Save
         </Button>
       </Stack>
@@ -271,6 +316,7 @@ function AdminHub() {
   const tab = TABS.some((t) => t.key === requested) ? requested : "account";
 
   const [settings, setSettings] = useState(null);
+  const [mailQuota, setMailQuota] = useState(null);
   const [branding, setBranding] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -279,6 +325,7 @@ function AdminHub() {
     adminApi("/admin/settings")
       .then((response) => {
         setSettings(response.settings);
+        setMailQuota(response.mail_quota ?? null);
         setBranding(response.branding ?? { display_name: null, has_logo: false });
       })
       .catch((e) => setError(e.message));
@@ -362,8 +409,10 @@ function AdminHub() {
                 {tab === "mail" && (
                   <MailTab
                     settings={settings}
-                    onSaved={(next, message) => {
+                    quota={mailQuota}
+                    onSaved={(next, message, quota) => {
                       setSettings(next);
+                      if (quota) setMailQuota(quota);
                       onMessage(message);
                     }}
                     onError={onError}

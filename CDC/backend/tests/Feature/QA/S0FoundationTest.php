@@ -247,7 +247,10 @@ class S0FoundationTest extends TestCase
         $this->assertSame(0, Inf::whereIn('status', ['accepted', 'under_review', 'rejected'])->count());
     }
 
-    /** Extra probe found while reading the controller: a null/blank status must be a 4xx, never a 500. */
+    /**
+     * Extra probe found while reading the controller: a null/blank status must be a 4xx, never a 500.
+     * QA F-040 fixed in P-1.12: a null/blank status means "draft" on create and "unchanged" on update.
+     */
     public function test_T0_4b_extra_blank_status_is_a_validation_error_not_a_server_error(): void
     {
         Mail::fake();

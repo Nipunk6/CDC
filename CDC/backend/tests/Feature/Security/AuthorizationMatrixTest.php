@@ -110,6 +110,7 @@ class AuthorizationMatrixTest extends TestCase
     // Test 1: route × actor permission matrix
     // ---------------------------------------------------------------------------------------------------------
 
+    /** SEC-022 (= QA F-040) fixed in P-1.12: no policy-document show route; cross-tenant JNF/INF update answers 404 before validating. */
     public function test_every_api_route_enforces_authentication_role_and_tenant_boundaries(): void
     {
         $this->buildFixture();

@@ -56,6 +56,10 @@ return [
 
     'frontend_url' => env('FRONTEND_URL', 'http://127.0.0.1:3000'),
 
+    // SEC-007: host names this API may be reached by, besides APP_URL's host and its subdomains (comma-separated,
+    // exact names). Enforced by Laravel's TrustHosts outside the local and testing environments.
+    'trusted_hosts' => array_values(array_filter(array_map('trim', explode(',', (string) env('TRUSTED_HOSTS', ''))))),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

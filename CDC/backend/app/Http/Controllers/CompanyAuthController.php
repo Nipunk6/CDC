@@ -9,6 +9,7 @@ use App\Models\EmailLog;
 use App\Models\RecruiterEmailVerification;
 use App\Models\User;
 use App\Services\PortalNotificationService;
+use App\Support\MailCooldown;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,9 @@ use Throwable;
 
 class CompanyAuthController extends Controller
 {
+    /** How long a verified recruiter address stays good for registration after the link is clicked (SEC-014, B7). */
+    private const VERIFIED_EMAIL_VALID_HOURS = 24;
+
     public function __construct(private readonly PortalNotificationService $notificationService)
     {
     }
@@ -37,7 +41,7 @@ class CompanyAuthController extends Controller
             'postal_address' => ['nullable', 'string', 'max:1000'],
             'employee_count' => ['nullable', 'integer', 'min:1', 'max:10000000'],
             'sector' => ['required', 'string', 'max:255'],
-            'company_logo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
+            'company_logo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
 
             'recruiter_name' => ['required', 'string', 'max:255', "regex:/^[\\pL\\s'.-]+$/u"],
             'recruiter_designation' => ['required', 'string', 'max:255'],
@@ -181,13 +185,28 @@ class CompanyAuthController extends Controller
         ]);
 
         $validated = $request->validate([
-            'email' => ['required', 'string', 'email:rfc,dns', 'max:255', 'unique:users,email', 'unique:companies,hr_email'],
+            'email' => ['required', 'string', $this->recruiterEmailRule(), 'max:255', 'unique:users,email', 'unique:companies,hr_email'],
             'name' => ['nullable', 'string', 'max:255'],
         ], [
             'email.unique' => 'The email has already been registered.',
         ]);
 
         $email = $this->normalizeEmail($validated['email']);
+
+        // SEC-010: one link per address per 10 minutes. Checked before the token is rotated, so a repeat request
+        // cannot invalidate the link that was already sent.
+        if (! MailCooldown::attempt('recruiter-verification', $email)) {
+            $wait = max(1, MailCooldown::remaining('recruiter-verification', $email));
+
+            return response()->json([
+                'message' => sprintf(
+                    'A verification link was sent to this address recently. Check your inbox (and spam folder), or request a new link in %d minute%s.',
+                    (int) ceil($wait / 60),
+                    (int) ceil($wait / 60) === 1 ? '' : 's'
+                ),
+            ], 429)->header('Retry-After', (string) $wait);
+        }
+
         $name = trim((string) ($validated['name'] ?? 'Recruiter'));
         $ttlMinutes = max((int) env('COMPANY_RECRUITER_VERIFY_TTL_MINUTES', 30), 5);
         $expiresAt = now()->addMinutes($ttlMinutes);
@@ -202,7 +221,8 @@ class CompanyAuthController extends Controller
             ]
         );
 
-        $apiOrigin = rtrim($request->getSchemeAndHttpHost(), '/');
+        // SEC-007: from APP_URL, never from the request's Host / X-Forwarded-Host headers.
+        $apiOrigin = rtrim((string) config('app.url'), '/');
         $verifyUrl = sprintf(
             '%s/api/auth/company/recruiter-email/verify?token=%s',
             $apiOrigin,
@@ -224,6 +244,8 @@ class CompanyAuthController extends Controller
                 'sent_at' => now(),
             ]);
         } catch (Throwable $exception) {
+            MailCooldown::release('recruiter-verification', $email); // the send failed: let them try again now
+
             Log::error('Recruiter verification email delivery failed.', [
                 'email' => $email,
                 'error' => $exception->getMessage(),
@@ -277,11 +299,14 @@ class CompanyAuthController extends Controller
             );
         }
 
-        if ($verification->verified_at === null) {
-            $verification->update([
-                'verified_at' => now(),
-            ]);
-        }
+        // SEC-014: the link works once. Its hash is replaced by the hash of a random value nobody holds, so a second
+        // click finds nothing. Phase 1 B7: from now on `expires_at` is the end of the registration window, not the
+        // link's 30 minutes, so a recruiter who takes a while over the form is still verified.
+        $verification->update([
+            'token_hash' => hash('sha256', Str::random(64)),
+            'verified_at' => $verification->verified_at ?? now(),
+            'expires_at' => now()->addHours(self::VERIFIED_EMAIL_VALID_HOURS),
+        ]);
 
         return $this->renderRecruiterVerificationResult(
             status: 'success',
@@ -293,7 +318,7 @@ class CompanyAuthController extends Controller
     public function recruiterEmailVerificationStatus(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'string', 'email:rfc,dns', 'max:255'],
+            'email' => ['required', 'string', $this->recruiterEmailRule(), 'max:255'],
         ]);
 
         $email = $this->normalizeEmail($validated['email']);
@@ -345,5 +370,11 @@ class CompanyAuthController extends Controller
             'message' => $message,
             'returnUrl' => $returnUrl,
         ]);
+    }
+
+    /** `email:rfc,dns` normally; tests turn the DNS part off (config services.recruiter_email.dns_check). */
+    private function recruiterEmailRule(): string
+    {
+        return config('services.recruiter_email.dns_check', true) ? 'email:rfc,dns' : 'email:rfc';
     }
 }

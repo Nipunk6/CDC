@@ -494,6 +494,8 @@ class S8ExportsTest extends TestCase
     /**
      * Strict reading of "keep Phase 1's one-row CSV untouched" (Q8.3) + "only ADDITIVE columns": every original column
      * keeps its POSITION (new columns appended), so positional consumers (Excel column letters, scripts) keep working.
+     *
+     * QA F-019: fixed in P-1.13 (was in group qa-open until then).
      */
     public function test_T8_3b_phase1_csv_original_columns_keep_their_positions(): void
     {

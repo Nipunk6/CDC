@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class CompanySeeder extends Seeder
 {
@@ -32,6 +33,9 @@ class CompanySeeder extends Seeder
             ],
         ];
 
+        // No password in source (P-1.11): DEMO_COMPANY_PASSWORD from .env, or a random one (use "Forgot password").
+        $password = (string) env('DEMO_COMPANY_PASSWORD', '') ?: Str::password(24);
+
         foreach ($companies as $companyData) {
             $company = Company::updateOrCreate(
                 ['hr_email' => $companyData['hr_email']],
@@ -42,7 +46,7 @@ class CompanySeeder extends Seeder
                 ['email' => $companyData['hr_email']],
                 [
                     'name' => $companyData['hr_name'],
-                    'password' => 'password123',
+                    'password' => $password,
                     'role' => 'company',
                     'company_id' => $company->id,
                 ]

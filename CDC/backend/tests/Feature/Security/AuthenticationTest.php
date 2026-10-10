@@ -3,12 +3,15 @@
 namespace Tests\Feature\Security;
 
 use App\Mail\PasswordResetLinkMail;
+use App\Mail\RecruiterEmailVerificationMail;
 use App\Mail\StudentInvitationMail;
 use App\Models\Company;
 use App\Models\RecruiterEmailVerification;
 use App\Models\StudentProfile;
 use App\Models\User;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Middleware\TrustHosts;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -51,7 +54,12 @@ class AuthenticationTest extends TestCase
 
     // ---------------------------------------------------------------- A3.1 / A3.2 enumeration
 
-    /** SEC finding (timing oracle): an unknown account must cost the same as a known one with a wrong password. */
+    /**
+     * SEC finding (timing oracle): an unknown account must cost the same as a known one with a wrong password.
+     *
+     * Known open finding SEC-003: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_A3_1_failed_login_timing_does_not_reveal_whether_the_account_exists(): void
     {
         // Factory first (it caches its own cost-4 hash in a static), then production cost for this account only.
@@ -77,7 +85,12 @@ class AuthenticationTest extends TestCase
         $this->assertLessThan(50, $gap, sprintf('known accounts answer %.0f ms slower than unknown ones (bcrypt only runs for existing users)', $gap));
     }
 
-    /** SEC finding: the second reset request for an existing account answers 429, an unknown account never does. */
+    /**
+     * SEC finding: the second reset request for an existing account answers 429, an unknown account never does.
+     *
+     * Known open finding SEC-003: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_A3_2_forgot_password_responses_are_identical_for_existing_and_unknown_accounts(): void
     {
         StudentProfile::factory()->create(['roll_no' => '22JE0002']);
@@ -100,7 +113,12 @@ class AuthenticationTest extends TestCase
         }
     }
 
-    /** SEC finding (Low): no compromised-password or personal-information check. */
+    /**
+     * SEC finding (Low): no compromised-password or personal-information check.
+     *
+     * Known open finding SEC-012: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     */
+    #[Group('qa-open')]
     public function test_A3_4_common_or_personal_passwords_are_rejected(): void
     {
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0003', 'full_name' => 'Asha Verma']);
@@ -229,13 +247,59 @@ class AuthenticationTest extends TestCase
         $this->assertNull(RecruiterEmailVerification::where('email', 'hr@late.test')->value('verified_at'));
     }
 
-    /** SEC finding (Low): a verification link keeps working after it was used, until it expires. */
+    /** SEC-014 (P-1.12): a verification link works once; the address stays verified. */
     public function test_A3_9_verification_link_is_single_use(): void
     {
         $token = Str::random(64);
         RecruiterEmailVerification::create(['email' => 'hr@twice.test', 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(30)]);
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertSee('verified successfully');
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertDontSee('verified successfully');
+        $this->assertNotNull(RecruiterEmailVerification::where('email', 'hr@twice.test')->value('verified_at'));
+    }
+
+    /** SEC-014 / Phase 1 B7 (P-1.12): once verified, the address stays verified for 24 hours, not just the link's 30 minutes. */
+    public function test_A3_9_verified_address_outlives_the_link_lifetime(): void
+    {
+        config(['services.recruiter_email.dns_check' => false]);
+        $token = Str::random(64);
+        RecruiterEmailVerification::create(['email' => 'hr@slow.qa.test', 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(30)]);
+        $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertSee('verified successfully');
+
+        $this->travel(2)->hours();
+        $this->getJson('/api/auth/company/recruiter-email/verification-status?email=hr@slow.qa.test')->assertOk()->assertJson(['verified' => true]);
+
+        $this->travel(23)->hours();
+        $this->getJson('/api/auth/company/recruiter-email/verification-status?email=hr@slow.qa.test')->assertOk()->assertJson(['verified' => false]);
+    }
+
+    /** SEC-007 (P-1.10): the emailed link is built from APP_URL, never from the Host / X-Forwarded-Host headers. */
+    public function test_A3_9_verification_link_uses_configured_origin(): void
+    {
+        config(['app.url' => 'https://api.cdc.test', 'services.recruiter_email.dns_check' => false]);
+
+        $this->withHeaders(['Host' => 'evil.example', 'X-Forwarded-Host' => 'evil.example', 'X-Forwarded-Proto' => 'https'])
+            ->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'hr@newco.qa.test', 'name' => 'Asha'])
+            ->assertOk();
+
+        Mail::assertSent(RecruiterEmailVerificationMail::class, fn (RecruiterEmailVerificationMail $m) => str_starts_with($m->verifyUrl, 'https://api.cdc.test/api/auth/company/recruiter-email/verify?token=')
+            && ! str_contains($m->verifyUrl, 'evil'));
+    }
+
+    /** SEC-007 (P-1.10): Laravel's TrustHosts runs globally; trusted hosts are APP_URL's host (+ subdomains) and the exact names in TRUSTED_HOSTS. */
+    public function test_A3_9_trusted_hosts_come_from_config_and_are_exact(): void
+    {
+        $this->assertContains(TrustHosts::class, app(HttpKernel::class)->getGlobalMiddleware());
+
+        config(['app.url' => 'https://api.cdc.test', 'app.trusted_hosts' => ['portal.cdc.test']]);
+        $patterns = app(TrustHosts::class)->hosts();
+        // Symfony's Request::setTrustedHosts() wraps every pattern as {pattern}i.
+        $trusted = fn (string $host): bool => collect($patterns)->contains(fn (?string $p) => $p !== null && preg_match('{'.$p.'}i', $host) === 1);
+
+        $this->assertTrue($trusted('api.cdc.test'));
+        $this->assertTrue($trusted('portal.cdc.test'));
+        $this->assertFalse($trusted('evil.example'));
+        $this->assertFalse($trusted('portal.cdc.test.evil.example'), 'configured names are anchored, not substrings');
+        $this->assertFalse($trusted('xportal.cdc.test'));
     }
 
     // ---------------------------------------------------------------- A3.10 super-admin protection

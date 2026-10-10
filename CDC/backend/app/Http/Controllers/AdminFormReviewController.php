@@ -19,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Support\CsvSafe;
 
 class AdminFormReviewController extends Controller
 {
@@ -270,9 +271,6 @@ class AdminFormReviewController extends Controller
             'backlogs_allowed',
             'gender_filter',
             'slp_requirement',
-            'min_tenth_percent',
-            'min_twelfth_percent',
-            'branch_backlog_caps',
             'graduating_batch',
             'eligible_branches',
             'ctc_min',
@@ -294,6 +292,10 @@ class AdminFormReviewController extends Controller
             'admin_remarks',
             'form_submitted_at',
             'form_accepted_at',
+            // Added after Phase 1: always at the end, so the original columns keep their positions (QA F-019).
+            'min_tenth_percent',
+            'min_twelfth_percent',
+            'branch_backlog_caps',
         ];
 
         $eligibleBranches = $this->flattenSelectedBranches($formData['eligibility'] ?? []);
@@ -386,9 +388,6 @@ class AdminFormReviewController extends Controller
             (isset($formData['globalBacklogs']) ? ((bool) $formData['globalBacklogs'] ? 'Yes' : 'No') : 'No'),
             (string) ($formData['genderFilter'] ?? 'all'),
             (string) ($formData['slpRequirement'] ?? ''),
-            (string) ($formData['minTenthPercent'] ?? ''),
-            (string) ($formData['minTwelfthPercent'] ?? ''),
-            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
             (string) ($formData['graduatingBatch'] ?? $jnf->graduating_batch ?? ''),
             $eligibleBranchesStr,
             (string) ($jnf->ctc_min ?? ''),
@@ -410,6 +409,9 @@ class AdminFormReviewController extends Controller
             (string) ($jnf->admin_remarks ?? ''),
             $this->formatIstTime($submittedAt),
             $this->formatIstTime($acceptedAt),
+            (string) ($formData['minTenthPercent'] ?? ''),
+            (string) ($formData['minTwelfthPercent'] ?? ''),
+            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
         ];
 
         return $this->streamCsvDownload(
@@ -452,9 +454,6 @@ class AdminFormReviewController extends Controller
             'backlogs_allowed',
             'gender_filter',
             'slp_requirement',
-            'min_tenth_percent',
-            'min_twelfth_percent',
-            'branch_backlog_caps',
             'graduating_batch',
             'eligible_branches',
             'stipend',
@@ -465,6 +464,10 @@ class AdminFormReviewController extends Controller
             'admin_remarks',
             'form_submitted_at',
             'form_accepted_at',
+            // Added after Phase 1: always at the end, so the original columns keep their positions (QA F-019).
+            'min_tenth_percent',
+            'min_twelfth_percent',
+            'branch_backlog_caps',
         ];
 
         $eligibleBranches = $this->flattenSelectedBranches($formData['eligibility'] ?? []);
@@ -557,9 +560,6 @@ class AdminFormReviewController extends Controller
             (isset($formData['globalBacklogs']) ? ((bool) $formData['globalBacklogs'] ? 'Yes' : 'No') : 'No'),
             (string) ($formData['genderFilter'] ?? 'all'),
             (string) ($formData['slpRequirement'] ?? ''),
-            (string) ($formData['minTenthPercent'] ?? ''),
-            (string) ($formData['minTwelfthPercent'] ?? ''),
-            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
             (string) ($formData['graduatingBatch'] ?? $inf->graduating_batch ?? ''),
             $eligibleBranchesStr,
             (string) ($inf->stipend ?? ''),
@@ -570,6 +570,9 @@ class AdminFormReviewController extends Controller
             (string) ($inf->admin_remarks ?? ''),
             $this->formatIstTime($submittedAt),
             $this->formatIstTime($acceptedAt),
+            (string) ($formData['minTenthPercent'] ?? ''),
+            (string) ($formData['minTwelfthPercent'] ?? ''),
+            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
         ];
 
         return $this->streamCsvDownload(
@@ -1720,7 +1723,8 @@ class AdminFormReviewController extends Controller
             }
 
             fputcsv($output, $headers);
-            fputcsv($output, $row);
+            // SEC-006: every value cell is formula-safe, whichever path built it (same column order as before).
+            fputcsv($output, array_map(fn ($cell): string => CsvSafe::cell((string) $cell), $row));
             fclose($output);
         }, $fileName, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -1728,7 +1732,13 @@ class AdminFormReviewController extends Controller
         ]);
     }
 
+    /** One CSV cell, formula-safe (SEC-006): the raw value with a leading apostrophe when it starts like a formula. */
     private function csvValue(mixed $value): string
+    {
+        return CsvSafe::cell($this->csvRawValue($value));
+    }
+
+    private function csvRawValue(mixed $value): string
     {
         if ($value === null) {
             return '';
@@ -1748,7 +1758,7 @@ class AdminFormReviewController extends Controller
             }
 
             if (array_is_list($value)) {
-                return implode('; ', array_map(fn ($item): string => $this->csvValue($item), $value));
+                return implode('; ', array_map(fn ($item): string => $this->csvRawValue($item), $value));
             }
 
             return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';

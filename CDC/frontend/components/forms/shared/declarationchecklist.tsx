@@ -62,6 +62,21 @@ const declarationTexts = {
   resultsViaCdc: "Results and communication will be shared through CDC and not directly to students.",
 };
 
+// SEC-019: a policy document's address is used only if it is a web link (http/https, PDFs go through the proxy) or a
+// path on this site; javascript:, data: and any other scheme never reach a link, a download or the viewer.
+function safeDocumentUrl(raw: string): string | null {
+  const value = (raw ?? "").trim();
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\")) return value;
+  return null;
+}
+
+function viewerUrl(raw: string): string | null {
+  const value = safeDocumentUrl(raw);
+  if (value === null) return null;
+  return /^https?:\/\//i.test(value) ? `/api/proxy-pdf?url=${encodeURIComponent(value)}` : value;
+}
+
 export default function DeclarationChecklist({
   formType,
   draftId,
@@ -170,8 +185,8 @@ export default function DeclarationChecklist({
                   <Box
                     key={doc.id}
                     component="a"
-                    href={doc.type === "link" ? doc.url : "#"}
-                    target={doc.type === "link" ? "_blank" : undefined}
+                    href={doc.type === "link" ? (safeDocumentUrl(doc.url) ?? "#") : "#"}
+                    target={doc.type === "link" && safeDocumentUrl(doc.url) ? "_blank" : undefined}
                     rel={doc.type === "link" ? "noopener noreferrer" : undefined}
                     onClick={
                       doc.type === "link"
@@ -282,10 +297,8 @@ export default function DeclarationChecklist({
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <IconButton
               onClick={() => {
-                if (pdfUrl) {
-                  const downloadUrl = pdfUrl.url.startsWith("http")
-                    ? `/api/proxy-pdf?url=${encodeURIComponent(pdfUrl.url)}`
-                    : pdfUrl.url;
+                const downloadUrl = pdfUrl ? viewerUrl(pdfUrl.url) : null;
+                if (pdfUrl && downloadUrl) {
                   const link = document.createElement('a');
                   link.href = downloadUrl;
                   link.download = `${pdfUrl.title || 'document'}.pdf`;
@@ -306,13 +319,9 @@ export default function DeclarationChecklist({
           </Box>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0, bgcolor: "#f5f5f5" }}>
-          {pdfUrl && (
+          {pdfUrl && viewerUrl(pdfUrl.url) && (
             <PdfViewer
-              url={
-                pdfUrl.url.startsWith("http")
-                  ? `/api/proxy-pdf?url=${encodeURIComponent(pdfUrl.url)}`
-                  : pdfUrl.url
-              }
+              url={viewerUrl(pdfUrl.url) as string}
               onReachBottom={handleReachBottom}
             />
           )}

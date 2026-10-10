@@ -333,11 +333,11 @@ export default function CompanyProfilePage() {
       return;
     }
 
-    // Client-side validation: file extension (jpg, jpeg, png, webp, svg)
-    const allowedExtensions = ["jpg", "jpeg", "png", "webp", "svg"];
+    // Client-side validation: file extension (jpg, jpeg, png, webp; no svg, SEC-004)
+    const allowedExtensions = ["jpg", "jpeg", "png", "webp"];
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
     if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
-      setError("Logo upload failed: Invalid file format. Only JPG, JPEG, PNG, WEBP, and SVG are allowed.");
+      setError("Logo upload failed: Invalid file format. Only JPG, JPEG, PNG and WEBP are allowed.");
       e.target.value = "";
       return;
     }
@@ -367,7 +367,7 @@ export default function CompanyProfilePage() {
                 {!logoUrl && <BusinessIcon fontSize="large" />}
               </Avatar>
               <input
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,.webp"
                 style={{ display: "none" }}
                 id="logo-upload-button"
                 type="file"

@@ -200,7 +200,8 @@ class SAAuditCoverageTest extends TestCase
         $policy = PolicyDocument::create(['title' => 'QA Policy', 'type' => 'link', 'url' => 'https://example.com/policy.pdf', 'is_visible_jnf' => true, 'is_visible_inf' => true]);
         $branchChange = BranchChangeRequest::create(['student_profile_id' => $s[2]->id, 'current_branch' => 'Computer Science & Engineering', 'requested_branch' => 'Mining Engineering', 'reason' => 'Interest', 'status' => 'pending']);
         $proposal = ShortlistProposal::create(['job_posting_id' => $p->id, 'posting_round_id' => $pR1->id, 'proposed_by' => $companyUser->id, 'kind' => 'shortlist', 'payload' => [['roll_no' => $s[3]->roll_no]], 'status' => 'pending']);
-        $block = PlacementBlock::create(['student_profile_id' => $s[4]->id, 'placement_cycle_id' => $ft->id, 'scope' => 'all', 'reason' => 'manual', 'remark' => 'QA', 'active' => true, 'blocked_by' => $this->adminB->id]);
+        // On s6, not s4: the Re-add route below brings s4 back, and a blocked student is no longer re-added (QA F-035).
+        $block = PlacementBlock::create(['student_profile_id' => $s[6]->id, 'placement_cycle_id' => $ft->id, 'scope' => 'all', 'reason' => 'manual', 'remark' => 'QA', 'active' => true, 'blocked_by' => $this->adminB->id]);
 
         // Superset parity fixtures.
         $note = StudentNote::create(['student_profile_id' => $s[1]->id, 'author_id' => $this->adminB->id, 'body' => 'Called about the PPT']);

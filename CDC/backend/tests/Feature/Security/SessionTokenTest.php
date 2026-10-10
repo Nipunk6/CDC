@@ -39,6 +39,29 @@ class SessionTokenTest extends TestCase
         $this->bearer($token)->getJson('/api/auth/user')->assertUnauthorized();
     }
 
+    /**
+     * SEC-015 (P-1.12): the NextAuth session must not outlive the 7-day API token. Static check of the frontend source:
+     * the lifetime constant equals Sanctum's expiration, auth.ts uses it as the session maxAge and expires the session
+     * from it, and the admin and company API helpers sign out on 401.
+     */
+    public function test_T4_5_frontend_session_does_not_outlive_api_token(): void
+    {
+        $frontend = base_path('../frontend');
+        $lifetime = @file_get_contents($frontend.'/lib/sessionlifetime.js');
+        $this->assertIsString($lifetime, 'frontend/lib/sessionlifetime.js exists');
+        $this->assertMatchesRegularExpression('/export const API_TOKEN_LIFETIME_SECONDS = (\d+);/', $lifetime);
+        preg_match('/export const API_TOKEN_LIFETIME_SECONDS = (\d+);/', $lifetime, $m);
+        $this->assertSame(config('sanctum.expiration') * 60, (int) $m[1], 'same lifetime as config/sanctum.php');
+
+        $auth = file_get_contents($frontend.'/auth.ts');
+        $this->assertStringContainsString('maxAge: API_TOKEN_LIFETIME_SECONDS', $auth);
+        $this->assertStringContainsString('apiTokenExpired(', $auth);
+
+        foreach (['lib/adminapi.ts', 'lib/companyapi.ts', 'lib/adminupload.js', 'lib/companydownload.js'] as $helper) {
+            $this->assertStringContainsString('signOutOnUnauthorized(', file_get_contents($frontend.'/'.$helper), $helper);
+        }
+    }
+
     public function test_T4_2_logout_revokes_the_token_for_every_role(): void
     {
         foreach (['admin', 'company', 'student'] as $role) {
@@ -85,7 +108,10 @@ class SessionTokenTest extends TestCase
     /**
      * SEC finding (Low): the resume link a company receives (applicant list/export) keeps opening the resume for
      * 30 days after the student withdrew — the signed URL is a bearer credential not tied to the application.
+     *
+     * Known open finding SEC-013: fails on purpose until fixed (group qa-open; remove the tag when fixed).
      */
+    #[Group('qa-open')]
     public function test_T4_8_resume_link_handed_to_a_company_dies_when_the_application_is_withdrawn(): void
     {
         Storage::fake('local');

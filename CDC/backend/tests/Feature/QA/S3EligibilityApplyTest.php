@@ -887,6 +887,7 @@ class S3EligibilityApplyTest extends TestCase
         $this->assertSame(1, Application::query()->where('job_posting_id', $posting->id)->where('student_profile_id', $student->id)->count());
     }
 
+    /** QA F-017: fixed in P-1.13 (was in group qa-open until then). */
     public function test_T3_6c_double_submit_race_window_is_a_clean_4xx_not_500(): void
     {
         // Simulates the second of two concurrent submits: the other request's row appears after this request's

@@ -61,9 +61,11 @@ Route::middleware('throttle:signed-files')->group(function () {
     Route::get('/branding/logo', [\App\Http\Controllers\BrandingController::class, 'logo']);
 });
 
+// Login has its own 600/min per-IP bucket instead of the 60/min `api` one (SEC-008 / QA N-1).
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login-ip');
+
 Route::middleware('throttle:api')->group(function () {
 Route::prefix('auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
     Route::post('/company/register', [CompanyAuthController::class, 'register']);
@@ -300,7 +302,8 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->prefix('admin')->gr
         Route::put('/infs/{inf}', [AdminFormBuilderController::class, 'updateInf']);
     });
 
-    Route::apiResource('/policy-documents', PolicyDocumentController::class);
+    // SEC-022 / F-040: the controller has no show(); the admin list carries every field.
+    Route::apiResource('/policy-documents', PolicyDocumentController::class)->except('show');
 });
 
 Route::middleware(['auth:sanctum', 'active', 'role:company'])->get('/company/ping', function () {
