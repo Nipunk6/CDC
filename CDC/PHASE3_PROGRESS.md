@@ -3,16 +3,24 @@ Spec: PHASE3 MASTER PROMPT v1.0 (owner's notes 08-10-2026). Branch: `phase3`. De
 Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run build`, `npm run lint`, `npx tsc --noEmit` (from CDC/frontend). Restore `CDC/qa/evidence CDC/security/evidence` after test runs.
 
 ## CURRENT STATE
-- Working on: P0 Foundations (branch `phase3-p0`, stacked on `phase3`; PR #1 was still open on GitHub when P0 started, P3-D30)
-- Last completed: P-1.1 to P-1.13 and the P-1 close-out (P3-D8 to P3-D29)
+- Working on: nothing; P0 is finished and committed on branch `phase3-p0` (stacked on `phase3`; not pushed). STOPPED for the owner's "go" (next milestone: PU)
+- Last completed: P0.1 to P0.6 (P3-D30 to P3-D35)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P0.4 login log (migration S6, LoginLogService, purge command)
+- NEXT ACTION: wait for the owner's "go"; then PU.0 (invoke the frontend-design plugin, write `CDC/docs/ui/DESIGN_BRIEF.md`) and PU.1 (before screenshots)
 
 ## BLOCKED / QUESTIONS FOR OWNER
-- OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
+- OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for PU.
+- PR #1 (`phase3` → `main`) still showed as open on GitHub on 2026-10-10 although the owner wrote that it was merged (P3-D30). `phase3-p0` is not pushed; say if a pull request is wanted.
 - SEC-002 secret rotation: owner's answer had both template options; still Open (P3-D17).
 - `qa-open` still holds 4 security tests that were never approved for fixing: SEC-003 (A3_1, A3_2), SEC-012 (A3_4), SEC-013 (T4_8). Fix them as P-1.14, or leave them tagged? (P3-D28)
+
+## HANDOVER NOTES (running list, collected for P13.5)
+- **Cron:** production needs `* * * * * cd <CDC/backend> && php artisan schedule:run >> /dev/null 2>&1`. Scheduled now: `placement:open-scheduled` (every minute), `login-logs:purge` (02:30 IST, retention from Settings → Login Log). Locally: `php artisan schedule:work`.
+- **Queue worker:** `php artisan queue:work` under a supervisor (deferred mail waits for it even in Immediate mode).
+- **New migrations (P0):** `…000040` mentor role, `…000041` Phase 3 settings, `…000042` login_logs. Run `php artisan migrate`.
+- **Client IP in the login log:** correct only when `INTERNAL_PROXY_SECRET` is the same in backend and frontend and Next.js sits behind a reverse proxy that appends the real address to `X-Forwarded-For`; otherwise every row shows the Next.js server's address (or "Forwarded address not verified").
+- From P-1 (see `SECURITY_REPORT.md` §12.4): `TRUSTED_HOSTS`, `expose_php=Off`, `/storage/*` headers, HSTS.
 
 ## MILESTONE CHECKLIST
 - [x] Housekeeping: 3 commits on main, branch phase3 (P3-D2)
@@ -32,13 +40,13 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
   - [x] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
   - [x] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
-- [ ] P0 Foundations, login IP log, settings, scheduler
+- [x] P0 Foundations, login IP log, settings, scheduler (done 2026-10-10, branch `phase3-p0`; evidence `qa/evidence/p0_gates.txt`)
   - [x] P0.1 preconditions; progress file with every task ID; decisions logged; Phase 3 notice in both CLAUDE.md files
   - [x] P0.2 migration S1 (mentor role) + frontend role plumbing (types, auth.ts, proxy.ts, /auth/login/mentor)
   - [x] P0.3 migration S22 (settings defaults) + Settings sections: Reminders, Mail pool, Rules, Login logs, MIS API
-  - [ ] P0.4 migration S6 + LoginLogService (every attempt, every role, trusted IP) + `login-logs:purge`
-  - [ ] P0.5 admin Login Log page; student "Last login" line; audited export
-  - [ ] P0.6 scheduler registration + cron documented
+  - [x] P0.4 migration S6 + LoginLogService (every attempt, every role, trusted IP) + `login-logs:purge`
+  - [x] P0.5 admin Login Log page; student "Last login" line; audited export
+  - [x] P0.6 scheduler registration + cron documented
 - [ ] PU Unified UI: left-sidebar AppShell for every portal (P3-D16, P3-D17)
   - [ ] PU.0 frontend-design plugin → `CDC/docs/ui/DESIGN_BRIEF.md`
   - [ ] PU.1 before screenshots (390, 1440) → `CDC/qa/screenshots/pu-before/`
@@ -100,3 +108,5 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · owner: "merged PR #1, go for P0". GitHub showed PR #1 still open; P0 started on `phase3-p0` (P3-D30). P0.1: task IDs for P0–P13 added, CLAUDE.md notices
 - 2026-10-10 · P0.2 mentor role: migration …000040, auth types/auth.ts/proxy.ts, /auth/login/mentor, /mentor holding page, MENTOR actor in both matrices (P3-D32)
 - 2026-10-10 · P0.3 Phase 3 settings: SettingsService defaults + secrets, migration …000041, AdminSettingsController, Settings tabs (P3-D33)
+- 2026-10-10 · P0.4–P0.6 login log: migration …000042, LoginLogService, AuthController, AdminLoginLogController (+export), login-logs:purge on the scheduler, admin Login Log page, student last-login line, cron documented (P3-D34)
+- 2026-10-10 · P0 Definition of Done run (P3-D35): evidence qa/evidence/p0_gates.txt, screenshots qa/screenshots/p3/p0/

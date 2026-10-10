@@ -69,6 +69,7 @@ const baseNavItems: NavItem[] = [
   { label: "Excel Templates", href: "/admin/excel-templates", group: "Reports" },
   { label: "Notifications", href: "/admin/notifications", group: "Administration" },
   { label: "Audit Log", href: "/admin/audit-logs", group: "Administration" },
+  { label: "Login Log", href: "/admin/login-logs", group: "Administration" },
   { label: "Settings", href: "/admin/settings", group: "Administration" },
 ];
 

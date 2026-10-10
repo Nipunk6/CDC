@@ -49,6 +49,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             Accept: "application/json",
             // SEC-008: the real client IP, signed, so Laravel's login limits and logs are per user, not per server.
             ...(await signedClientIpHeaders(request?.headers)),
+            // Phase 3 N4: the browser's own name for the login log (this call is made by the Next.js server).
+            ...(request?.headers?.get("user-agent") ? { "X-CDC-Client-User-Agent": request.headers.get("user-agent") as string } : {}),
           },
           body: JSON.stringify({
             ...(credentials.rollNo

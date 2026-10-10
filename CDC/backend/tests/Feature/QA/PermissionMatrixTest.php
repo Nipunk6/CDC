@@ -531,7 +531,8 @@ class PermissionMatrixTest extends TestCase
 
         preg_match_all('/\{(\w+)\??\}/', $route->uri(), $m);
         $action = $route->getActionName();
-        $superOnly = str_contains($action, 'AdminManagementController');
+        // Super-admin-only actions: managing admins, and (Phase 3 P0.5) downloading the login log.
+        $superOnly = str_contains($action, 'AdminManagementController') || str_ends_with($action, 'AdminLoginLogController@export');
 
         $class = match (true) {
             ! $auth => $signed ? 'public(signed)' : 'public',

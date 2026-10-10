@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\StudentProfile;
+use App\Services\LoginLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +12,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StudentProfileController extends Controller
 {
+    public function __construct(private readonly LoginLogService $loginLog)
+    {
+    }
+
     public function show(Request $request): JsonResponse
     {
         $student = $this->student($request);
@@ -104,7 +109,12 @@ class StudentProfileController extends Controller
             ->with(['placementCycle:id,name', 'offer:id,offer_type'])
             ->get();
 
+        // Phase 3 N4: the student's own last sign-ins (time and address), never anyone else's.
+        [$lastLogin, $previousLogin] = $student->user ? $this->loginLog->lastTwo($student->user) : [null, null];
+
         return $student->toArray() + [
+            'last_login' => $lastLogin,
+            'previous_login' => $previousLogin,
             'active_blocks' => $blocks->map(fn ($b) => [
                 'id' => $b->id,
                 'placement_cycle' => $b->placementCycle?->name,
