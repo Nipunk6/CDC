@@ -7,11 +7,12 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - Last completed: P-1.1 to P-1.8 (P3-D8 to P3-D15)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P-1.13 QA leftovers — remaining qa-open items: F-017, F-019, F-021, F-037, F-041
+- NEXT ACTION: P-1 close-out (full re-run, SECURITY_REPORT §12, QA_REPORT re-test note, push, update PR #1 description, stop)
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
 - SEC-002 secret rotation: owner's answer had both template options; still Open (P3-D17).
+- `qa-open` still holds 4 security tests that were never approved for fixing: SEC-003 (A3_1, A3_2), SEC-012 (A3_4), SEC-013 (T4_8). Fix them as P-1.14, or leave them tagged? (P3-D28)
 
 ## MILESTONE CHECKLIST
 - [x] Housekeeping: 3 commits on main, branch phase3 (P3-D2)
@@ -29,7 +30,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P-1.10 SEC-007 verification link from config; trustHosts() from env
   - [x] P-1.11 CompanySeeder hard-coded password removed
   - [x] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
-  - [ ] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
+  - [x] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
   - [ ] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
 - [ ] P0 Foundations, login IP log, settings, scheduler
 - [ ] PU Unified UI: left-sidebar AppShell for every portal (frontend-design plugin first; DESIGN_BRIEF.md; Inter via next/font; restyled pageheader.jsx; lib/statuscolors.js replaces 8 getStatusColor copies; before/after screenshots) (P3-D16, P3-D17)
@@ -69,3 +70,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P-1.12e SEC-022 + F-040 ownership before validation, one 404 body, policy-documents without show, blank status (P3-D25); qa-open down to 10
 - 2026-10-10 · P-1.13a F-027 + F-035 offer guard: no offer or Re-add for a student who holds an offer or an applicable block in the cycle (P3-D26)
 - 2026-10-10 · P-1.13b F-022, F-026, F-028, F-033 fixed; F-018 confirmed already fixed (P3-D27)
+- 2026-10-10 · P-1.13c F-017, F-019, F-021, F-037, F-041 fixed; qa-open down to 4 security tests (P3-D28)

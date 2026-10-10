@@ -19,7 +19,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
-use PHPUnit\Framework\Attributes\Group;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -496,9 +495,8 @@ class S8ExportsTest extends TestCase
      * Strict reading of "keep Phase 1's one-row CSV untouched" (Q8.3) + "only ADDITIVE columns": every original column
      * keeps its POSITION (new columns appended), so positional consumers (Excel column letters, scripts) keep working.
      *
-     * Known open finding QA F-019: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     * QA F-019: fixed in P-1.13 (was in group qa-open until then).
      */
-    #[Group('qa-open')]
     public function test_T8_3b_phase1_csv_original_columns_keep_their_positions(): void
     {
         [$jnf, $inf] = $this->acceptedForms();

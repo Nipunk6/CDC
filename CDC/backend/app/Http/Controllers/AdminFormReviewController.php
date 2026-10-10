@@ -271,9 +271,6 @@ class AdminFormReviewController extends Controller
             'backlogs_allowed',
             'gender_filter',
             'slp_requirement',
-            'min_tenth_percent',
-            'min_twelfth_percent',
-            'branch_backlog_caps',
             'graduating_batch',
             'eligible_branches',
             'ctc_min',
@@ -295,6 +292,10 @@ class AdminFormReviewController extends Controller
             'admin_remarks',
             'form_submitted_at',
             'form_accepted_at',
+            // Added after Phase 1: always at the end, so the original columns keep their positions (QA F-019).
+            'min_tenth_percent',
+            'min_twelfth_percent',
+            'branch_backlog_caps',
         ];
 
         $eligibleBranches = $this->flattenSelectedBranches($formData['eligibility'] ?? []);
@@ -387,9 +388,6 @@ class AdminFormReviewController extends Controller
             (isset($formData['globalBacklogs']) ? ((bool) $formData['globalBacklogs'] ? 'Yes' : 'No') : 'No'),
             (string) ($formData['genderFilter'] ?? 'all'),
             (string) ($formData['slpRequirement'] ?? ''),
-            (string) ($formData['minTenthPercent'] ?? ''),
-            (string) ($formData['minTwelfthPercent'] ?? ''),
-            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
             (string) ($formData['graduatingBatch'] ?? $jnf->graduating_batch ?? ''),
             $eligibleBranchesStr,
             (string) ($jnf->ctc_min ?? ''),
@@ -411,6 +409,9 @@ class AdminFormReviewController extends Controller
             (string) ($jnf->admin_remarks ?? ''),
             $this->formatIstTime($submittedAt),
             $this->formatIstTime($acceptedAt),
+            (string) ($formData['minTenthPercent'] ?? ''),
+            (string) ($formData['minTwelfthPercent'] ?? ''),
+            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
         ];
 
         return $this->streamCsvDownload(
@@ -453,9 +454,6 @@ class AdminFormReviewController extends Controller
             'backlogs_allowed',
             'gender_filter',
             'slp_requirement',
-            'min_tenth_percent',
-            'min_twelfth_percent',
-            'branch_backlog_caps',
             'graduating_batch',
             'eligible_branches',
             'stipend',
@@ -466,6 +464,10 @@ class AdminFormReviewController extends Controller
             'admin_remarks',
             'form_submitted_at',
             'form_accepted_at',
+            // Added after Phase 1: always at the end, so the original columns keep their positions (QA F-019).
+            'min_tenth_percent',
+            'min_twelfth_percent',
+            'branch_backlog_caps',
         ];
 
         $eligibleBranches = $this->flattenSelectedBranches($formData['eligibility'] ?? []);
@@ -558,9 +560,6 @@ class AdminFormReviewController extends Controller
             (isset($formData['globalBacklogs']) ? ((bool) $formData['globalBacklogs'] ? 'Yes' : 'No') : 'No'),
             (string) ($formData['genderFilter'] ?? 'all'),
             (string) ($formData['slpRequirement'] ?? ''),
-            (string) ($formData['minTenthPercent'] ?? ''),
-            (string) ($formData['minTwelfthPercent'] ?? ''),
-            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
             (string) ($formData['graduatingBatch'] ?? $inf->graduating_batch ?? ''),
             $eligibleBranchesStr,
             (string) ($inf->stipend ?? ''),
@@ -571,6 +570,9 @@ class AdminFormReviewController extends Controller
             (string) ($inf->admin_remarks ?? ''),
             $this->formatIstTime($submittedAt),
             $this->formatIstTime($acceptedAt),
+            (string) ($formData['minTenthPercent'] ?? ''),
+            (string) ($formData['minTwelfthPercent'] ?? ''),
+            implode('; ', $this->flattenBacklogCaps($formData['eligibility'] ?? [])),
         ];
 
         return $this->streamCsvDownload(
