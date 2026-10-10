@@ -3,11 +3,11 @@ Spec: PHASE3 MASTER PROMPT v1.0 (owner's notes 08-10-2026). Branch: `phase3`. De
 Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run build`, `npm run lint`, `npx tsc --noEmit` (from CDC/frontend). Restore `CDC/qa/evidence CDC/security/evidence` after test runs.
 
 ## CURRENT STATE
-- Working on: nothing; P-1 Hardening is finished and pushed to PR #1. STOPPED for the owner's review (order: owner merges PR #1 → P0 → PU → P1 …, P3-D16)
+- Working on: P0 Foundations (branch `phase3-p0`, stacked on `phase3`; PR #1 was still open on GitHub when P0 started, P3-D30)
 - Last completed: P-1.1 to P-1.13 and the P-1 close-out (P3-D8 to P3-D29)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: wait for the owner to review and merge PR #1 and to say "go"; then P0.1 (append the Phase 3 notice to both CLAUDE.md files, P0 checklist)
+- NEXT ACTION: P0.2 mentor role (migration S1, frontend role plumbing)
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
@@ -33,20 +33,45 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
   - [x] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
 - [ ] P0 Foundations, login IP log, settings, scheduler
-- [ ] PU Unified UI: left-sidebar AppShell for every portal (frontend-design plugin first; DESIGN_BRIEF.md; Inter via next/font; restyled pageheader.jsx; lib/statuscolors.js replaces 8 getStatusColor copies; before/after screenshots) (P3-D16, P3-D17)
+  - [ ] P0.1 preconditions; progress file with every task ID; decisions logged; Phase 3 notice in both CLAUDE.md files
+  - [ ] P0.2 migration S1 (mentor role) + frontend role plumbing (types, auth.ts, proxy.ts, /auth/login/mentor)
+  - [ ] P0.3 migration S22 (settings defaults) + Settings sections: Reminders, Mail pool, Rules, Login logs, MIS API
+  - [ ] P0.4 migration S6 + LoginLogService (every attempt, every role, trusted IP) + `login-logs:purge`
+  - [ ] P0.5 admin Login Log page; student "Last login" line; audited export
+  - [ ] P0.6 scheduler registration + cron documented
+- [ ] PU Unified UI: left-sidebar AppShell for every portal (P3-D16, P3-D17)
+  - [ ] PU.0 frontend-design plugin → `CDC/docs/ui/DESIGN_BRIEF.md`
+  - [ ] PU.1 before screenshots (390, 1440) → `CDC/qa/screenshots/pu-before/`
+  - [ ] PU.2 `components/shared/appshell.jsx` (sidebar, rail, drawer; slim top bar; restyled `pageheader.jsx`; Inter via next/font)
+  - [ ] PU.3 admin, company, student shells on AppShell; `lib/nav/{admin,company,student,mentor}.js`
+  - [ ] PU.4 page polish: stat tiles, tables, `lib/statuscolors.js` (replaces 8 `getStatusColor` copies), forms
+  - [ ] PU.5 public pages (landing, login) in the same visual language
 - [ ] P1 CKEditor 5 + HTML sanitisation (🛑 OD-16)
+  - [ ] P1.1 `HtmlSanitizer` · P1.2 clean at every rich-text write + `html:resanitize` · P1.3 CKEditor in `richtexteditor.tsx` (🛑) · P1.4 `safehtml.jsx` · P1.5 CSP check
 - [ ] P2 MIS data, pre-registration, secondary degrees (HTTP driver 🛑 OD-1)
+  - [ ] P2.1 migrations S2–S5 · P2.2 `MisImportService` · P2.3 `MisClient` (fake + disabled http) · P2.4 accounts as a separate step · P2.5 double-major visibility · P2.6 old add-student paths write staging
 - [ ] P3 Eligibility & offer rules
+  - [ ] P3.1 international field · P3.2 `EligibilityService` rules + parity test · P3.3 `BatchChangeService` · P3.4 PPO decline + exclusions (S20) · P3.5 cycle labels
 - [ ] P4 Notice board, archive, dashboard v2, walk-ins
+  - [ ] P4.1 notice board · P4.2 Open/Closed archive · P4.3 walk-ins (S12) · P4.4 student dashboard v2
 - [ ] P5 Deadline reminders
+  - [ ] P5.1 `DeadlineReminderService::dueSlots` · P5.2 `reminders:dispatch` (S11) · P5.3 settings UI + per-posting toggle
 - [ ] P6 Shortlist categories & attendance uploads
+  - [ ] P6.1 Placed/Blocked vs Unplaced tabs + exports · P6.2 round attendance upload · P6.3 event attendance (S15)
 - [ ] P7 Juniors: events dashboard + experience survey
+  - [ ] P7.1 `student.access` middleware · P7.2 events by year · P7.3 survey, moderation, junior feed (S16)
 - [ ] P8 Mentors (🛑 OD-6)
+  - [ ] P8.1 mentor accounts + mapping (S13) · P8.2 mentor shell and pages · P8.3 `ResumeReviewService` (S14)
 - [ ] P9 Mail infrastructure: Zimbra pool, delivery log, tags, composer, company outreach
+  - [ ] P9.1 migrations S7–S10, S17, S18 · P9.2 sender pool · P9.3 delivery log · P9.4 mail senders page · P9.5 tag groups · P9.6 composer · P9.7 company outreach + invitation tracker
 - [ ] P10 SCPT & SPOC + double-major analytics
+  - [ ] P10.1 SCPT registry (S19) · P10.2 SPOC assignment · P10.3 analytics additions
 - [ ] P11 UI polish + mobile
+  - [ ] P11.0 design review with the brief · P11.1 dashboards · P11.2 four-width check + F-023
 - [ ] P12 Alumni portal (🛑 OD-12)
+  - [ ] P12.1 "Graduate batch" · P12.2 alumni area
 - [ ] P13 Final QA, security regression, handover
+  - [ ] P13.1 traceability N1–N31 · P13.2 full re-run + Phase 3 E2E · P13.3 security delta (§13) · P13.4 `Phase3DemoSeeder` · P13.5 handover
 
 ## CHANGELOG
 - 2026-10-09 · housekeeping commits 8336756, 3a9d4e2, d53ceb8 on main; branch phase3
@@ -72,3 +97,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P-1.13b F-022, F-026, F-028, F-033 fixed; F-018 confirmed already fixed (P3-D27)
 - 2026-10-10 · P-1.13c F-017, F-019, F-021, F-037, F-041 fixed; qa-open down to 4 security tests (P3-D28)
 - 2026-10-10 · P-1 close-out: gates re-run (710 passed; matrices 0 violations; e2e 9/9 on the production build; both audits pass), SECURITY_REPORT §12, QA_REPORT §11.8, evidence `qa/evidence/retest_p1_gates.txt` (P3-D29)
+- 2026-10-10 · owner: "merged PR #1, go for P0". GitHub showed PR #1 still open; P0 started on `phase3-p0` (P3-D30). P0.1: task IDs for P0–P13 added, CLAUDE.md notices

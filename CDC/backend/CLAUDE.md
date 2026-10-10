@@ -1,1 +1,3 @@
 Phase 2 in progress. Before any work read /PHASE2_IMPLEMENTATION_SPEC.md Part A, /PHASE2_PROGRESS.md. New frontend code is JavaScript (.jsx). DB is MySQL only. Admin actions must be audit-logged.
+
+Phase 3 in progress. Before any work read the PHASE 3 MASTER PROMPT Part A (owner's notes of 08-10-2026, re-issued 10-10-2026), /CDC/PHASE3_PROGRESS.md and /CDC/PHASE3_DECISIONS.md. Rules: new frontend files are .js/.jsx; MySQL only; every admin or mentor change is audit-logged; reuse EligibilityService, BlockingPolicy, MailDispatchService, AuditService, SettingsService, ExportService, SpreadsheetImportService; never send real mail in development (MAIL_MAILER=log); commit as the CDC account with no AI trailer; the owner merges pull requests.
