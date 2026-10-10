@@ -7,6 +7,7 @@ use App\Models\ApplicationRoundResult;
 use App\Models\JobPosting;
 use App\Models\PostingRound;
 use App\Services\AuditService;
+use App\Services\BlockingPolicy;
 use App\Services\PipelineService;
 use App\Services\SpreadsheetImportService;
 use App\Services\StakeholderNotifier;
@@ -23,7 +24,8 @@ class AdminPipelineController extends Controller
         private readonly AuditService $audit,
         private readonly PipelineService $pipeline,
         private readonly SpreadsheetImportService $spreadsheets,
-        private readonly StakeholderNotifier $stakeholders
+        private readonly StakeholderNotifier $stakeholders,
+        private readonly BlockingPolicy $blocking
     ) {
     }
 
@@ -338,6 +340,11 @@ class AdminPipelineController extends Controller
 
         if (! $row || $row->result !== 'rejected' || ! $row->isPublished()) {
             return response()->json(['message' => 'Only a candidate whose rejection in this stage was published can be re-added.'], 422);
+        }
+
+        // QA F-035 (owner rule): a student who already holds an offer in this cycle, or is blocked, is not brought back.
+        if ($refusal = $this->blocking->offerRefusal($application->studentProfile, $jobPosting, $application->id)) {
+            return response()->json(['message' => $refusal], 422);
         }
 
         $before = $row->only(['result', 'is_addendum', 'published_at', 'remark']);

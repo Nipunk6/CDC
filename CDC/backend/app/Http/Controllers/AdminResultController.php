@@ -9,11 +9,13 @@ use App\Models\JobPosting;
 use App\Models\Offer;
 use App\Models\PlacementBlock;
 use App\Models\PostingRound;
+use App\Models\StudentProfile;
 use App\Services\AuditService;
 use App\Services\BlockingPolicy;
 use App\Services\MailDispatchService;
 use App\Services\PipelineService;
 use App\Services\PortalNotificationService;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -69,6 +71,8 @@ class AdminResultController extends Controller
                 'published' => $row->isPublished(),
                 'placed_elsewhere_flag' => $row->application->placed_elsewhere_flag,
                 'active_blocks' => ($activeBlocks[$student->id] ?? collect())->map(fn (PlacementBlock $b) => $b->message())->values(),
+                // Why this candidate cannot be offered right now (QA F-035); the console disables their row.
+                'offer_refusal' => $row->application->offer ? null : $this->policy->offerRefusal($student, $jobPosting, $row->application_id),
                 'offer' => $row->application->offer,
                 'suggested' => [
                     'offer_type' => $defaultType,
@@ -168,10 +172,20 @@ class AdminResultController extends Controller
 
         // Offers only for the final round's pool or people already decided in it (no skipping earlier rejections, D84).
         $poolIds = $this->pipeline->pool($final)->pluck('id')->all();
-        $finalIds = $final->results()->pluck('application_id')->all();
+        $finalRows = $final->results()->get()->keyBy('application_id');
+        $finalIds = $finalRows->keys()->all();
         foreach ($applications as $application) {
             if (! in_array($application->id, $poolIds, true) && ! in_array($application->id, $finalIds, true)) {
                 return response()->json(['message' => "{$application->studentProfile->roll_no} did not reach the final stage. Use Re-add on the stage where they were not selected."], 422);
+            }
+            // QA F-027: a rejection already published in the final stage is undone only through Re-add (company told, audited).
+            $finalRow = $finalRows->get($application->id);
+            if ($finalRow && $finalRow->result === 'rejected' && $finalRow->isPublished()) {
+                return response()->json(['message' => "{$application->studentProfile->roll_no} was not selected in the final stage. Use Re-add on that stage first."], 422);
+            }
+            // QA F-035 (owner rule): never a second offer in the cycle, never an offer through an active block.
+            if ($refusal = $this->policy->offerRefusal($application->studentProfile, $jobPosting, $application->id)) {
+                return response()->json(['message' => $refusal], 422);
             }
         }
 
@@ -191,6 +205,14 @@ class AdminResultController extends Controller
             $blocks = collect();
             $flagged = 0;
             $blockScopes = [];
+
+            // Same check again under a row lock, so two announcements at the same moment cannot both offer one student.
+            StudentProfile::query()->whereIn('id', $applications->pluck('student_profile_id'))->lockForUpdate()->get();
+            foreach ($applications as $application) {
+                if ($refusal = $this->policy->offerRefusal($application->studentProfile, $jobPosting, $application->id)) {
+                    throw new HttpResponseException(response()->json(['message' => $refusal], 422));
+                }
+            }
 
             foreach ($validated['selections'] as $selection) {
                 /** @var Application $application */

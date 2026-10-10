@@ -86,7 +86,8 @@ export default function AdminResultsPage({ params }) {
       [...response.selected, ...response.waitlisted].forEach((item) => {
         if (!item.offer) {
           // A published selection without an offer (its offer was revoked, S2) is not re-offered unless ticked again.
-          next[item.application_id] = { ...rowFrom(item, response.offer_types), include: item.result === "selected" && !item.published };
+          // A candidate the API would refuse (holds an offer in this cycle, or blocked: QA F-035) is never pre-ticked.
+          next[item.application_id] = { ...rowFrom(item, response.offer_types), include: item.result === "selected" && !item.published && !item.offer_refusal };
         }
       });
       setRows(next);
@@ -156,7 +157,11 @@ export default function AdminResultsPage({ params }) {
           {item.offer ? (
             <Chip size="small" color="success" label="Offered" />
           ) : (
-            <Checkbox checked={Boolean(row?.include)} onChange={(e) => update(item.application_id, { include: e.target.checked })} />
+            <Checkbox
+              checked={Boolean(row?.include)}
+              disabled={Boolean(item.offer_refusal)}
+              onChange={(e) => update(item.application_id, { include: e.target.checked })}
+            />
           )}
         </TableCell>
         <TableCell>
@@ -176,6 +181,11 @@ export default function AdminResultsPage({ params }) {
               <Chip key={m} size="small" color="warning" label={m} />
             ))}
           </Stack>
+          {item.offer_refusal && !item.offer && (
+            <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5 }}>
+              Cannot be offered: {item.offer_refusal}
+            </Typography>
+          )}
         </TableCell>
         {item.offer ? (
           <TableCell colSpan={3}>
