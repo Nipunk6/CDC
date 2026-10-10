@@ -70,6 +70,7 @@ class AdminResultController extends Controller
                 'result' => $row->result,
                 'published' => $row->isPublished(),
                 'placed_elsewhere_flag' => $row->application->placed_elsewhere_flag,
+                'used_unverified_resume' => (bool) $row->application->used_unverified_resume, // QA F-022
                 'active_blocks' => ($activeBlocks[$student->id] ?? collect())->map(fn (PlacementBlock $b) => $b->message())->values(),
                 // Why this candidate cannot be offered right now (QA F-035); the console disables their row.
                 'offer_refusal' => $row->application->offer ? null : $this->policy->offerRefusal($student, $jobPosting, $row->application_id),

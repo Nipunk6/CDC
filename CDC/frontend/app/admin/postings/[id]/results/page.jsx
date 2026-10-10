@@ -177,6 +177,7 @@ export default function AdminResultsPage({ params }) {
           </Typography>
           <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
             {item.placed_elsewhere_flag && <Chip size="small" color="error" label="🚩 Placed elsewhere" />}
+            {item.used_unverified_resume && <Chip size="small" color="warning" label="⚠ Unverified resume" />}
             {(item.active_blocks ?? []).map((m) => (
               <Chip key={m} size="small" color="warning" label={m} />
             ))}

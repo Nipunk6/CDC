@@ -191,6 +191,42 @@ final class BlockingPolicy
         return $others->count();
     }
 
+    /**
+     * After blocks were lifted in some cycles: a live application keeps its placed-elsewhere flag only if an active
+     * block in its cycle still covers it ("all" covers everything, "internships_only" covers internship postings).
+     *
+     * @param  list<int>  $cycleIds
+     */
+    public function reconcileFlags(int $studentId, array $cycleIds): int
+    {
+        $cleared = 0;
+        foreach ($cycleIds as $cycleId) {
+            $scopes = PlacementBlock::query()
+                ->where('student_profile_id', $studentId)
+                ->where('placement_cycle_id', $cycleId)
+                ->where('active', true)
+                ->pluck('scope')
+                ->unique();
+            if ($scopes->contains('all')) {
+                continue;
+            }
+
+            Application::query()
+                ->with('jobPosting')
+                ->where('student_profile_id', $studentId)
+                ->where('placed_elsewhere_flag', true)
+                ->whereHas('jobPosting', fn ($q) => $q->where('placement_cycle_id', $cycleId))
+                ->get()
+                ->reject(fn (Application $a) => $scopes->contains('internships_only') && $a->jobPosting->postingType() === 'internship')
+                ->each(function (Application $a) use (&$cleared): void {
+                    $a->update(['placed_elsewhere_flag' => false]);
+                    $cleared++;
+                });
+        }
+
+        return $cleared;
+    }
+
     /** Sentence for the offer mail. */
     public function describe(string $scope): string
     {

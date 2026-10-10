@@ -206,20 +206,31 @@ class AdminPipelineController extends Controller
         $presentSet = array_flip(array_map(fn ($r) => strtoupper(trim($r)), $present));
 
         $marked = 0;
+        $markedPresent = 0;
         foreach ($found as $roll => $application) {
             $row = ApplicationRoundResult::query()->firstOrNew([
                 'application_id' => $application->id,
                 'posting_round_id' => $postingRound->id,
             ]);
-            $row->attendance = isset($presentSet[$roll]) ? 'yes' : 'no';
+            $attendance = isset($presentSet[$roll]) ? 'yes' : 'no';
+            // QA F-033: once this student's result in the stage is published, their attendance is part of the record.
+            if ($row->exists && $row->isPublished()) {
+                if ($row->attendance !== $attendance) {
+                    $unknown[] = ['roll_no' => $roll, 'reason' => 'Result already published for this stage; attendance not changed.'];
+                }
+
+                continue;
+            }
+            $row->attendance = $attendance;
             $row->result ??= 'pending';
             $row->save();
             $marked++;
+            $markedPresent += $attendance === 'yes' ? 1 : 0;
         }
 
         $this->audit->log($request, 'round.attendance', $postingRound, null, [
-            'present' => count(array_intersect_key($found, $presentSet)),
-            'absent' => $marked - count(array_intersect_key($found, $presentSet)),
+            'present' => $markedPresent,
+            'absent' => $marked - $markedPresent,
         ]);
 
         return response()->json([

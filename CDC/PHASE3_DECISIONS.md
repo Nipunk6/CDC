@@ -74,3 +74,10 @@ Spec: PHASE3 MASTER PROMPT v1.0 (owner's notes of 08-10-2026), as pasted by the 
   - Admin override stays possible and audited: lift the block (`block.remove`) or revoke the other offer (`offer.revoke`), then announce.
   - `SAAuditCoverageTest` fixture: the manual block moved from student 4 to student 6, because the Re-add route under test brings student 4 back.
   - Tests: `QA/FixF027F035OfferGuardTest` (4). Full gate 699 passed.
+- 2026-10-10 · P3-D27 · **P-1.13b the other QA fixes approved in the owner's QA follow-up.**
+  - **F-018 already fixed** (parity work, "L9"): a results upload reports a row listed more than once and counts it once; `S4PipelineTest::test_T4_2b_admin_upload_xlsx_reports_every_bad_row` passes and was never in `qa-open`. No change.
+  - **F-022:** `results/prepare` rows carry `used_unverified_resume`; the results console shows the "⚠ Unverified resume" chip (same label as the Applicants tab).
+  - **F-026:** rejecting a resume (also one approved earlier) sets `used_unverified_resume` on the **live** (`applied`) applications that use it; withdrawn ones are left alone; approving again clears it. `S1StudentAccountsTest::test_T1_7_extra_…` recorded the old behaviour and now asserts the new one.
+  - **F-028:** `AdminBlockController::destroy` lifts the block and reconciles "placed elsewhere" flags inside one transaction, through `BlockingPolicy::reconcileFlags()` — the rule `OfferEditService` already used for an offer revoke, moved to the policy so there is one implementation: a remaining `all` block keeps the flags, a remaining `internships_only` block keeps them on internship postings only (before, any remaining block kept every flag).
+  - **F-033:** `AdminPipelineController::attendance` no longer changes attendance on a row whose result in that stage is published; such rolls come back in `errors` ("Result already published for this stage; attendance not changed."). Re-sending the same value is not an error. The audit row now counts what was actually written. This is the lock P6.2 must respect.
+  - Tests: `QA/FixApprovedS4LeftoversTest` (5). Full gate 704 passed.

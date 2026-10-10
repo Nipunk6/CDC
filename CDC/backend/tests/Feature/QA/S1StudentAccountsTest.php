@@ -920,9 +920,8 @@ class S1StudentAccountsTest extends TestCase
     }
 
     /**
-     * NEEDS-OWNER-DECISION (recorded behaviour): B3 sets the flag at apply time when the chosen resume is not approved and
-     * clears it when the resume becomes approved; it does not say what happens when an APPROVED resume attached to a live
-     * application is later REJECTED. Today the application stays unflagged, so admins see no warning for it.
+     * QA F-026 (owner approved, fixed in P-1.13): when an APPROVED resume attached to a live application is later
+     * REJECTED, the application is flagged as using an unverified resume again, so admins see the warning.
      */
     public function test_T1_7_extra_rejecting_an_already_approved_attached_resume_records_behaviour(): void
     {
@@ -942,8 +941,8 @@ class S1StudentAccountsTest extends TestCase
         $this->patchJson("/api/admin/resumes/{$approved->id}", ['status' => 'rejected', 'admin_remark' => 'Fake internship listed'])->assertOk();
 
         $this->assertSame('rejected', $approved->fresh()->status);
-        $this->assertFalse(Application::sole()->used_unverified_resume, 'recorded: the live application is NOT re-flagged when its resume is rejected');
-        $this->getJson("/api/admin/postings/{$posting->id}/pipeline")->assertJsonPath('applications.0.used_unverified_resume', false)
+        $this->assertTrue(Application::sole()->used_unverified_resume, 'the live application is re-flagged when its resume is rejected (F-026)');
+        $this->getJson("/api/admin/postings/{$posting->id}/pipeline")->assertJsonPath('applications.0.used_unverified_resume', true)
             ->assertJsonPath('applications.0.resume.status', 'rejected');
     }
 

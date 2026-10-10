@@ -7,7 +7,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - Last completed: P-1.1 to P-1.8 (P3-D8 to P3-D15)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P-1.13 QA leftovers — remaining: F-022, F-026, F-028, F-033, F-018, then F-017, F-019, F-021, F-037, F-041
+- NEXT ACTION: P-1.13 QA leftovers — remaining qa-open items: F-017, F-019, F-021, F-037, F-041
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
@@ -68,3 +68,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P-1.12d SEC-019 https-only policy links, guarded download/viewer URLs (P3-D24)
 - 2026-10-10 · P-1.12e SEC-022 + F-040 ownership before validation, one 404 body, policy-documents without show, blank status (P3-D25); qa-open down to 10
 - 2026-10-10 · P-1.13a F-027 + F-035 offer guard: no offer or Re-add for a student who holds an offer or an applicable block in the cycle (P3-D26)
+- 2026-10-10 · P-1.13b F-022, F-026, F-028, F-033 fixed; F-018 confirmed already fixed (P3-D27)
