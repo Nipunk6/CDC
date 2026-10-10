@@ -7,7 +7,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - Last completed: P-1.1 to P-1.13 and the P-1 close-out (P3-D8 to P3-D29)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P0.3 settings defaults (S22) and the new Settings sections
+- NEXT ACTION: P0.4 login log (migration S6, LoginLogService, purge command)
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
@@ -35,7 +35,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - [ ] P0 Foundations, login IP log, settings, scheduler
   - [x] P0.1 preconditions; progress file with every task ID; decisions logged; Phase 3 notice in both CLAUDE.md files
   - [x] P0.2 migration S1 (mentor role) + frontend role plumbing (types, auth.ts, proxy.ts, /auth/login/mentor)
-  - [ ] P0.3 migration S22 (settings defaults) + Settings sections: Reminders, Mail pool, Rules, Login logs, MIS API
+  - [x] P0.3 migration S22 (settings defaults) + Settings sections: Reminders, Mail pool, Rules, Login logs, MIS API
   - [ ] P0.4 migration S6 + LoginLogService (every attempt, every role, trusted IP) + `login-logs:purge`
   - [ ] P0.5 admin Login Log page; student "Last login" line; audited export
   - [ ] P0.6 scheduler registration + cron documented
@@ -99,3 +99,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P-1 close-out: gates re-run (710 passed; matrices 0 violations; e2e 9/9 on the production build; both audits pass), SECURITY_REPORT §12, QA_REPORT §11.8, evidence `qa/evidence/retest_p1_gates.txt` (P3-D29)
 - 2026-10-10 · owner: "merged PR #1, go for P0". GitHub showed PR #1 still open; P0 started on `phase3-p0` (P3-D30). P0.1: task IDs for P0–P13 added, CLAUDE.md notices
 - 2026-10-10 · P0.2 mentor role: migration …000040, auth types/auth.ts/proxy.ts, /auth/login/mentor, /mentor holding page, MENTOR actor in both matrices (P3-D32)
+- 2026-10-10 · P0.3 Phase 3 settings: SettingsService defaults + secrets, migration …000041, AdminSettingsController, Settings tabs (P3-D33)
