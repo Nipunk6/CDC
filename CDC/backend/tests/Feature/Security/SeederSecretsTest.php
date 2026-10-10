@@ -10,8 +10,8 @@ use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
- * P-1.11: CompanySeeder carried a hard-coded password (the same weak value as an admin password, SEC_PROGRESS D-08).
- * Demo company users now get DEMO_COMPANY_PASSWORD, or a random password when it is not set.
+ * P-1.11: CompanySeeder carried a hard-coded password (SEC_PROGRESS D-08). Demo company users now get
+ * DEMO_COMPANY_PASSWORD, or a random password when it is not set.
  */
 #[Group('security')]
 class SeederSecretsTest extends TestCase

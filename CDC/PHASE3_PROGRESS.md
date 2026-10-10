@@ -3,11 +3,11 @@ Spec: PHASE3 MASTER PROMPT v1.0 (owner's notes 08-10-2026). Branch: `phase3`. De
 Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run build`, `npm run lint`, `npx tsc --noEmit` (from CDC/frontend). Restore `CDC/qa/evidence CDC/security/evidence` after test runs.
 
 ## CURRENT STATE
-- Working on: P-1 Hardening (order: P-1 finish + owner merge → P0 → PU → P1 …, P3-D16)
-- Last completed: P-1.1 to P-1.8 (P3-D8 to P3-D15)
+- Working on: nothing; P-1 Hardening is finished and pushed to PR #1. STOPPED for the owner's review (order: owner merges PR #1 → P0 → PU → P1 …, P3-D16)
+- Last completed: P-1.1 to P-1.13 and the P-1 close-out (P3-D8 to P3-D29)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: P-1 close-out (full re-run, SECURITY_REPORT §12, QA_REPORT re-test note, push, update PR #1 description, stop)
+- NEXT ACTION: wait for the owner to review and merge PR #1 and to say "go"; then P0.1 (append the Phase 3 notice to both CLAUDE.md files, P0 checklist)
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for P-1, P0 or PU.
@@ -17,7 +17,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 ## MILESTONE CHECKLIST
 - [x] Housekeeping: 3 commits on main, branch phase3 (P3-D2)
 - [x] Known open findings grouped `qa-open` (P3-D3)
-- [ ] P-1 Hardening
+- [x] P-1 Hardening (done 2026-10-10; PR #1 awaits the owner's review and merge)
   - [x] P-1.1 SEC-008 + QA N-1 signed forwarded IP, login 600/min per IP, per-account backoff
   - [x] P-1.2 QA daily mail-recipient cap (MailDispatchService, BCC counted, release to next day, settings used/remaining)
   - [x] P-1.3 SEC-010 per-recipient cooldown (recruiter verification link, alumni confirmation)
@@ -31,7 +31,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P-1.11 CompanySeeder hard-coded password removed
   - [x] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
   - [x] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
-  - [ ] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
+  - [x] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
 - [ ] P0 Foundations, login IP log, settings, scheduler
 - [ ] PU Unified UI: left-sidebar AppShell for every portal (frontend-design plugin first; DESIGN_BRIEF.md; Inter via next/font; restyled pageheader.jsx; lib/statuscolors.js replaces 8 getStatusColor copies; before/after screenshots) (P3-D16, P3-D17)
 - [ ] P1 CKEditor 5 + HTML sanitisation (🛑 OD-16)
@@ -71,3 +71,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P-1.13a F-027 + F-035 offer guard: no offer or Re-add for a student who holds an offer or an applicable block in the cycle (P3-D26)
 - 2026-10-10 · P-1.13b F-022, F-026, F-028, F-033 fixed; F-018 confirmed already fixed (P3-D27)
 - 2026-10-10 · P-1.13c F-017, F-019, F-021, F-037, F-041 fixed; qa-open down to 4 security tests (P3-D28)
+- 2026-10-10 · P-1 close-out: gates re-run (710 passed; matrices 0 violations; e2e 9/9 on the production build; both audits pass), SECURITY_REPORT §12, QA_REPORT §11.8, evidence `qa/evidence/retest_p1_gates.txt` (P3-D29)

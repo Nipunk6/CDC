@@ -1,0 +1,51 @@
+## P-1 "Hardening" close-out gates (2026-10-10, branch phase3, after commit 5219b0f)
+Local stack: MySQL `iitism_placement`, backend `MAIL_MAILER=log` on :8000, Next.js 16.3.8. No real mail sent.
+
+BACKEND
+- php artisan test --exclude-group=qa-open (in-memory SQLite)      710 passed (10,339 assertions)
+- php artisan test --group=qa-open                                  4 failed BY DESIGN (open, not approved):
+    AuthenticationTest::test_A3_1 (SEC-003 login timing), ::test_A3_2 (SEC-003 forgot-password throttle),
+    ::test_A3_4_common_or_personal_passwords_are_rejected (SEC-012), SessionTokenTest::test_T4_8_resume_link…withdrawn (SEC-013)
+- Authorisation matrix (Security/AuthorizationMatrixTest)           267 route×methods, 1,848 cells (8 actors) + 36 probes = 1,884 requests:
+                                                                    0 violations, 0 5xx (was 6 violations)   → security/evidence/retest_p1_authorization_matrix.md
+- Permission matrix (QA/PermissionMatrixTest)                       1,386 cells (6 actors) + 36 probes = 1,422 requests:
+                                                                    0 violations, 0 5xx (was 5 violations)   → qa/evidence/retest_p1_permission_matrix.md
+- composer audit --locked --no-dev                                  exit 0 (no advisories in production packages)
+- composer audit --locked                                           3 low advisories, all symfony/yaml (dev-only, required by laravel/sail)
+
+MYSQL (throwaway database iitism_placement_p1_retest, dropped afterwards)
+- php artisan migrate:fresh --seed                                  OK, 64 migrations
+- db:seed --class=Phase2DemoSeeder                                  OK: 120 students, 8 offers, 16 blocks, 0 queued jobs
+- Tests of the P-1 changes run on MySQL (11 classes)                36 passed (430 assertions)
+    FixF027F035OfferGuardTest, FixApprovedS4LeftoversTest, ExistenceOracleTest, LoginThrottleTest, MailAbuseTest, HeadersTest,
+    UploadTest, PolicyDocumentTest, ExportInjectionTest, SeederSecretsTest, MailDailyCapTest
+- Whole suite on MySQL (--exclude-group=qa-open)                    702 passed, 8 failed. All 8 are assumptions inside the tests, not product faults:
+    FixF004BlockingTest ×2, S1 T1_6c, S7 T7_1, StudentDirectoryTest (suspend enrolment), VerifyFixStudentListsTest (m5)
+        → assertSame on arrays whose key/row order MySQL returns differently (JSON columns, rows read without ORDER BY)
+    S3 T3_8 → hard-codes event id 1 (MySQL does not reset AUTO_INCREMENT between tests)
+    S5 T5_8 → the test itself runs SQLite's `PRAGMA index_list`
+
+FRONTEND
+- npx tsc --noEmit                                                  clean
+- npm run lint                                                      0 errors, 76 warnings (unchanged)
+- npm run test:unit                                                 10 passed (safecallbackurl 3, csp 4, sessionlifetime 3)
+- npm run build (next 16.3.8, production)                           exit 0
+- npm audit --omit=dev --audit-level=high                           exit 0 (2 low: quill, via react-quill-new; left to the OD-16 editor decision)
+
+E2E (Playwright 1.58.2 against the PRODUCTION build on :3000, headless Chromium already installed; the bundled build 1208 is not installed)
+- tests/e2e/smoke.spec.ts                                           4 passed (incl. CSP header on 5 public pages, no CSP violation)
+- tests/e2e/student-portal.spec.js                                  5 passed (incl. SEC-005 callbackUrl; demo student + demo admin from Phase2DemoSeeder)
+    The admin test's selector was stale since the parity work (it clicked "New Job Profile"); fixed to pick a real job profile.
+- Production CSP header                                             present, no 'unsafe-eval'
+
+LIVE CHECKS (headless browser / curl; the built-in browser's sign-ins were not touched)
+- SEC-007  APP_ENV=production on a temporary port: own host 200, `Host: evil.example` 400, X-Forwarded-Host alone ignored
+- SEC-008  JS-signed client IP accepted by Laravel (HMAC interop), unsigned request falls back to the socket IP
+- SEC-009/018  JNF Declaration step renders the policy PDF in pdf.js: 6 pages, bundled worker, no CSP violation;
+               Chrome's own PDF viewer renders in an iframe and from a blob: URL
+- SEC-015  session cookie lifetime 7.00 days; after the API token was deleted server-side, /admin/postings signed out to /auth/login/admin
+- SEC-016  /api/branding: nosniff, X-Frame-Options DENY, Referrer-Policy no-referrer, no X-Powered-By; authenticated call: no-store
+- Mail cap Settings → Mail shows "Today: 0 used of 1800 · 1800 remaining"
+- API pass as demo admin (MySQL): /auth/user, /admin/dashboard, /admin/postings, /admin/students, /admin/settings, /admin/policy-documents,
+  /admin/blocks → 200; student detail has `placement_blocks`; results/prepare rows carry `offer_refusal` and `used_unverified_resume`;
+  GET /admin/policy-documents/1 → 405 (was 500); missing JNF → {"message":"JNF not found."}

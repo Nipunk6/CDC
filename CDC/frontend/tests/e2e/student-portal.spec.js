@@ -67,7 +67,8 @@ test.describe("Admin posting smoke", () => {
     await signIn(page, "admin", "Email Address", admin.email, admin.password);
 
     await page.goto("/admin/postings");
-    const firstPosting = page.locator('a[href^="/admin/postings/"]').first();
+    // A real job profile, not the "New Job Profile" button (also under /admin/postings/).
+    const firstPosting = page.locator('a[href^="/admin/postings/"]:not([href="/admin/postings/new"])').first();
     await expect(firstPosting).toBeVisible();
     await firstPosting.click();
     await page.getByRole("tab", { name: "Eligible" }).click();
