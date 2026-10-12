@@ -39,12 +39,21 @@ test.describe("Student portal smoke", () => {
 
     await page.goto("/student/postings");
     await expect(page.getByRole("heading", { name: "Job Profiles" })).toBeVisible();
-    const firstCard = page.locator('a[href^="/student/postings/"]').first();
-    await expect(firstCard).toBeVisible();
-    await expect(firstCard).toContainText("IST"); // deadlines are shown in IST (QA F-005)
+    const cards = page.locator('a[href^="/student/postings/"]');
+    await expect(cards.first()).toBeVisible();
+    await expect(cards.first()).toContainText("IST"); // deadlines are shown in IST (QA F-005)
 
-    await firstCard.click();
+    // The apply form exists only while a job profile takes applications, so the test must not depend on which demo
+    // deadlines have passed by today: it asks the list for profiles that are open now and that this student may apply to.
+    await page.goto("/student/postings?status=open&eligibility=eligible");
+    await expect(page.getByRole("heading", { name: "Job Profiles" })).toBeVisible();
+    const nothingOpen = page.getByText("No job profiles match.");
+    await expect(cards.first().or(nothingOpen)).toBeVisible();
+    test.skip(await nothingOpen.isVisible(), "no job profile is open to this student right now; float one with a future deadline");
+
+    await cards.first().click();
     await expect(page.getByText("Application deadline")).toBeVisible();
+    await expect(page.getByText("Applications are closed for this job profile.")).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Apply|Save changes/ }).first()).toBeVisible();
   });
 
