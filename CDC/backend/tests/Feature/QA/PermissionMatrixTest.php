@@ -217,10 +217,10 @@ class PermissionMatrixTest extends TestCase
         $this->restoreFiles();
         Cache::flush();
 
-        // 1) 61 rapid GETs to a cheap authenticated student route as one user.
+        // 1) 301 rapid GETs to a cheap authenticated student route as one user (300/min per user since P-1.14).
         $studentStatuses = [];
         $first429Headers = null;
-        for ($i = 1; $i <= 61; $i++) {
+        for ($i = 1; $i <= 301; $i++) {
             $r = $this->hit('GET', '/api/student/profile', $t1, [], false);
             $studentStatuses[] = $r['status'];
             if ($r['status'] === 429 && $first429Headers === null) {
@@ -228,7 +228,7 @@ class PermissionMatrixTest extends TestCase
             }
         }
         $firstStudent429 = array_search(429, $studentStatuses, true);
-        $okBefore = count(array_filter(array_slice($studentStatuses, 0, $firstStudent429 === false ? 61 : $firstStudent429), fn ($s) => $s === 200));
+        $okBefore = count(array_filter(array_slice($studentStatuses, 0, $firstStudent429 === false ? 301 : $firstStudent429), fn ($s) => $s === 200));
 
         // Same IP, different user: is the bucket per user (expected) or per IP?
         $otherUser = $this->hit('GET', '/api/student/profile', $t2, [], false);
@@ -265,8 +265,8 @@ class PermissionMatrixTest extends TestCase
             'signed' => ['statuses' => $signedStatuses, 'first429' => $firstSigned429],
         ]);
 
-        $this->assertContains(429, $studentStatuses, "61 rapid authenticated GETs never returned 429. See {$report}");
-        $this->assertSame(60, $firstStudent429, "Expected the 61st request to be the first 429. See {$report}");
+        $this->assertContains(429, $studentStatuses, "301 rapid authenticated GETs never returned 429. See {$report}");
+        $this->assertSame(300, $firstStudent429, "Expected the 301st request to be the first 429. See {$report}");
         $this->assertSame(200, $otherUser['status'], "A different user on the same IP was throttled: api limiter is not per-user. See {$report}");
         $this->assertContains(429, $loginStatuses, "61 failed logins from one IP were never throttled. See {$report}");
         $this->assertContains(429, $signedStatuses, "601 signed-link GETs from one IP were never throttled. See {$report}");
@@ -1038,7 +1038,7 @@ class PermissionMatrixTest extends TestCase
         $l[] = '## Results';
         $l[] = '';
         $s = $r['student'];
-        $l[] = '### 61 rapid `GET /api/student/profile` as one student (bearer token)';
+        $l[] = '### 301 rapid `GET /api/student/profile` as one student (bearer token; 300/min per user since P-1.14)';
         $l[] = '';
         $l[] = sprintf('- Status distribution: %s', $dist($s['statuses']));
         $l[] = sprintf('- First 429 at %s; %d × 200 before it.', $fmt($s['first429']), $s['okBefore']);
