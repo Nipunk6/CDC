@@ -1,5 +1,6 @@
 "use client";
 
+import { brand } from "@/lib/theme";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -396,7 +397,7 @@ export default function AlumniPage() {
         component="footer"
         sx={{
           py: 2,
-          bgcolor: "#1a1a2e",
+          bgcolor: brand.footer,
           color: "grey.500",
           borderTop: "1px solid rgba(255,255,255,0.1)",
           mt: "auto"
@@ -420,7 +421,7 @@ export default function AlumniPage() {
             textAlign="center"
             sx={{
               fontSize: "0.6rem",
-              color: "#1a1a2e", // Match background color to hide
+              color: brand.footer, // Match background color to hide
               userSelect: "text",
               mt: 0.5,
               cursor: "default"

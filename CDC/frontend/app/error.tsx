@@ -22,7 +22,7 @@ export default function GlobalRouteError({
         alignItems: "center",
         justifyContent: "center",
         p: 3,
-        background: "linear-gradient(135deg, #f2f6fb 0%, #fff4e8 100%)",
+        bgcolor: "background.default",
       }}
     >
       <Stack spacing={2.5} sx={{ maxWidth: 560, textAlign: "center" }}>
