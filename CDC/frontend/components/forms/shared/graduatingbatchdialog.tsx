@@ -72,8 +72,7 @@ export default function GraduatingBatchDialog({
       {/* Header */}
       <DialogTitle
         sx={{
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+          bgcolor: "primary.main",
           color: "white",
           display: "flex",
           alignItems: "center",

@@ -301,12 +301,11 @@ function PlacementCycleDetail({ id }) {
   return (
     <Box>
       <Paper
+        elevation={0}
         sx={{
-          p: 2,
+          bgcolor: "transparent",
+          p: 0,
           mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-          color: "white",
           borderRadius: 2,
         }}
       >
@@ -317,7 +316,7 @@ function PlacementCycleDetail({ id }) {
           spacing={2}
         >
           <Stack direction="row" spacing={2} alignItems="center">
-            <Avatar sx={{ width: 48, height: 48, bgcolor: "white", color: "primary.main" }}>
+            <Avatar sx={{ width: 48, height: 48, bgcolor: "background.paper", color: "primary.main", border: 1, borderColor: "divider" }}>
               <EventRepeatIcon />
             </Avatar>
             <Box>
@@ -329,14 +328,14 @@ function PlacementCycleDetail({ id }) {
                 <Chip
                   size="small"
                   label={cycle.type === "fulltime" ? "Full Time" : "Internship"}
-                  sx={{ bgcolor: alpha("#fff", 0.2), color: "white" }}
+                 
                 />
                 <Chip
                   size="small"
                   label={cycle.status === "open" ? "Open" : "Closed"}
-                  sx={{ bgcolor: alpha("#fff", 0.2), color: "white" }}
+                 
                 />
-                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                <Typography variant="body2" color="text.secondary">
                   {formatDate(cycle.starts_on)} → {formatDate(cycle.ends_on)}
                 </Typography>
               </Stack>
@@ -364,11 +363,7 @@ function PlacementCycleDetail({ id }) {
               href="/admin/placement-cycles"
               variant="outlined"
               startIcon={<ArrowBackIcon />}
-              sx={{
-                color: "white",
-                borderColor: "white",
-                "&:hover": { borderColor: "white", bgcolor: alpha("#fff", 0.1) },
-              }}
+             
             >
               All Placements
             </Button>

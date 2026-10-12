@@ -588,53 +588,49 @@ export default function InfFormPro({ initialData, onSaved, onCancel, api = compa
 
       {/* Header */}
       <Paper
+        elevation={0}
         sx={{
-          p: 2,
+          bgcolor: "transparent",
+          p: 0,
           mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.dark} 100%)`,
-          color: "white",
         }}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box>
             {formData.internshipTitle && (
-              <Typography variant="h6" fontWeight={700} sx={{ color: "rgba(255, 255, 255, 0.95)", textTransform: "uppercase", fontSize: "1.1rem", mb: 0.5 }}>
+              <Typography variant="h6" fontWeight={700} sx={{ textTransform: "uppercase", fontSize: "1.1rem", mb: 0.5 }}>
                 🎓 {formData.internshipTitle}
               </Typography>
             )}
             <Typography variant="h5" fontWeight={600}>
               Internship Notification Form (INF)
             </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+            <Typography variant="body2" color="text.secondary">
               IIT (ISM) Dhanbad — Career Development Centre
             </Typography>
           </Box>
           <Stack direction="row" spacing={2} alignItems="center">
             {formData.graduatingBatch && (
               <Chip
-                icon={<SchoolIcon style={{ color: "white" }} />}
+                icon={<SchoolIcon style={{}} />}
                 label={`Passout Batch of ${formData.graduatingBatch}`}
                 sx={{
-                  bgcolor: "rgba(255, 255, 255, 0.2)",
-                  color: "white",
                   fontWeight: 600,
                   fontSize: "0.9rem",
                   px: 1.5,
                   py: 2,
-                  border: "1px solid rgba(255, 255, 255, 0.4)",
                 }}
               />
             )}
             <Stack direction="row" spacing={1} alignItems="center">
               {saving && (
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <CircularProgress size={16} sx={{ color: "white" }} />
+                  <CircularProgress size={16} />
                   <Typography variant="caption">Saving...</Typography>
                 </Stack>
               )}
               {draftId && (
-                <Typography variant="caption" sx={{ bgcolor: alpha("#fff", 0.2), px: 1, py: 0.5, borderRadius: 1 }}>
+                <Typography variant="caption" sx={{ px: 1, py: 0.5, borderRadius: 1 }}>
                   Draft #{draftId}
                 </Typography>
               )}

@@ -31,7 +31,6 @@ import {
   TableRow,
   Tooltip,
   Typography,
-  alpha,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -48,6 +47,7 @@ import DraftsIcon from "@mui/icons-material/Drafts";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import BusinessIcon from "@mui/icons-material/Business";
 import { companyApi } from "@/lib/companyapi";
+import { statusColor } from "@/lib/statuscolors";
 
 type DashboardResponse = {
   stats: {
@@ -84,16 +84,6 @@ type DashboardResponse = {
     edit_access_requested_reason?: string | null;
     graduating_batch?: string;
   }>;
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "accepted": return "success";
-    case "submitted": case "under_review": return "info";
-    case "rejected": return "error";
-    case "draft": return "default";
-    default: return "default";
-  }
 };
 
 const getStatusIcon = (status: string) => {
@@ -215,12 +205,11 @@ export default function CompanyDashboard() {
 
       {/* Welcome Header */}
       <Paper
+        elevation={0}
         sx={{
-          p: 3,
+          bgcolor: "transparent",
+          p: 0,
           mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-          color: "white",
           borderRadius: 2,
         }}
       >
@@ -228,7 +217,7 @@ export default function CompanyDashboard() {
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar 
               src={data?.company?.logo_url || undefined}
-              sx={{ width: 56, height: 56, bgcolor: "white", color: "primary.main" }}
+              sx={{ width: 56, height: 56, bgcolor: "background.paper", color: "primary.main", border: 1, borderColor: "divider" }}
             >
               {!data?.company?.logo_url && <BusinessIcon fontSize="large" />}
             </Avatar>
@@ -236,7 +225,7 @@ export default function CompanyDashboard() {
               <Typography variant="h5" fontWeight={700}>
                 Welcome back{data?.company?.name ? `, ${data.company.name}` : ""}!
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              <Typography variant="body2" color="text.secondary">
                 Manage your Job and Internship Notification Forms
               </Typography>
             </Box>
@@ -247,7 +236,7 @@ export default function CompanyDashboard() {
               href="/company/jnf/new"
               variant="contained"
               startIcon={<AddIcon />}
-              sx={{ bgcolor: "white", color: "primary.main", "&:hover": { bgcolor: "grey.100" } }}
+             
             >
               New JNF
             </Button>
@@ -256,7 +245,7 @@ export default function CompanyDashboard() {
               href="/company/inf/new"
               variant="outlined"
               startIcon={<AddIcon />}
-              sx={{ color: "white", borderColor: "white", "&:hover": { borderColor: "white", bgcolor: alpha("#fff", 0.1) } }}
+             
             >
               New INF
             </Button>
@@ -293,10 +282,10 @@ export default function CompanyDashboard() {
       </Grid2>
 
       {/* Quick Actions */}
-      <Paper sx={{ p: 2, mb: 3, bgcolor: alpha("#1976d2", 0.05), border: "1px solid", borderColor: "primary.light" }}>
+      <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center" justifyContent="space-between">
           <Typography variant="subtitle1" fontWeight={600}>
-            🚀 Quick Actions
+            Quick Actions
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">
             <Button component={Link} href="/company/jnf/new" size="small" startIcon={<WorkIcon />}>
@@ -355,7 +344,7 @@ export default function CompanyDashboard() {
                             icon={getStatusIcon(jnf.status) || undefined}
                             label={jnf.status.replace("_", " ")}
                             size="small"
-                            color={getStatusColor(jnf.status) as "success" | "info" | "error" | "default"}
+                            color={statusColor(jnf.status) as "success" | "info" | "error" | "default"}
                             variant="outlined"
                           />
                           {jnf.status === "under_review" && (
@@ -487,7 +476,7 @@ export default function CompanyDashboard() {
                             icon={getStatusIcon(inf.status) || undefined}
                             label={inf.status.replace("_", " ")}
                             size="small"
-                            color={getStatusColor(inf.status) as "success" | "info" | "error" | "default"}
+                            color={statusColor(inf.status) as "success" | "info" | "error" | "default"}
                             variant="outlined"
                           />
                           {inf.status === "under_review" && (

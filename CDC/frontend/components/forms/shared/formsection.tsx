@@ -39,8 +39,7 @@ export default function FormSection({
         sx={{
           px: 3,
           py: 2,
-          background: (theme) =>
-            `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
+          bgcolor: (theme) => alpha(theme.palette.primary.main, 0.03),
           borderBottom: "1px solid",
           borderColor: "divider",
         }}

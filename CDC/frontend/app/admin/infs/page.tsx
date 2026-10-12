@@ -26,7 +26,6 @@ import {
   TableRow,
   Tooltip,
   Typography,
-  alpha,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -42,6 +41,7 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import DownloadIcon from "@mui/icons-material/Download";
 import { adminApi, adminDownload } from "@/lib/adminapi";
+import { statusColor } from "@/lib/statuscolors";
 
 type InfItem = {
   id: number;
@@ -53,16 +53,6 @@ type InfItem = {
   company?: { name: string; logo_url?: string | null };
   edit_access_requested_at?: string | null;
   graduating_batch?: string;
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "accepted": return "success";
-    case "submitted": return "warning";
-    case "under_review": return "info";
-    case "rejected": return "error";
-    default: return "default";
-  }
 };
 
 const getStatusIcon = (status: string) => {
@@ -134,25 +124,24 @@ function InfQueueContent() {
     <Box>
       {/* Header */}
       <Paper
+        elevation={0}
         sx={{
-          p: 2,
+          bgcolor: "transparent",
+          p: 0,
           mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.dark} 100%)`,
-          color: "white",
           borderRadius: 2,
         }}
       >
         <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }} spacing={2}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Avatar sx={{ width: 48, height: 48, bgcolor: "white", color: "secondary.main" }}>
+            <Avatar sx={{ width: 48, height: 48, bgcolor: "background.paper", color: "secondary.main", border: 1, borderColor: "divider" }}>
               <SchoolIcon />
             </Avatar>
             <Box>
               <Typography variant="h5" fontWeight={700}>
                 INF Review Queue
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              <Typography variant="body2" color="text.secondary">
                 Review and manage Internship Notification Forms
               </Typography>
             </Box>
@@ -162,7 +151,7 @@ function InfQueueContent() {
             href="/admin"
             variant="outlined"
             startIcon={<ArrowBackIcon />}
-            sx={{ color: "white", borderColor: "white", "&:hover": { borderColor: "white", bgcolor: alpha("#fff", 0.1) } }}
+           
           >
             Back to Dashboard
           </Button>
@@ -275,7 +264,7 @@ function InfQueueContent() {
                                 icon={getStatusIcon(inf.status) || undefined}
                                 label={inf.status.replace("_", " ")}
                                 size="small"
-                                color={getStatusColor(inf.status) as "success" | "warning" | "info" | "error" | "default"}
+                                color={statusColor(inf.status) as "success" | "warning" | "info" | "error" | "default"}
                                 variant="outlined"
                               />
                               {inf.review_marked && (

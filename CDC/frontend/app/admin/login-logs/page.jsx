@@ -26,8 +26,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import LoginIcon from "@mui/icons-material/Login";
 import DownloadIcon from "@mui/icons-material/Download";
+import FilterListIcon from "@mui/icons-material/FilterList";
 
 import PageHeader from "@/components/shared/pageheader";
 import { adminApi, adminDownload } from "@/lib/adminapi";
@@ -55,6 +55,7 @@ const REASONS = {
 const ROLE_LABELS = { student: "Student", company: "Recruiter", admin: "Admin", mentor: "Mentor" };
 
 const EMPTY = { role: "", outcome: "", q: "", ip: "", from: "", to: "" };
+const FROM_TABLET = "@media (min-width:768px)";
 
 const queryOf = (filters) => {
   const query = new URLSearchParams();
@@ -72,6 +73,9 @@ export default function AdminLoginLogsPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  // On a phone the filters fold away behind one button, so the table is on the first screen (design brief §5).
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersSet = Object.values(applied).filter(Boolean).length;
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +116,6 @@ export default function AdminLoginLogsPage() {
   return (
     <>
       <PageHeader
-        icon={<LoginIcon />}
         title="Login Log"
         subtitle="Every sign-in attempt: who, when, from which address, and whether it worked."
         backHref="/admin"
@@ -130,6 +133,17 @@ export default function AdminLoginLogsPage() {
       )}
 
       <Paper sx={{ p: 2, mb: 2 }}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          fullWidth
+          startIcon={<FilterListIcon />}
+          onClick={() => setFiltersOpen((open) => !open)}
+          aria-expanded={filtersOpen}
+          sx={{ display: "flex", justifyContent: "flex-start", [FROM_TABLET]: { display: "none" } }}
+        >
+          {filtersOpen ? "Hide filters" : filtersSet ? `Filters (${filtersSet} set)` : "Filters"}
+        </Button>
         <Stack
           direction={{ xs: "column", lg: "row" }}
           spacing={1.5}
@@ -137,7 +151,9 @@ export default function AdminLoginLogsPage() {
           onSubmit={(e) => {
             e.preventDefault();
             apply();
+            setFiltersOpen(false);
           }}
+          sx={{ display: filtersOpen ? "flex" : "none", mt: filtersOpen ? 1.5 : 0, [FROM_TABLET]: { display: "flex", mt: 0 } }}
         >
           <FormControl size="small" sx={{ minWidth: 160 }}>
             <InputLabel id="ll-role">Role</InputLabel>

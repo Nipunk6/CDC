@@ -115,7 +115,6 @@ export default function StudentCategoriesPage() {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setEditing({ title: "", description: "" })}
-            sx={{ bgcolor: "common.white", color: "primary.main", "&:hover": { bgcolor: "grey.100" } }}
           >
             Add Category
           </Button>

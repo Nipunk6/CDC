@@ -44,6 +44,7 @@ import FloatDialog from "@/components/admin/floatdialog";
 import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
 import type { ProgrammeStipend } from "@/components/forms/shared/stipendgrid";
 import type { Currency } from "@/components/forms/shared/currencyselector";
+import { statusColor } from "@/lib/statuscolors";
 
 type FormData = {
   companyProfile?: {
@@ -148,16 +149,6 @@ type StatusHistoryEntry = {
 };
 
 const getHistoryDisplayEmail = (entry: StatusHistoryEntry) => entry.author_email || "";
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "accepted": return "success";
-    case "submitted": return "warning";
-    case "under_review": return "info";
-    case "rejected": return "error";
-    default: return "default";
-  }
-};
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -486,12 +477,11 @@ export default function AdminInfDetailPage() {
     <Box>
       {/* Header */}
       <Paper
+        elevation={0}
         sx={{
-          p: 2,
+          bgcolor: "transparent",
+          p: 0,
           mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.dark} 100%)`,
-          color: "white",
           borderRadius: 2,
         }}
       >
@@ -499,7 +489,7 @@ export default function AdminInfDetailPage() {
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar 
               src={inf?.company?.logo_url || undefined}
-              sx={{ width: 48, height: 48, bgcolor: "white", color: "secondary.main" }}
+              sx={{ width: 48, height: 48, bgcolor: "background.paper", color: "secondary.main", border: 1, borderColor: "divider" }}
             >
               {!inf?.company?.logo_url && <SchoolIcon />}
             </Avatar>
@@ -507,7 +497,7 @@ export default function AdminInfDetailPage() {
               <Typography variant="h5" fontWeight={700}>
                 {formData.internshipTitle || inf?.internship_title || "INF Review"}
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              <Typography variant="body2" color="text.secondary">
                 {inf?.company?.name ?? "Unknown Company"} • Submitted {inf?.created_at ? new Date(inf.created_at).toLocaleDateString() : "-"}
               </Typography>
             </Box>
@@ -516,22 +506,22 @@ export default function AdminInfDetailPage() {
             <Chip
               icon={getStatusIcon(inf?.status ?? "") || undefined}
               label={(inf?.status ?? "").replace("_", " ").toUpperCase()}
-              color={getStatusColor(inf?.status ?? "") as "success" | "warning" | "info" | "error" | "default"}
-              sx={{ color: "white", fontWeight: 600 }}
+              color={statusColor(inf?.status ?? "") as "success" | "warning" | "info" | "error" | "default"}
+              sx={{ fontWeight: 600 }}
             />
             {inf?.status === "submitted" && Boolean(inf?.edit_access_requested_at) && (
               <Chip
                 label="EDIT ACCESS REQUIRED"
                 color="error"
                 variant="filled"
-                sx={{ fontWeight: 700, color: "white", fontSize: '0.85rem' }}
+                sx={{ fontWeight: 700, fontSize: '0.85rem' }}
               />
             )}
             <Button
               variant="outlined"
               startIcon={<ArrowBackIcon />}
               onClick={() => router.push("/admin/infs")}
-              sx={{ color: "white", borderColor: "white" }}
+             
             >
               Back
             </Button>
@@ -872,7 +862,7 @@ export default function AdminInfDetailPage() {
                   <Chip
                     icon={getStatusIcon(inf?.status ?? "") || undefined}
                     label={(inf?.status ?? "").replace("_", " ").toUpperCase()}
-                    color={getStatusColor(inf?.status ?? "") as "success" | "warning" | "info" | "error" | "default"}
+                    color={statusColor(inf?.status ?? "") as "success" | "warning" | "info" | "error" | "default"}
                     sx={{ mt: 0.5, width: "100%" }}
                   />
                 </Box>

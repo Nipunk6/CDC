@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { useSession } from "next-auth/react";
 import {
   Alert,
   Avatar,
@@ -24,7 +24,6 @@ import {
   TableRow,
   Tooltip,
   Typography,
-  alpha,
 } from "@mui/material";
 import BusinessIcon from "@mui/icons-material/Business";
 import WorkIcon from "@mui/icons-material/Work";
@@ -37,6 +36,10 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { adminApi } from "@/lib/adminapi";
 import PendingRequestsBanner from "@/components/admin/pendingrequestsbanner";
+import { statusColor } from "@/lib/statuscolors";
+import { greeting, todayLabel } from "@/lib/greeting";
+import PageHeader from "@/components/shared/pageheader";
+import StatTile from "@/components/shared/stattile";
 
 type DashboardData = {
   stats: {
@@ -78,16 +81,6 @@ type DashboardData = {
   };
 };
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "accepted": return "success";
-    case "submitted": return "warning";
-    case "under_review": return "info";
-    case "rejected": return "error";
-    default: return "default";
-  }
-};
-
 const getStatusIcon = (status: string) => {
   switch (status) {
     case "accepted": return <CheckCircleIcon fontSize="small" />;
@@ -102,6 +95,10 @@ export default function AdminPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { data: session } = useSession();
+  const [hello] = useState(() => greeting());
+  const [today] = useState(() => todayLabel());
+  const firstName = (session?.user?.name ?? "").trim().split(/\s+/)[0] ?? "";
 
   useEffect(() => {
     const run = async () => {
@@ -132,67 +129,20 @@ export default function AdminPage() {
     <Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* Welcome Header */}
-      <Paper
-        sx={{
-          p: 3,
-          mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-          color: "white",
-          borderRadius: 2,
-        }}
-      >
-        <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }} spacing={2}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Image
-                src="/images/iitism-logo.png"
-                alt="IIT ISM Logo"
-                width={56}
-                height={56}
-                style={{ objectFit: "contain" }}
-              />
-            </Box>
-            <Box>
-              <Typography variant="h5" fontWeight={700}>
-                Admin Dashboard
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                IIT (ISM) Dhanbad — Career Development Centre
-              </Typography>
-            </Box>
-          </Stack>
-          <Stack direction="row" spacing={2}>
-            <Button
-              component={Link}
-              href="/admin/jnfs"
-              variant="contained"
-              startIcon={<WorkIcon />}
-              sx={{ bgcolor: "white", color: "primary.main", "&:hover": { bgcolor: "grey.100" } }}
-            >
+      <PageHeader
+        title={`${hello}${firstName ? `, ${firstName}` : ""}`}
+        subtitle={`${today} · Career Development Centre, IIT (ISM) Dhanbad`}
+        actions={
+          <>
+            <Button component={Link} href="/admin/jnfs" variant="contained" startIcon={<WorkIcon />}>
               Review JNFs
             </Button>
-            <Button
-              component={Link}
-              href="/admin/infs"
-              variant="outlined"
-              startIcon={<SchoolIcon />}
-              sx={{ color: "white", borderColor: "white", "&:hover": { borderColor: "white", bgcolor: alpha("#fff", 0.1) } }}
-            >
+            <Button component={Link} href="/admin/infs" variant="outlined" startIcon={<SchoolIcon />}>
               Review INFs
             </Button>
-          </Stack>
-        </Stack>
-      </Paper>
+          </>
+        }
+      />
 
       <PendingRequestsBanner sx={{ mb: 3 }} />
 
@@ -206,83 +156,42 @@ export default function AdminPage() {
       {/* Quick Stats */}
       <Grid2 container spacing={2} sx={{ mb: 3 }}>
         {[
-          { label: "Total Companies", value: stats?.companies_total ?? 0, icon: <BusinessIcon />, color: "primary.main" },
-          { label: "Pending Reviews", value: stats?.pending_reviews ?? 0, icon: <HourglassEmptyIcon />, color: "warning.main" },
-          { label: "JNFs Submitted", value: stats?.jnf_submitted ?? 0, icon: <WorkIcon />, color: "info.main" },
-          { label: "INFs Submitted", value: stats?.inf_submitted ?? 0, icon: <SchoolIcon />, color: "secondary.main" },
-          { label: "JNFs Accepted", value: stats?.jnf_accepted ?? 0, icon: <CheckCircleIcon />, color: "success.main" },
-          { label: "INFs Accepted", value: stats?.inf_accepted ?? 0, icon: <CheckCircleIcon />, color: "success.main" },
+          { label: "Total companies", value: stats?.companies_total ?? 0 },
+          { label: "Pending reviews", value: stats?.pending_reviews ?? 0, tone: (stats?.pending_reviews ?? 0) > 0 ? "warning.dark" : undefined },
+          { label: "JNFs submitted", value: stats?.jnf_submitted ?? 0, href: "/admin/jnfs?status=submitted", linkLabel: "Review" },
+          { label: "INFs submitted", value: stats?.inf_submitted ?? 0, href: "/admin/infs?status=submitted", linkLabel: "Review" },
+          { label: "JNFs accepted", value: stats?.jnf_accepted ?? 0 },
+          { label: "INFs accepted", value: stats?.inf_accepted ?? 0 },
         ].map((item) => (
-          <Grid2 key={item.label} size={{ xs: 6, md: 2 }}>
-            <Card sx={{ height: "100%" }}>
-              <CardContent sx={{ py: 2 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" textTransform="uppercase" fontSize={10}>
-                      {item.label}
-                    </Typography>
-                    <Typography variant="h4" fontWeight={700} sx={{ color: item.color }}>
-                      {item.value}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ color: item.color, opacity: 0.3 }}>{item.icon}</Box>
-                </Stack>
-              </CardContent>
-            </Card>
+          <Grid2 key={item.label} size={{ xs: 6, sm: 4, lg: 2 }}>
+            <StatTile {...item} />
           </Grid2>
         ))}
       </Grid2>
 
       {/* Draft Submissions */}
-      <Paper sx={{ p: 2.5, mb: 3, border: "1px solid", borderColor: alpha("#ff9800", 0.35), bgcolor: alpha("#ff9800", 0.04) }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} justifyContent="space-between" mb={2}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <HourglassEmptyIcon sx={{ color: "warning.main" }} />
-            <Typography variant="h6" fontWeight={600}>
-              Draft Submissions
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary">
-            Drafts are tracked separately from pending reviews.
-          </Typography>
-        </Stack>
-
-        <Grid2 container spacing={2}>
-          {[
-            { label: "Draft JNFs", value: stats?.jnf_draft ?? 0, icon: <WorkIcon />, color: "warning.main", href: "/admin/jnfs?status=draft&origin=draft" },
-            { label: "Draft INFs", value: stats?.inf_draft ?? 0, icon: <SchoolIcon />, color: "warning.main", href: "/admin/infs?status=draft&origin=draft" },
-          ].map((item) => (
-            <Grid2 key={item.label} size={{ xs: 12, md: 6 }}>
-              <Card sx={{ height: "100%" }}>
-                <CardContent>
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" textTransform="uppercase" fontSize={10}>
-                        {item.label}
-                      </Typography>
-                      <Typography variant="h4" fontWeight={700} sx={{ color: item.color }}>
-                        {item.value}
-                      </Typography>
-                      <Button component={Link} href={item.href} size="small" sx={{ mt: 1, px: 0 }}>
-                        View Drafts
-                      </Button>
-                    </Box>
-                    <Box sx={{ color: item.color, opacity: 0.3 }}>{item.icon}</Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid2>
-          ))}
+      <Typography variant="h6" sx={{ fontSize: "1.125rem", fontWeight: 700 }}>
+        Draft submissions
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        Drafts are tracked separately from pending reviews.
+      </Typography>
+      <Grid2 container spacing={2} sx={{ mb: 3 }}>
+        <Grid2 size={{ xs: 6, sm: 4, lg: 2 }}>
+          <StatTile label="Draft JNFs" value={stats?.jnf_draft ?? 0} href="/admin/jnfs?status=draft&origin=draft" linkLabel="View drafts" />
         </Grid2>
-      </Paper>
+        <Grid2 size={{ xs: 6, sm: 4, lg: 2 }}>
+          <StatTile label="Draft INFs" value={stats?.inf_draft ?? 0} href="/admin/infs?status=draft&origin=draft" linkLabel="View drafts" />
+        </Grid2>
+      </Grid2>
 
       {/* Quick Actions */}
-      <Paper sx={{ p: 2, mb: 3, bgcolor: alpha("#1976d2", 0.05), border: "1px solid", borderColor: "primary.light" }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center" justifyContent="space-between">
-          <Typography variant="subtitle1" fontWeight={600}>
-            🎯 Quick Actions
+      <Paper sx={{ px: 2, py: 1.5, mb: 3, borderRadius: 3 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 1, sm: 2 }} alignItems={{ sm: "center" }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, flexShrink: 0 }}>
+            Quick actions
           </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Button component={Link} href="/admin/jnfs?status=submitted" size="small" startIcon={<WorkIcon />}>
               Pending JNFs ({stats?.jnf_submitted ?? 0})
             </Button>
@@ -358,7 +267,7 @@ export default function AdminPage() {
                                 icon={getStatusIcon(jnf.status) || undefined}
                                 label={jnf.status.replace("_", " ")}
                                 size="small"
-                                color={getStatusColor(jnf.status) as "success" | "warning" | "info" | "error" | "default"}
+                                color={statusColor(jnf.status) as "success" | "warning" | "info" | "error" | "default"}
                                 variant="outlined"
                               />
                               {jnf.status === "submitted" && jnf.edit_access_requested_at && (
@@ -445,7 +354,7 @@ export default function AdminPage() {
                                 icon={getStatusIcon(inf.status) || undefined}
                                 label={inf.status.replace("_", " ")}
                                 size="small"
-                                color={getStatusColor(inf.status) as "success" | "warning" | "info" | "error" | "default"}
+                                color={statusColor(inf.status) as "success" | "warning" | "info" | "error" | "default"}
                                 variant="outlined"
                               />
                               {inf.status === "submitted" && inf.edit_access_requested_at && (
