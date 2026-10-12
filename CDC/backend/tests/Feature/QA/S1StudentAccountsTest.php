@@ -862,7 +862,7 @@ class S1StudentAccountsTest extends TestCase
         $logA = $logs->firstWhere('subject_id', $a->id);
         $this->assertEquals('7.00', $logA->before['current_cgpa']);
         $this->assertEquals('7.40', $logA->after['current_cgpa']);
-        $this->assertSame(['current_cgpa', 'ongoing_backlogs', 'total_backlogs'], array_keys($logA->after));
+        $this->assertEqualsCanonicalizing(['current_cgpa', 'ongoing_backlogs', 'total_backlogs'], array_keys($logA->after)); // key order is the database's
 
         // Direct service call (the future institute-DB hook) with extra keys.
         app(StudentAcademicSyncService::class)->apply([

@@ -24,6 +24,7 @@ use Database\Factories\StudentProfileFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -828,9 +829,8 @@ class S5ResultsBlockingTest extends TestCase
         Mail::assertQueued(OfferMail::class, 1);
 
         // DB-level guarantee: unique index on offers.application_id.
-        $unique = collect(DB::select("PRAGMA index_list('offers')"))
-            ->filter(fn ($index) => (int) $index->unique === 1)
-            ->contains(fn ($index) => collect(DB::select("PRAGMA index_info('{$index->name}')"))->pluck('name')->all() === ['application_id']);
+        $unique = collect(Schema::getIndexes('offers'))
+            ->contains(fn (array $index) => $index['unique'] && $index['columns'] === ['application_id']);
         $this->assertTrue($unique, 'offers.application_id must carry a UNIQUE index');
     }
 
