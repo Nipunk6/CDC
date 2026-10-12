@@ -62,13 +62,15 @@ columns of roll numbers, CGPAs and counts line up.
 | Page title | 24 / 32 (20 / 28 on phones) | 700 | letter-spacing −0.01em |
 | Section title | 18 / 26 | 700 | inside a page |
 | Card title | 16 / 24 | 600 | |
-| Body | 14 / 22 | 400 | the default for signed-in screens |
+| Body | 16 / 24 (MUI `body1`); 14 / 20 (`body2`) for dense text | 400 | MUI defaults kept; text fields stay at 16 px so phones do not zoom on focus |
 | Table cell | 14 / 20 | 400 | header cells 13 / 20, 600, `text.secondary` |
 | Caption / helper | 12 / 18 | 400 | never smaller than 12 |
 | Sidebar item | 14 / 20 | 500 (600 when active) | |
 | Sidebar group heading | 11 / 16 | 600 | small caps look: upper case, letter-spacing 0.06em (owner's request) |
 
 Public pages (landing, login) may use the larger MUI heading sizes; signed-in screens do not go above the page title.
+On public pages the gold of the institute header (`brand.gold` in `lib/theme.ts`) is used only on maroon; on white the
+darker `brand.goldText` is used, because gold on white is about 2.2:1 and fails AA.
 Line length for running text stays under about 80 characters (`maxWidth: "72ch"` on paragraphs of explanation).
 
 ### Space, shape, depth
@@ -182,3 +184,4 @@ Places where the plugin's guidance and the owner's constraints pulled apart; the
 | Avoid all-caps labels | "Grouped sections with small caps headings" in the sidebar | Sidebar group headings are small caps; nothing else is |
 | Choose a distinctive typeface for the brief | Inter, no other font | Inter only; character comes from weight, tabular figures and spacing |
 | Take an aesthetic risk with the palette | Maroon primary, navy secondary stay | Palette kept; the risk taken is restraint (one saturated block per screen) |
+| Body text 14 px on signed-in screens (first draft of this brief) | No functional change; forms must stay usable on phones | MUI sizes kept (body 16 px, inputs 16 px); density comes from table cells and sidebar items at 14 px |

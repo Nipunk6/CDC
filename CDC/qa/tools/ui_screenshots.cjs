@@ -71,7 +71,8 @@ const slug = (route) => (route === "/" ? "home" : route.replace(/^\//, "").repla
         await page.locator('button[type="submit"]').click();
         await page.waitForURL((u) => !u.pathname.startsWith("/auth"), { timeout: 90000 });
       }
-      for (const route of spec.pages) {
+      const only = process.env.PAGES ? new RegExp(process.env.PAGES) : null; // optional: PAGES='^/admin$' to take a subset
+      for (const route of spec.pages.filter((r) => !only || only.test(r))) {
         errors.length = 0;
         try {
           await page.goto(BASE + route, { waitUntil: "load", timeout: 90000 });

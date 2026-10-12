@@ -1,0 +1,79 @@
+## Phase 3 PU "Unified UI": acceptance (2026-10-12, branch phase3-pu)
+Local stack: MySQL `iitism_placement`, backend `MAIL_MAILER=log` on :8000, Next.js 16.3.8 dev on :3000. No real mail sent.
+Browser checks ran in a separate headless Chromium with the Phase2DemoSeeder demo accounts and one temporary mentor
+account on a .qa.test address (deleted afterwards, with its login-log rows). Both servers were stopped at the end.
+
+1  Gates
+- php artisan test --exclude-group=qa-open (SQLite)       736 passed (10,678 assertions); includes both permission matrices
+- npx tsc --noEmit clean · npm run lint 0 errors / 76 warnings (same count as before PU) · npm run test:unit 10 passed
+- npm run build                                            exit 0; Inter is in .next/static/media (7 woff2 files), and no file of the
+                                                           build refers to fonts.googleapis.com or fonts.gstatic.com
+- qa-open                                                  unchanged: 1 test (SEC-013)
+
+2  Screenshots: qa/screenshots/pu-before (140, at 390 and 1440) and qa/screenshots/pu-after (284 = 71 pages x 390, 768, 1024, 1440)
+- The capture tool also checks every page for sideways scroll and console errors.
+- First full run: 1 problem, /admin/postings at 768 px scrolled sideways by 41 px (three filters in one row next to the
+  new rail). Fixed (the filter row wraps), affected pages re-captured: "No sideways scroll and no console errors."
+
+3  Sidebar smoke test per role: frontend/tests/e2e/shell-nav.spec.js (Chromium), 8 passed
+   ✓ admin shell › every sidebar link opens its page and is marked as the current page (5.7s)
+   ✓ admin shell › the sidebar collapses to a rail, remembers it, and becomes a drawer on a phone (3.0s)
+   ✓ company shell › the sidebar collapses to a rail, remembers it, and becomes a drawer on a phone (3.5s)
+   ✓ student shell › every sidebar link opens its page and is marked as the current page (2.8s)
+   ✓ student shell › the sidebar collapses to a rail, remembers it, and becomes a drawer on a phone (3.2s)
+   ✓ mentor shell › every sidebar link opens its page and is marked as the current page (965ms)
+   ✓ mentor shell › the sidebar collapses to a rail, remembers it, and becomes a drawer on a phone (2.8s)
+- "every sidebar link": clicks each link of the sidebar, checks the address, that exactly that item is marked as the
+  current page, that the page does not scroll sideways, and that the top bar holds no link other than the notifications bell.
+- "collapses": 260 px -> 72 px rail, still collapsed after a reload, back to 260 px; always the rail at 1024 px; at 390 px
+  no sidebar until the menu button opens the drawer, which marks the current page and has "Sign out".
+- Existing specs in the same run: smoke.spec.ts 4 passed (CSP included); student-portal.spec.js 4 passed, 1 failed:
+  "student signs in, browses job profiles and opens one" expects an Apply button on the first job profile; the first demo
+  profile's deadline (21 Sept 2026) has passed, so the page correctly shows "Applications are closed". The apply panel is
+  not touched by PU; the spec depends on the date of the demo data.
+
+4  Phase 1 smoke (browser, on two throwaway copies of demo JNF 1 made with "Duplicate for New Role"; the copies, their
+   status history and their 22 notifications were deleted afterwards)
+   PASS  company A: "Duplicate for New Role" opened the wizard on a new draft (JNF 51)
+   PASS  company A: passout batch dialog confirmed
+   PASS  company A: wizard is inside the sidebar shell
+   PASS  company A: autosave showed "Draft saved" without pressing Save
+   PASS  company A: tab "Eligibility" renders
+   PASS  company A: tab "Compensation" renders
+   PASS  company A: tab "Selection" renders
+   PASS  company A: tab "Declaration" renders
+   PASS  company A: 2 guideline(s) wait to be read
+   PASS  company A: declarations are locked before the guidelines are opened
+   PASS  company A: guideline PDF is drawn in the viewer (through the proxy)
+   PASS  company A: every guideline shows "Read & Agreed"
+   PASS  company A: declarations unlock after reading
+   PASS  company A: "Submit JNF" went through (left)
+   PASS  company B: "Duplicate for New Role" opened the wizard on a new draft (JNF 52)
+   PASS  company B: passout batch dialog confirmed
+   PASS  company B: wizard is inside the sidebar shell
+   PASS  company B: autosave showed "Draft saved" without pressing Save
+   PASS  company B: tab "Eligibility" renders
+   PASS  company B: tab "Compensation" renders
+   PASS  company B: tab "Selection" renders
+   PASS  company B: tab "Declaration" renders
+   PASS  company B: 2 guideline(s) wait to be read
+   PASS  company B: declarations are locked before the guidelines are opened
+   PASS  company B: guideline PDF is drawn in the viewer (through the proxy)
+   PASS  company B: every guideline shows "Read & Agreed"
+   PASS  company B: declarations unlock after reading
+   PASS  company B: "Submit JNF" went through (message)
+   PASS  admin: submitted copies appear in JNF Reviews
+   PASS  admin: "Accept JNF" accepted JNF 51
+   PASS  admin: "Download CSV" gave accepted-jnf-51.csv
+   PASS  admin: rejecting without remarks is refused with a message
+   PASS  admin: "Reject JNF" rejected JNF 52 ("JNF marked as rejected.")
+   PASS  admin: the page shows REJECTED after a reload
+   PASS  admin: both actions asked for confirmation (Are you sure you want to reject this JNF?)
+   PASS  console errors: 0
+   After the run the database showed JNF A = accepted and JNF B = rejected.
+
+5  QA E2E-1 (the full placement run: cycle, import, float, apply, shortlist, rounds, offers)
+- NOT repeated click by click in the browser. PU changed no request, no handler and no backend file; the run's rules are
+  covered by the backend suite above (S1 to S9, 736 tests). In the browser, every page of that run was opened in the new
+  shell at four widths with no console error (section 2), and the job-profile, Eligible-list and student pages are in the
+  e2e specs of section 3.
