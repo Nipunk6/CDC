@@ -3,6 +3,7 @@
 namespace Tests\Feature\Security;
 
 use App\Mail\PasswordResetLinkMail;
+use App\Mail\PortalNoticeMail;
 use App\Mail\RecruiterEmailVerificationMail;
 use App\Mail\StudentInvitationMail;
 use App\Models\Company;
@@ -12,11 +13,13 @@ use App\Models\User;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Middleware\TrustHosts;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Group;
@@ -57,9 +60,8 @@ class AuthenticationTest extends TestCase
     /**
      * SEC finding (timing oracle): an unknown account must cost the same as a known one with a wrong password.
      *
-     * Known open finding SEC-003: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     * SEC-003: fixed in P-1.14 (was in group qa-open until then).
      */
-    #[Group('qa-open')]
     public function test_A3_1_failed_login_timing_does_not_reveal_whether_the_account_exists(): void
     {
         // Factory first (it caches its own cost-4 hash in a static), then production cost for this account only.
@@ -88,9 +90,8 @@ class AuthenticationTest extends TestCase
     /**
      * SEC finding: the second reset request for an existing account answers 429, an unknown account never does.
      *
-     * Known open finding SEC-003: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     * SEC-003: fixed in P-1.14 (was in group qa-open until then).
      */
-    #[Group('qa-open')]
     public function test_A3_2_forgot_password_responses_are_identical_for_existing_and_unknown_accounts(): void
     {
         StudentProfile::factory()->create(['roll_no' => '22JE0002']);
@@ -100,6 +101,109 @@ class AuthenticationTest extends TestCase
         ];
 
         $this->assertSame($sequence(['roll_no' => '99ZZ0002']), $sequence(['roll_no' => '22JE0002']), 'existing account is distinguishable by the reset throttle');
+    }
+
+    /** SEC-003 (P-1.14): a mail fault or a revoked invitation looks exactly like "sent" too. */
+    public function test_A3_2_forgot_password_never_answers_differently_for_an_existing_account(): void
+    {
+        StudentProfile::factory()->create(['roll_no' => '22JE0003']);
+        $unknown = $this->postJson('/api/auth/forgot-password', ['roll_no' => '99ZZ0003']);
+        $known = $this->postJson('/api/auth/forgot-password', ['roll_no' => '22JE0003']);
+        $again = $this->postJson('/api/auth/forgot-password', ['roll_no' => '22JE0003']); // throttled by the broker
+
+        foreach ([$known, $again] as $response) {
+            $this->assertSame($unknown->status(), $response->status());
+            $this->assertSame($unknown->getContent(), $response->getContent());
+        }
+        Mail::assertSent(PasswordResetLinkMail::class, 1); // the throttled repeat sends nothing
+    }
+
+    // ---------------------------------------------------------------- A3.3 recruiter registration enumeration
+
+    /**
+     * SEC-003 (P-1.14): asking for a verification link looks the same for an address that already has an account as
+     * for a new one. The new address gets the link; the existing owner gets a notice instead.
+     */
+    public function test_A3_3_verification_link_response_is_identical_for_registered_and_new_addresses(): void
+    {
+        config(['services.recruiter_email.dns_check' => false]);
+        User::factory()->create(['role' => 'company', 'email' => 'taken@co.qa.test', 'name' => 'Asha Rao']);
+        Company::create(['name' => 'Legacy', 'hr_name' => 'HR', 'hr_email' => 'legacy@co.qa.test']);
+
+        $shape = function (string $email) {
+            $response = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => $email, 'name' => 'Someone']);
+            $body = $response->json();
+            $this->assertIsString($body['status_token'] ?? null, $email);
+            $this->assertSame(40, strlen($body['status_token']), $email);
+            unset($body['status_token']);
+
+            return [$response->status(), $body];
+        };
+
+        $new = $shape('new@co.qa.test');
+        $this->assertSame(200, $new[0]);
+        $this->assertSame($new, $shape('taken@co.qa.test'), 'an address with a user account');
+        $this->assertSame($new, $shape('legacy@co.qa.test'), 'an address used as a company HR email');
+
+        Mail::assertSent(RecruiterEmailVerificationMail::class, fn ($m) => $m->hasTo('new@co.qa.test'));
+        Mail::assertSent(RecruiterEmailVerificationMail::class, 1);
+        Mail::assertSent(PortalNoticeMail::class, fn ($m) => $m->hasTo('taken@co.qa.test') && str_contains($m->render(), 'already has an account'));
+        Mail::assertSent(PortalNoticeMail::class, fn ($m) => $m->hasTo('legacy@co.qa.test'));
+        $this->assertSame(['new@co.qa.test'], RecruiterEmailVerification::pluck('email')->all(), 'no verification is started for a registered address');
+
+        // The 10-minute cooldown answers the same for both as well.
+        $repeatNew = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'new@co.qa.test']);
+        $repeatTaken = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'taken@co.qa.test']);
+        $this->assertSame(429, $repeatNew->status());
+        $this->assertSame([$repeatNew->status(), $repeatNew->json('message')], [$repeatTaken->status(), $repeatTaken->json('message')]);
+    }
+
+    /** SEC-003 (P-1.14): the status check needs the token given to the browser that asked for the link. */
+    public function test_A3_3_verification_status_needs_the_status_token(): void
+    {
+        config(['services.recruiter_email.dns_check' => false, 'app.url' => 'http://localhost']);
+        User::factory()->create(['role' => 'company', 'email' => 'taken@co.qa.test']);
+        $statusToken = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'new@co.qa.test'])->assertOk()->json('status_token');
+        $fakeToken = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'taken@co.qa.test'])->assertOk()->json('status_token');
+        $status = fn (array $query) => $this->getJson('/api/auth/company/recruiter-email/verification-status?'.http_build_query($query));
+
+        $status(['email' => 'new@co.qa.test'])->assertStatus(422)->assertJsonValidationErrors('status_token');
+        $status(['email' => 'new@co.qa.test', 'status_token' => $statusToken])->assertOk()->assertJson(['verified' => false]);
+
+        // The recruiter clicks the emailed link.
+        $link = null;
+        Mail::assertSent(RecruiterEmailVerificationMail::class, function (RecruiterEmailVerificationMail $m) use (&$link) {
+            $link = $m->verifyUrl;
+
+            return true;
+        });
+        $this->get(str_replace('http://localhost', '', $link))->assertSee('verified successfully');
+
+        $status(['email' => 'new@co.qa.test', 'status_token' => $statusToken])->assertOk()->assertJson(['verified' => true]);
+        $status(['email' => 'new@co.qa.test', 'status_token' => str_repeat('x', 40)])->assertOk()->assertJson(['verified' => false]);
+        $status(['email' => 'taken@co.qa.test', 'status_token' => $fakeToken])->assertOk()->assertJson(['verified' => false]);
+        $status(['email' => 'nobody@co.qa.test', 'status_token' => $statusToken])->assertOk()->assertJson(['verified' => false]);
+    }
+
+    /** SEC-003 (P-1.14): registering with an address that already has an account says only "verify the email first". */
+    public function test_A3_3_registration_does_not_say_that_an_address_is_registered(): void
+    {
+        Storage::fake('public');
+        User::factory()->create(['role' => 'company', 'email' => 'taken@co.qa.test']);
+        $payload = fn (string $email) => [
+            'company_name' => 'Acme', 'website' => 'https://acme.example', 'sector' => 'IT', 'company_logo' => UploadedFile::fake()->image('logo.png', 64, 64),
+            'recruiter_name' => 'Asha Rao', 'recruiter_designation' => 'HR', 'hr_email' => $email, 'hr_phone' => '9876543210',
+            'head_name' => 'Head', 'head_designation' => 'Lead', 'head_email' => 'head@acme.example', 'head_mobile' => '9876543211',
+            'poc1_name' => 'Poc', 'poc1_designation' => 'HR', 'poc1_email' => 'poc@acme.example', 'poc1_mobile' => '9876543212',
+            'password' => 'Zx9!kLm2#Qw', 'password_confirmation' => 'Zx9!kLm2#Qw',
+        ];
+
+        $taken = $this->post('/api/auth/company/register', $payload('taken@co.qa.test'), ['Accept' => 'application/json']);
+        $fresh = $this->post('/api/auth/company/register', $payload('fresh@co.qa.test'), ['Accept' => 'application/json']);
+
+        $this->assertSame(422, $taken->status());
+        $this->assertSame([$fresh->status(), $fresh->getContent()], [$taken->status(), $taken->getContent()]);
+        $this->assertStringNotContainsString('already been registered', $taken->getContent());
     }
 
     // ---------------------------------------------------------------- A3.4 password policy
@@ -262,14 +366,15 @@ class AuthenticationTest extends TestCase
     {
         config(['services.recruiter_email.dns_check' => false]);
         $token = Str::random(64);
-        RecruiterEmailVerification::create(['email' => 'hr@slow.qa.test', 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(30)]);
+        RecruiterEmailVerification::create(['email' => 'hr@slow.qa.test', 'token_hash' => hash('sha256', $token), 'status_token_hash' => hash('sha256', 'browser-status-token'), 'expires_at' => now()->addMinutes(30)]);
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertSee('verified successfully');
+        $status = '/api/auth/company/recruiter-email/verification-status?email=hr@slow.qa.test&status_token=browser-status-token';
 
         $this->travel(2)->hours();
-        $this->getJson('/api/auth/company/recruiter-email/verification-status?email=hr@slow.qa.test')->assertOk()->assertJson(['verified' => true]);
+        $this->getJson($status)->assertOk()->assertJson(['verified' => true]);
 
         $this->travel(23)->hours();
-        $this->getJson('/api/auth/company/recruiter-email/verification-status?email=hr@slow.qa.test')->assertOk()->assertJson(['verified' => false]);
+        $this->getJson($status)->assertOk()->assertJson(['verified' => false]);
     }
 
     /** SEC-007 (P-1.10): the emailed link is built from APP_URL, never from the Host / X-Forwarded-Host headers. */

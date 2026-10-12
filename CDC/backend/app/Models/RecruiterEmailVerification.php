@@ -17,6 +17,7 @@ class RecruiterEmailVerification extends Model
     protected $fillable = [
         'email',
         'token_hash',
+        'status_token_hash',
         'expires_at',
         'verified_at',
     ];

@@ -277,6 +277,8 @@ function RegisterForm() {
   const [sendingVerificationLink, setSendingVerificationLink] = useState(false);
   const [verificationCooldown, setVerificationCooldown] = useState(0);
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+  // SEC-003: the API answers "verified yet?" only with the status token it gave this browser with the link.
+  const [verificationStatusToken, setVerificationStatusToken] = useState<{ email: string; token: string } | null>(null);
   const [processedVerificationQuery, setProcessedVerificationQuery] = useState(false);
 
   const {
@@ -352,6 +354,7 @@ function RegisterForm() {
         fields: Partial<RegisterFormValues>;
         step: number;
         verifiedEmail?: string | null;
+        verificationStatusToken?: { email: string; token: string } | null;
       };
       if (parsed.fields) {
         // Use reset to repopulate all fields at once, keeping passwords blank
@@ -362,6 +365,9 @@ function RegisterForm() {
       }
       if (parsed.verifiedEmail) {
         setVerifiedEmail(parsed.verifiedEmail);
+      }
+      if (parsed.verificationStatusToken?.email && parsed.verificationStatusToken?.token) {
+        setVerificationStatusToken(parsed.verificationStatusToken);
       }
     } catch {
       // Corrupt storage — ignore silently
@@ -386,11 +392,12 @@ function RegisterForm() {
         },
         step: activeStep,
         verifiedEmail,
+        verificationStatusToken,
       }));
     } catch {
       // sessionStorage quota exceeded or unavailable — ignore
     }
-  }, [persistedFields, activeStep, verifiedEmail]);
+  }, [persistedFields, activeStep, verifiedEmail, verificationStatusToken]);
 
   const normalizedRecruiterEmail = useMemo(
     () => (recruiterEmail ?? "").trim().toLowerCase(),
@@ -400,10 +407,12 @@ function RegisterForm() {
   const isRecruiterEmailVerified =
     verifiedEmail !== null && verifiedEmail === normalizedRecruiterEmail;
 
-  const checkRecruiterEmailVerificationStatus = async (emailArg?: string) => {
+  const checkRecruiterEmailVerificationStatus = async (emailArg?: string, tokenArg?: string) => {
     const email = (emailArg ?? normalizedRecruiterEmail).trim().toLowerCase();
+    const statusToken = tokenArg ?? (verificationStatusToken?.email === email ? verificationStatusToken.token : null);
 
-    if (!email || verifiedEmail === email) {
+    // Without the status token for this address there is nothing to ask (the link's own return page still works).
+    if (!email || verifiedEmail === email || !statusToken) {
       return;
     }
 
@@ -411,7 +420,7 @@ function RegisterForm() {
 
     try {
       const response = await fetch(
-        `${apiBase}/auth/company/recruiter-email/verification-status?email=${encodeURIComponent(email)}`,
+        `${apiBase}/auth/company/recruiter-email/verification-status?email=${encodeURIComponent(email)}&status_token=${encodeURIComponent(statusToken)}`,
         {
           method: "GET",
           headers: {
@@ -503,7 +512,7 @@ function RegisterForm() {
       window.removeEventListener("focus", onWindowFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [normalizedRecruiterEmail, verifiedEmail]);
+  }, [normalizedRecruiterEmail, verifiedEmail, verificationStatusToken]);
 
   const handleSendVerificationLink = async () => {
     setSuccess(null);
@@ -554,10 +563,14 @@ function RegisterForm() {
         return;
       }
 
+      const sent = (await response.json().catch(() => ({}))) as { status_token?: string };
+      if (sent.status_token) {
+        setVerificationStatusToken({ email, token: sent.status_token });
+      }
       setEmailVerificationRequested(true);
       setVerificationCooldown(60);
       setSuccess("Verification link sent. Please check your recruiter email inbox.");
-      void checkRecruiterEmailVerificationStatus(email);
+      void checkRecruiterEmailVerificationStatus(email, sent.status_token);
     } catch {
       setError("Unable to send verification link right now. Please try again.");
     } finally {

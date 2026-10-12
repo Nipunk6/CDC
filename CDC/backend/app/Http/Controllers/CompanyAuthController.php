@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\PortalNoticeMail;
 use App\Mail\RecruiterEmailVerificationMail;
 use App\Mail\NewCompanyRegistrationMail;
 use App\Models\Company;
@@ -45,7 +46,9 @@ class CompanyAuthController extends Controller
 
             'recruiter_name' => ['required', 'string', 'max:255', "regex:/^[\\pL\\s'.-]+$/u"],
             'recruiter_designation' => ['required', 'string', 'max:255'],
-            'hr_email' => ['required', 'string', 'email', 'max:255', 'unique:users,email', 'unique:companies,hr_email'],
+            // SEC-003: no `unique` rule here. Whether the address already has an account is checked only after it is
+            // verified (below), so only the mailbox's owner can ever learn it.
+            'hr_email' => ['required', 'string', 'email', 'max:255'],
             'hr_phone' => ['required', 'string', 'max:30'],
             'hr_alt_phone' => ['nullable', 'string', 'max:30'],
 
@@ -68,8 +71,6 @@ class CompanyAuthController extends Controller
             'poc2_landline' => ['nullable', 'string', 'max:30'],
 
             'password' => ['required', 'string', 'confirmed', Password::min(8)->letters()->mixedCase()->numbers()],
-        ], [
-            'hr_email.unique' => 'The email has already been registered.',
         ]);
 
         $normalizedHrEmail = $this->normalizeEmail($validated['hr_email']);
@@ -77,6 +78,13 @@ class CompanyAuthController extends Controller
         if (! $this->isRecruiterEmailVerified($normalizedHrEmail)) {
             return response()->json([
                 'message' => 'Please verify the recruiter email before completing registration.',
+            ], 422);
+        }
+
+        if ($this->emailIsRegistered($normalizedHrEmail)) {
+            return response()->json([
+                'message' => 'The email has already been registered.',
+                'errors' => ['hr_email' => ['The email has already been registered.']],
             ], 422);
         }
 
@@ -185,10 +193,8 @@ class CompanyAuthController extends Controller
         ]);
 
         $validated = $request->validate([
-            'email' => ['required', 'string', $this->recruiterEmailRule(), 'max:255', 'unique:users,email', 'unique:companies,hr_email'],
+            'email' => ['required', 'string', $this->recruiterEmailRule(), 'max:255'],
             'name' => ['nullable', 'string', 'max:255'],
-        ], [
-            'email.unique' => 'The email has already been registered.',
         ]);
 
         $email = $this->normalizeEmail($validated['email']);
@@ -211,11 +217,26 @@ class CompanyAuthController extends Controller
         $ttlMinutes = max((int) env('COMPANY_RECRUITER_VERIFY_TTL_MINUTES', 30), 5);
         $expiresAt = now()->addMinutes($ttlMinutes);
         $token = Str::random(64);
+        // SEC-003: the browser that asked gets a status token; only with it can "verified yet?" be checked.
+        $statusToken = Str::random(40);
+
+        // SEC-003: an address that already has an account gets the very same answer. No link is created; its owner
+        // is told by mail that someone tried to register with it.
+        if ($this->emailIsRegistered($email)) {
+            $this->notifyRegisteredOwner($email);
+
+            return response()->json([
+                'message' => 'A verification link has been sent to your email address.',
+                'expires_in_minutes' => $ttlMinutes,
+                'status_token' => $statusToken,
+            ]);
+        }
 
         RecruiterEmailVerification::query()->updateOrCreate(
             ['email' => $email],
             [
                 'token_hash' => hash('sha256', $token),
+                'status_token_hash' => hash('sha256', $statusToken),
                 'expires_at' => $expiresAt,
                 'verified_at' => null,
             ]
@@ -267,6 +288,7 @@ class CompanyAuthController extends Controller
         return response()->json([
             'message' => 'A verification link has been sent to your email address.',
             'expires_in_minutes' => $ttlMinutes,
+            'status_token' => $statusToken,
         ]);
     }
 
@@ -317,16 +339,58 @@ class CompanyAuthController extends Controller
 
     public function recruiterEmailVerificationStatus(Request $request): JsonResponse
     {
+        // SEC-003: without the status token of the browser that asked for the link, the answer is always "no", so
+        // this public endpoint says nothing about anyone else's address.
         $validated = $request->validate([
-            'email' => ['required', 'string', $this->recruiterEmailRule(), 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'status_token' => ['required', 'string', 'max:100'],
         ]);
 
         $email = $this->normalizeEmail($validated['email']);
+        $storedHash = RecruiterEmailVerification::query()->where('email', $email)->value('status_token_hash');
+        $tokenMatches = is_string($storedHash) && hash_equals($storedHash, hash('sha256', $validated['status_token']));
 
         return response()->json([
-            'verified' => $this->isRecruiterEmailVerified($email),
+            'verified' => $tokenMatches && $this->isRecruiterEmailVerified($email),
             'email' => $email,
         ]);
+    }
+
+    private function emailIsRegistered(string $email): bool
+    {
+        return User::query()->where('email', $email)->exists() || Company::query()->where('hr_email', $email)->exists();
+    }
+
+    /** SEC-003: tell the owner of an existing account that someone tried to register with their address. */
+    private function notifyRegisteredOwner(string $email): void
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
+        $subject = 'You already have a CDC portal account';
+
+        try {
+            Mail::to($email)->send(new PortalNoticeMail(
+                $subject,
+                'Hello,',
+                $subject,
+                [
+                    'Someone asked to register a company on the CDC placement portal with this email address, but it already has an account.',
+                    'If this was you, sign in instead. If you have forgotten your password, use "Forgot password" on the sign-in page.',
+                    'If this was not you, you can ignore this email. Nothing has changed on your account.',
+                ],
+                "{$frontendUrl}/auth/login/recruiter",
+                'Sign in'
+            ));
+
+            EmailLog::create([
+                'recipient_email' => $email,
+                'subject' => $subject,
+                'template' => 'emails.portal-notice',
+                'status' => 'sent',
+                'sent_at' => now(),
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('Registered-address notice could not be sent.', ['error' => $exception->getMessage()]);
+        }
     }
 
     private function isRecruiterEmailVerified(string $email): bool

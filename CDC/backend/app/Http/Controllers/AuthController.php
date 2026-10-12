@@ -9,6 +9,7 @@ use App\Services\LoginThrottleService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
@@ -44,6 +45,12 @@ class AuthController extends Controller
         }
 
         $user = $this->resolveLoginUser($validated);
+
+        // SEC-003: an unknown account costs one password check too, so the response time does not say whether the
+        // email or roll number exists.
+        if (! $user) {
+            Hash::check($validated['password'], $this->dummyPasswordHash());
+        }
 
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
             $this->throttle->recordFailure($identifier, (string) $request->ip());
@@ -113,45 +120,26 @@ class AuthController extends Controller
             ]);
         }
 
+        // SEC-003: whatever happens next (sent, throttled by the broker, a mail fault), the answer is the same as for
+        // an unknown account, so the response never says whether the account exists. Faults go to the log.
         try {
             $status = Password::sendResetLink([
                 'email' => $email,
             ]);
-        } catch (TransportExceptionInterface $exception) {
-            Log::error('Password reset email transport failure.', [
-                'email' => $email,
-                'error' => $exception->getMessage(),
-            ]);
 
-            return response()->json([
-                'message' => 'Mail server is not configured correctly. Please contact support.',
-            ], 503);
+            if (! in_array($status, [Password::RESET_LINK_SENT, Password::INVALID_USER, Password::RESET_THROTTLED], true)) {
+                Log::warning('Password reset link was not sent.', ['status' => $status]);
+            }
         } catch (Throwable $exception) {
-            Log::error('Password reset email failed unexpectedly.', [
-                'email' => $email,
+            Log::error('Password reset email failed.', [
+                'transport' => $exception instanceof TransportExceptionInterface,
                 'error' => $exception->getMessage(),
             ]);
-
-            return response()->json([
-                'message' => 'Unable to send reset link right now. Please try again.',
-            ], 500);
-        }
-
-        if (in_array($status, [Password::RESET_LINK_SENT, Password::INVALID_USER], true)) {
-            return response()->json([
-                'message' => 'If the account exists, a password reset link has been sent.',
-            ]);
-        }
-
-        if ($status === Password::RESET_THROTTLED) {
-            return response()->json([
-                'message' => 'Please wait before requesting another reset link.',
-            ], 429);
         }
 
         return response()->json([
-            'message' => 'Unable to send reset link right now. Please try again.',
-        ], 422);
+            'message' => 'If the account exists, a password reset link has been sent.',
+        ]);
     }
 
     public function resetPassword(Request $request): JsonResponse
@@ -206,6 +194,16 @@ class AuthController extends Controller
     /**
      * Students sign in with their roll number; admins and companies with email.
      */
+    /**
+     * A real hash (made once at the current cost, then cached) of a value nobody knows, for the unknown-account path.
+     */
+    private function dummyPasswordHash(): string
+    {
+        $rounds = (int) config('hashing.bcrypt.rounds', 12);
+
+        return Cache::rememberForever("auth.dummy_password_hash.{$rounds}", fn () => Hash::make(Str::random(40)));
+    }
+
     private function resolveLoginUser(array $validated): ?User
     {
         if (! empty($validated['roll_no'])) {
