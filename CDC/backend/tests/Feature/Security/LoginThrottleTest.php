@@ -44,7 +44,7 @@ class LoginThrottleTest extends TestCase
         ];
     }
 
-    private function student(string $roll, string $password = 'Secret123'): StudentProfile
+    private function student(string $roll, string $password = 'Kx7-Tmq9-Zr42'): StudentProfile
     {
         $student = StudentProfile::factory()->create(['roll_no' => $roll]);
         $student->user->update(['password' => Hash::make($password)]);
@@ -119,10 +119,10 @@ class LoginThrottleTest extends TestCase
         $this->assertStringContainsString('Too many attempts', $sixth->json('message'));
 
         // Even the right password waits out the (short) backoff from this IP...
-        $this->login('22JE0001', 'Secret123', '10.2.2.2')->assertStatus(429);
+        $this->login('22JE0001', 'Kx7-Tmq9-Zr42', '10.2.2.2')->assertStatus(429);
         // ...and succeeds a couple of seconds later: no minute-long lockout.
         $this->travel(2)->seconds();
-        $this->login('22JE0001', 'Secret123', '10.2.2.2')->assertOk();
+        $this->login('22JE0001', 'Kx7-Tmq9-Zr42', '10.2.2.2')->assertOk();
     }
 
     public function test_backoff_doubles_but_is_capped_at_a_minute(): void
@@ -151,7 +151,7 @@ class LoginThrottleTest extends TestCase
             $this->login('22JE0003', 'guess-'.$i, '198.51.100.66');
         }
 
-        $this->login('22JE0003', 'Secret123', '10.4.4.4')->assertOk();
+        $this->login('22JE0003', 'Kx7-Tmq9-Zr42', '10.4.4.4')->assertOk();
     }
 
     public function test_guessing_from_many_ips_triggers_a_short_account_wide_backoff(): void
@@ -166,7 +166,7 @@ class LoginThrottleTest extends TestCase
         $this->assertLessThanOrEqual(30, (int) $blocked->headers->get('Retry-After'));
 
         $this->travel(31)->seconds();
-        $this->login('22JE0004', 'Secret123', '10.5.5.100')->assertOk();
+        $this->login('22JE0004', 'Kx7-Tmq9-Zr42', '10.5.5.100')->assertOk();
     }
 
     public function test_a_forged_forwarded_ip_cannot_rotate_past_the_backoff(): void

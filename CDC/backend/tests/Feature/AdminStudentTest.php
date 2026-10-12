@@ -131,9 +131,9 @@ class AdminStudentTest extends TestCase
     public function test_student_logs_in_with_roll_number_and_suspension_blocks_login(): void
     {
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0100']);
-        $student->user->update(['password' => Hash::make('Secret123')]);
+        $student->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
 
-        $this->postJson('/api/auth/login', ['roll_no' => '22je0100', 'password' => 'Secret123'])
+        $this->postJson('/api/auth/login', ['roll_no' => '22je0100', 'password' => 'Kx7-Tmq9-Zr42'])
             ->assertOk()
             ->assertJsonPath('user.role', 'student')
             ->assertJsonPath('user.student_profile.roll_no', '22JE0100');
@@ -142,7 +142,7 @@ class AdminStudentTest extends TestCase
         $this->patchJson("/api/admin/students/{$student->id}/suspend")->assertOk();
         $this->patchJson("/api/admin/students/{$student->id}/suspend")->assertStatus(422);
 
-        $this->postJson('/api/auth/login', ['roll_no' => '22JE0100', 'password' => 'Secret123'])
+        $this->postJson('/api/auth/login', ['roll_no' => '22JE0100', 'password' => 'Kx7-Tmq9-Zr42'])
             ->assertStatus(403)
             ->assertJsonPath('message', 'Account suspended. Contact CDC.');
 

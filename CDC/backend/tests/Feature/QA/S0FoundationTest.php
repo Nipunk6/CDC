@@ -155,8 +155,8 @@ class S0FoundationTest extends TestCase
         $response = $this->postJson('/api/auth/admin/register', [
             'name' => 'Evil Admin',
             'email' => 'evil@example.com',
-            'password' => 'Password123',
-            'password_confirmation' => 'Password123',
+            'password' => 'Qd4-Rvx6-Tm19',
+            'password_confirmation' => 'Qd4-Rvx6-Tm19',
         ]);
 
         $this->assertContains($response->status(), [404, 405], 'POST /api/auth/admin/register must be gone (404/405), got '.$response->status());
@@ -331,15 +331,15 @@ class S0FoundationTest extends TestCase
 
     public function test_T0_4e_logout_revokes_the_token_for_admin_company_and_student(): void
     {
-        $admin = User::factory()->create(['role' => 'admin', 'email' => 'a@qa.test', 'password' => Hash::make('Secret123')]);
-        $company = User::factory()->create(['role' => 'company', 'company_id' => $this->company()->id, 'email' => 'c@qa.test', 'password' => Hash::make('Secret123')]);
+        $admin = User::factory()->create(['role' => 'admin', 'email' => 'a@qa.test', 'password' => Hash::make('Kx7-Tmq9-Zr42')]);
+        $company = User::factory()->create(['role' => 'company', 'company_id' => $this->company()->id, 'email' => 'c@qa.test', 'password' => Hash::make('Kx7-Tmq9-Zr42')]);
         $student = StudentProfile::factory()->create(['roll_no' => '22JE7001']);
-        $student->user->update(['password' => Hash::make('Secret123')]);
+        $student->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
 
         $logins = [
-            'admin' => ['email' => 'a@qa.test', 'password' => 'Secret123'],
-            'company' => ['email' => 'c@qa.test', 'password' => 'Secret123'],
-            'student' => ['roll_no' => '22JE7001', 'password' => 'Secret123'],
+            'admin' => ['email' => 'a@qa.test', 'password' => 'Kx7-Tmq9-Zr42'],
+            'company' => ['email' => 'c@qa.test', 'password' => 'Kx7-Tmq9-Zr42'],
+            'student' => ['roll_no' => '22JE7001', 'password' => 'Kx7-Tmq9-Zr42'],
         ];
 
         foreach ($logins as $role => $credentials) {

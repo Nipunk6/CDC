@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Models\StudentProfile;
 use App\Models\User;
+use App\Rules\SafePassword;
 use App\Services\LoginThrottleService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -147,7 +149,9 @@ class AuthController extends Controller
         $validated = $request->validate([
             'token' => ['required', 'string'],
             'email' => ['required', 'email'],
-            'password' => ['required', 'string', 'confirmed', PasswordRule::min(8)->letters()->mixedCase()->numbers()],
+            // SEC-012: not a common password and not built on the email's own name part. The account's name and roll
+            // number are checked below, once the link has proved who is asking.
+            'password' => ['required', 'string', 'confirmed', PasswordRule::min(8)->letters()->mixedCase()->numbers(), new SafePassword([$request->input('email')])],
         ]);
 
         $credentials = [
@@ -157,6 +161,12 @@ class AuthController extends Controller
             'token' => $validated['token'],
         ];
         $setPassword = function (User $user, string $password): void {
+            // SEC-012: runs only after the link's token was accepted; a refusal here leaves the link usable.
+            Validator::make(
+                ['password' => $password],
+                ['password' => [new SafePassword([$user->name, $user->studentProfile?->full_name, $user->studentProfile?->roll_no, $user->email])]]
+            )->validate();
+
             $user->forceFill([
                 'password' => $password,
                 'remember_token' => Str::random(60),

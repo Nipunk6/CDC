@@ -79,7 +79,7 @@ class StudentInvitationTest extends TestCase
     private function setPassword(string $email, string $token)
     {
         return $this->postJson('/api/auth/reset-password', [
-            'email' => $email, 'token' => $token, 'password' => 'NewPass123', 'password_confirmation' => 'NewPass123',
+            'email' => $email, 'token' => $token, 'password' => 'Vb3-Wnq8-Xd57', 'password_confirmation' => 'Vb3-Wnq8-Xd57',
         ]);
     }
 

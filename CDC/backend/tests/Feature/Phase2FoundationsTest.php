@@ -38,8 +38,8 @@ class Phase2FoundationsTest extends TestCase
         $response = $this->postJson('/api/auth/admin/register', [
             'name' => 'Evil Admin',
             'email' => 'evil@example.com',
-            'password' => 'Password123',
-            'password_confirmation' => 'Password123',
+            'password' => 'Qd4-Rvx6-Tm19',
+            'password_confirmation' => 'Qd4-Rvx6-Tm19',
         ]);
 
         $response->assertNotFound();

@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\EmailLog;
 use App\Models\RecruiterEmailVerification;
 use App\Models\User;
+use App\Rules\SafePassword;
 use App\Services\PortalNotificationService;
 use App\Support\MailCooldown;
 use Illuminate\Validation\Rules\Password;
@@ -70,7 +71,8 @@ class CompanyAuthController extends Controller
             'poc2_mobile' => ['nullable', 'string', 'max:30'],
             'poc2_landline' => ['nullable', 'string', 'max:30'],
 
-            'password' => ['required', 'string', 'confirmed', Password::min(8)->letters()->mixedCase()->numbers()],
+            // SEC-012: not a common password, and not built on the recruiter's own name or email.
+            'password' => ['required', 'string', 'confirmed', Password::min(8)->letters()->mixedCase()->numbers(), new SafePassword([$request->input('recruiter_name'), $request->input('hr_email')])],
         ]);
 
         $normalizedHrEmail = $this->normalizeEmail($validated['hr_email']);

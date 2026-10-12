@@ -68,7 +68,7 @@ class AuthenticationTest extends TestCase
         $known = StudentProfile::factory()->create(['roll_no' => '22JE0001']);
         config(['hashing.bcrypt.rounds' => 12]);
         app('hash')->forgetDrivers();
-        $known->user->update(['password' => Hash::make('Secret123')]);
+        $known->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
         $this->assertSame(12, password_get_info($known->user->fresh()->password)['options']['cost']);
 
         $time = function (array $body): float {
@@ -220,9 +220,8 @@ class AuthenticationTest extends TestCase
     /**
      * SEC finding (Low): no compromised-password or personal-information check.
      *
-     * Known open finding SEC-012: fails on purpose until fixed (group qa-open; remove the tag when fixed).
+     * SEC-012: fixed in P-1.14 (was in group qa-open until then).
      */
-    #[Group('qa-open')]
     public function test_A3_4_common_or_personal_passwords_are_rejected(): void
     {
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0003', 'full_name' => 'Asha Verma']);
@@ -236,6 +235,27 @@ class AuthenticationTest extends TestCase
         $this->assertSame([], $accepted, 'weak/common/personal passwords accepted');
     }
 
+    /** SEC-012 (P-1.14): the same rule on company registration; a strong unrelated password still passes the rule. */
+    public function test_A3_4_registration_rejects_common_and_personal_passwords_and_accepts_a_strong_one(): void
+    {
+        Storage::fake('public');
+        RecruiterEmailVerification::create(['email' => 'asha.rao@acme.qa.test', 'token_hash' => hash('sha256', 'x'), 'expires_at' => now()->addHour(), 'verified_at' => now()]);
+        $register = fn (string $password) => $this->post('/api/auth/company/register', [
+            'company_name' => 'Acme', 'website' => 'https://acme.example', 'sector' => 'IT', 'company_logo' => UploadedFile::fake()->image('logo.png', 64, 64),
+            'recruiter_name' => 'Asha Rao', 'recruiter_designation' => 'HR', 'hr_email' => 'asha.rao@acme.qa.test', 'hr_phone' => '9876543210',
+            'head_name' => 'Head', 'head_designation' => 'Lead', 'head_email' => 'head@acme.example', 'head_mobile' => '9876543211',
+            'poc1_name' => 'Poc', 'poc1_designation' => 'HR', 'poc1_email' => 'poc@acme.example', 'poc1_mobile' => '9876543212',
+            'password' => $password, 'password_confirmation' => $password,
+        ], ['Accept' => 'application/json']);
+
+        foreach (['Password1', 'Qwerty2026', 'Dragon!99', 'AshaRao2026', 'xAsha.Rao77'] as $weak) {
+            $register($weak)->assertStatus(422)->assertJsonValidationErrors('password');
+        }
+        $this->assertSame(0, Company::count());
+
+        $register('Tr4vel-Kettle-93')->assertCreated();
+    }
+
     // ---------------------------------------------------------------- A3.5 reset flow
 
     public function test_A3_5_reset_token_is_single_use_email_bound_expiring_and_revokes_api_tokens(): void
@@ -245,14 +265,14 @@ class AuthenticationTest extends TestCase
         $oldToken = $a->createToken('auth-token')->plainTextToken;
 
         $tokenA = Password::broker()->createToken($a);
-        $this->reset('b@co.test', $tokenA, 'NewPass123')->assertStatus(422); // A's token with B's email
-        $this->reset('a@co.test', $tokenA, 'NewPass123')->assertOk();
-        $this->reset('a@co.test', $tokenA, 'NewPass456')->assertStatus(422); // reuse
+        $this->reset('b@co.test', $tokenA, 'Vb3-Wnq8-Xd57')->assertStatus(422); // A's token with B's email
+        $this->reset('a@co.test', $tokenA, 'Vb3-Wnq8-Xd57')->assertOk();
+        $this->reset('a@co.test', $tokenA, 'Hg5-Jzp2-Lc86')->assertStatus(422); // reuse
         $this->bearer($oldToken)->getJson('/api/auth/user')->assertUnauthorized(); // old API tokens revoked
 
         $tokenB = Password::broker()->createToken($b);
         DB::table('password_reset_tokens')->where('email', 'b@co.test')->update(['created_at' => now()->subMinutes(61)]);
-        $this->reset('b@co.test', $tokenB, 'NewPass123')->assertStatus(422); // expired
+        $this->reset('b@co.test', $tokenB, 'Vb3-Wnq8-Xd57')->assertStatus(422); // expired
     }
 
     public function test_A3_5_reset_link_is_built_from_config_not_from_host_headers(): void
@@ -288,9 +308,9 @@ class AuthenticationTest extends TestCase
         $this->assertStringNotContainsString('8.73', $html);
         $this->assertStringNotContainsString('9876501234', $html);
 
-        $this->reset($first['email'], $first['token'], 'NewPass123')->assertStatus(422); // superseded
-        $this->reset($second['email'], $second['token'], 'NewPass123')->assertOk();
-        $this->reset($second['email'], $second['token'], 'NewPass456')->assertStatus(422); // single use
+        $this->reset($first['email'], $first['token'], 'Vb3-Wnq8-Xd57')->assertStatus(422); // superseded
+        $this->reset($second['email'], $second['token'], 'Vb3-Wnq8-Xd57')->assertOk();
+        $this->reset($second['email'], $second['token'], 'Hg5-Jzp2-Lc86')->assertStatus(422); // single use
     }
 
     // ---------------------------------------------------------------- A3.7 account state
@@ -325,9 +345,9 @@ class AuthenticationTest extends TestCase
     public function test_A3_8_api_token_of_one_role_never_reaches_another_roles_routes(): void
     {
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0005']);
-        $student->user->update(['password' => Hash::make('Secret123')]);
+        $student->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
         // The API issues a token whatever "portal" the user came from (portal choice is UI-only by design)…
-        $token = $this->postJson('/api/auth/login', ['roll_no' => '22JE0005', 'password' => 'Secret123'])->assertOk()->json('token');
+        $token = $this->postJson('/api/auth/login', ['roll_no' => '22JE0005', 'password' => 'Kx7-Tmq9-Zr42'])->assertOk()->json('token');
         // …but the role boundary holds.
         $this->bearer($token)->getJson('/api/company/postings')->assertForbidden();
         $this->bearer($token)->getJson('/api/admin/students')->assertForbidden();
