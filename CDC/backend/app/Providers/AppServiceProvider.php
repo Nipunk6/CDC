@@ -38,10 +38,14 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(MessageSent::class, [MailDispatchService::class, 'markSent']);
         Event::listen(JobFailed::class, [MailDispatchService::class, 'markFailed']);
 
+        // A signed-in user gets 300 requests a minute of their own (an admin page makes several calls at once and
+        // 60 a minute stopped normal work); a guest stays at 60 a minute per address (owner decision 2026-10-12).
         RateLimiter::for('api', function (Request $request) {
-            $key = $request->user()?->id ?? $request->ip();
+            $user = $request->user();
 
-            return Limit::perMinute(60)->by((string) $key);
+            return $user
+                ? Limit::perMinute(300)->by('user:'.$user->id)
+                : Limit::perMinute(60)->by('ip:'.$request->ip());
         });
 
         // Login's own per-IP budget (SEC-008 / QA N-1): a campus shares a few NAT addresses, so login is not in the

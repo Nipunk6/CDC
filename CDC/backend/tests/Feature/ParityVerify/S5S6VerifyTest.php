@@ -99,7 +99,7 @@ class S5S6VerifyTest extends TestCase
         $this->app['auth']->forgetGuards();
 
         return $this->postJson('/api/auth/reset-password', [
-            'email' => $email, 'token' => $token, 'password' => 'NewPass123', 'password_confirmation' => 'NewPass123',
+            'email' => $email, 'token' => $token, 'password' => 'Vb3-Wnq8-Xd57', 'password_confirmation' => 'Vb3-Wnq8-Xd57',
         ]);
     }
 
@@ -202,7 +202,7 @@ class S5S6VerifyTest extends TestCase
         $this->assertSame(0, AuditLog::whereIn('action', ['student.invite_revoke', 'student.invite_revoke_bulk'])->count());
         // The activated student can still sign in with their password.
         $this->app['auth']->forgetGuards();
-        $this->postJson('/api/auth/login', ['roll_no' => '25JE0101', 'password' => 'NewPass123', 'role' => 'student'])->assertOk();
+        $this->postJson('/api/auth/login', ['roll_no' => '25JE0101', 'password' => 'Vb3-Wnq8-Xd57', 'role' => 'student'])->assertOk();
     }
 
     public function test_s5_revoked_link_and_earlier_forgot_link_cannot_set_a_password_until_resend(): void

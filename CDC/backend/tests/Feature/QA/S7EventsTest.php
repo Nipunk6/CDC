@@ -168,7 +168,7 @@ class S7EventsTest extends TestCase
         $this->assertSame('https://meet.example.test/acme', $event->meeting_link);
         $this->assertStringContainsString('<strong>Acme</strong>', $event->description, 'rich text is stored as authored');
         $this->assertSame('branches', $event->audience_type);
-        $this->assertSame([['programme' => self::BTECH, 'branch' => 'Computer Science & Engineering']], $event->audience_filter['branches']);
+        $this->assertEquals([['programme' => self::BTECH, 'branch' => 'Computer Science & Engineering']], $event->audience_filter['branches']); // key order is the database's
         $this->assertTrue($event->starts_at->equalTo(\Carbon\Carbon::parse('2027-01-15T09:30:00Z')));
         $this->assertSame(2, AuditLog::where('action', 'event.create')->where('user_id', $this->admin->id)->count());
 

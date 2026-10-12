@@ -11,9 +11,9 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for PU.
-- PR #1 (`phase3` → `main`) still showed as open on GitHub on 2026-10-10 although the owner wrote that it was merged (P3-D30). `phase3-p0` is not pushed; say if a pull request is wanted.
+- PR #1 (`phase3` → `main`) was still open on GitHub on 2026-10-12; the owner's answers on it and on SEC-002 again carried both template options. `phase3-p0` is pushed with a pull request based on `phase3`; retarget it to `main` once PR #1 is merged.
 - SEC-002 secret rotation: owner's answer had both template options; still Open (P3-D17).
-- `qa-open` still holds 4 security tests that were never approved for fixing: SEC-003 (A3_1, A3_2), SEC-012 (A3_4), SEC-013 (T4_8). Fix them as P-1.14, or leave them tagged? (P3-D28)
+- `qa-open` holds one test: `SessionTokenTest::test_T4_8_…` (SEC-013), left open by the owner on 12-10-2026.
 
 ## HANDOVER NOTES (running list, collected for P13.5)
 - **Cron:** production needs `* * * * * cd <CDC/backend> && php artisan schedule:run >> /dev/null 2>&1`. Scheduled now: `placement:open-scheduled` (every minute), `login-logs:purge` (02:30 IST, retention from Settings → Login Log). Locally: `php artisan schedule:work`.
@@ -40,6 +40,8 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P-1.12 Lows: SEC-014, SEC-015, SEC-016, SEC-019, SEC-022
   - [x] P-1.13 QA leftovers: F-017, F-019, F-021, F-037, F-040 (+SEC-022), F-041; confirm/fix F-018, F-022, F-026, F-027, F-028, F-033, F-035 (F-027, F-035 first); qa-open group empty (P3-D17)
   - [x] P-1 close: tests, authorisation matrix, build/lint/tsc, npm audit, composer audit, QA E2E-1, SECURITY_REPORT §12 Re-test Results, QA_REPORT re-test note, push to PR #1 + update description, stop and report (owner merges)
+  - [x] P-1.14 (owner, 12-10-2026): API rate limit 300/min per signed-in user; SEC-003; SEC-012 (P3-D37 to P3-D39). SEC-013 stays open
+  - [x] CI workflow `.github/workflows/ci.yml`; suite passes on MySQL; composer.lock installable on PHP 8.2 (P3-D40)
 - [x] P0 Foundations, login IP log, settings, scheduler (done 2026-10-10, branch `phase3-p0`; evidence `qa/evidence/p0_gates.txt`)
   - [x] P0.1 preconditions; progress file with every task ID; decisions logged; Phase 3 notice in both CLAUDE.md files
   - [x] P0.2 migration S1 (mentor role) + frontend role plumbing (types, auth.ts, proxy.ts, /auth/login/mentor)
@@ -110,3 +112,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P0.3 Phase 3 settings: SettingsService defaults + secrets, migration …000041, AdminSettingsController, Settings tabs (P3-D33)
 - 2026-10-10 · P0.4–P0.6 login log: migration …000042, LoginLogService, AuthController, AdminLoginLogController (+export), login-logs:purge on the scheduler, admin Login Log page, student last-login line, cron documented (P3-D34)
 - 2026-10-10 · P0 Definition of Done run (P3-D35): evidence qa/evidence/p0_gates.txt, screenshots qa/screenshots/p3/p0/
+- 2026-10-12 · on `phase3`: P-1.14 (rate limit df09539, SEC-003 d40b6c2, SEC-012 868a26e), MySQL-neutral tests aebb9de, PHP 8.2 lock 498f4fd, CI a9fe018; merged into `phase3-p0`

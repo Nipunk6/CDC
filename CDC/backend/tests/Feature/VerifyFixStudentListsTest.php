@@ -139,7 +139,7 @@ class VerifyFixStudentListsTest extends TestCase
 
         $this->downloaded('status=active&cgpa_max=7');
         $log = AuditLog::where('action', 'cycle.export')->latest('id')->firstOrFail();
-        $this->assertSame(['cgpa_max' => '7', 'status' => 'active'], $log->after['filters']);
+        $this->assertEquals(['cgpa_max' => '7', 'status' => 'active'], $log->after['filters']); // key order is the database's
         $this->assertSame(2, $log->after['count']);
         $this->assertNull($log->after['template_id']);
 

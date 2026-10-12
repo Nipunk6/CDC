@@ -1,0 +1,147 @@
+# CI for the CDC placement portal (CDC/backend = Laravel, CDC/frontend = Next.js).
+# Runs on every pull request and on pushes to main. No job sends mail or needs a real secret.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests (MySQL) and Composer audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: CDC/backend
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: iitism_placement_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+
+      # PHP 8.2 is the project's stated minimum; composer.json pins the platform to it.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: mbstring, pdo_mysql, gd, zip, intl, bcmath, fileinfo, dom, xml, xmlreader, xmlwriter, simplexml
+          coverage: none
+          tools: composer:v2
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare the environment file
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      # The suite's own defaults are in-memory SQLite (phpunit.xml); these variables point it at the MySQL service.
+      # The qa-open group holds the deliberately failing tests of findings that are still open.
+      - name: Run the tests on MySQL
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: iitism_placement_test
+          DB_USERNAME: root
+          DB_PASSWORD: ""
+          MAIL_MAILER: array
+        run: php artisan test --exclude-group=qa-open
+
+      - name: Composer audit (production packages, release gate)
+        run: composer audit --locked --no-dev
+
+      - name: Composer audit (with development packages, information only)
+        if: always()
+        continue-on-error: true
+        run: composer audit --locked
+
+  frontend:
+    name: Frontend lint, types, unit tests, build and npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: CDC/frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Build-time placeholders only; nothing is deployed from CI.
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXTAUTH_SECRET: ci-build-placeholder-not-used-anywhere
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: CDC/frontend/package-lock.json
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Production build
+        run: npm run build
+
+      - name: npm audit (production packages, release gate)
+        run: npm audit --omit=dev --audit-level=high
+
+      # Development tooling is reported but does not fail the build: a lint-only dependency (braces, through
+      # eslint-config-next) has a high advisory with no fixed version published.
+      - name: npm audit (with development packages, information only)
+        if: always()
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+  secret-scan:
+    name: Secret scan on changed lines
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan the lines this change adds
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="origin/$BASE_REF"
+          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            BASE="$BEFORE_SHA"
+          else
+            BASE="HEAD~1"
+          fi
+          python3 CDC/security/secret_scan.py diff "$BASE"

@@ -1005,8 +1005,8 @@ class S3EligibilityApplyTest extends TestCase
         $this->assertSame(17, Application::count());
 
         Sanctum::actingAs($this->admin);
-        $this->postJson('/api/admin/events', ['title' => 'PPT by A', 'event_type' => 'ppt', 'starts_at' => now()->addDays(2)->toIso8601String(), 'company_id' => $this->companyA->id, 'audience_type' => 'posting_applicants', 'audience_filter' => ['job_posting_id' => $posting->id]])->assertCreated();
-        $this->postJson('/api/admin/events/1/publish')->assertOk();
+        $eventId = $this->postJson('/api/admin/events', ['title' => 'PPT by A', 'event_type' => 'ppt', 'starts_at' => now()->addDays(2)->toIso8601String(), 'company_id' => $this->companyA->id, 'audience_type' => 'posting_applicants', 'audience_filter' => ['job_posting_id' => $posting->id]])->assertCreated()->json('event.id');
+        $this->postJson("/api/admin/events/{$eventId}/publish")->assertOk();
 
         $month = $posting->application_deadline->timezone('Asia/Kolkata')->format('Y-m');
         $endpoints = [
