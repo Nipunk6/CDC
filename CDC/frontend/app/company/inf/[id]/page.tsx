@@ -34,6 +34,7 @@ import type { ProgrammeEligibility } from "@/components/forms/shared/eligibility
 import type { ProgrammeStipend } from "@/components/forms/shared/stipendgrid";
 import type { Currency } from "@/components/forms/shared/currencyselector";
 import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
+import { statusColor } from "@/lib/statuscolors";
 
 type FormData = {
   companyProfile?: {
@@ -127,16 +128,6 @@ const getCurrencySymbol = (currency?: string) => {
     case "EUR": return "€";
     case "GBP": return "£";
     default: return "₹";
-  }
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "accepted": return "success";
-    case "submitted": return "warning";
-    case "under_review": return "info";
-    case "rejected": return "error";
-    default: return "default";
   }
 };
 
@@ -255,12 +246,11 @@ export default function ViewInfPage({ params }: { params: Promise<{ id: string }
     <Box>
       {/* Header */}
       <Paper
+        elevation={0}
         sx={{
-          p: 2,
+          bgcolor: "transparent",
+          p: 0,
           mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.dark} 100%)`,
-          color: "white",
           borderRadius: 2,
         }}
       >
@@ -268,7 +258,7 @@ export default function ViewInfPage({ params }: { params: Promise<{ id: string }
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar 
               src={inf?.company?.logo_url || formData.companyProfile?.logoUrl || undefined}
-              sx={{ width: 48, height: 48, bgcolor: "white", color: "secondary.main" }}
+              sx={{ width: 48, height: 48, bgcolor: "background.paper", color: "secondary.main", border: 1, borderColor: "divider" }}
             >
               {!(inf?.company?.logo_url || formData.companyProfile?.logoUrl) && <SchoolIcon />}
             </Avatar>
@@ -276,7 +266,7 @@ export default function ViewInfPage({ params }: { params: Promise<{ id: string }
               <Typography variant="h5" fontWeight={700}>
                 {formData.internshipTitle || inf?.internship_title || "INF Details"}
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              <Typography variant="body2" color="text.secondary">
                 Submitted {inf?.created_at ? new Date(inf.created_at).toLocaleDateString() : "-"}
               </Typography>
             </Box>
@@ -284,15 +274,15 @@ export default function ViewInfPage({ params }: { params: Promise<{ id: string }
           <Stack direction="row" spacing={1} alignItems="center">
             <Chip
               label={(inf?.status ?? "").replace("_", " ").toUpperCase()}
-              color={getStatusColor(inf?.status ?? "") as "success" | "warning" | "info" | "error" | "default"}
-              sx={{ color: "white", fontWeight: 600 }}
+              color={statusColor(inf?.status ?? "") as "success" | "warning" | "info" | "error" | "default"}
+              sx={{ fontWeight: 600 }}
             />
             <Button
               variant="outlined"
               startIcon={<ArrowBackIcon />}
               component={Link}
               href="/company"
-              sx={{ color: "white", borderColor: "white" }}
+             
             >
               Back
             </Button>

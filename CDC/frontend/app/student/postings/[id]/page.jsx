@@ -62,26 +62,23 @@ export default function StudentPostingDetailPage({ params }) {
           Job Profiles
         </Button>
         <Card
-          sx={{
-            background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-            color: "white",
-          }}
+         
         >
           <CardContent>
             <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar src={posting.company?.logo_url ?? undefined} variant="rounded" sx={{ width: 56, height: 56, bgcolor: "white", color: "primary.main" }}>
+              <Avatar src={posting.company?.logo_url ?? undefined} variant="rounded" sx={{ width: 56, height: 56, bgcolor: "background.paper", color: "primary.main", border: 1, borderColor: "divider" }}>
                 {posting.company?.name?.[0]}
               </Avatar>
               <Box sx={{ minWidth: 0 }}>
                 <Typography variant="h5" fontWeight={700} sx={{ wordBreak: "break-word" }}>
                   {posting.title}
                 </Typography>
-                <Typography sx={{ opacity: 0.9 }}>{posting.company?.name}</Typography>
+                <Typography color="text.secondary">{posting.company?.name}</Typography>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                  <Chip size="small" sx={{ bgcolor: "white" }} label={posting.offer_label ?? (posting.type === "fulltime" ? "Full Time" : "Internship")} />
-                  {compensationText(posting.compensation) && <Chip size="small" sx={{ bgcolor: "white" }} label={compensationText(posting.compensation)} />}
-                  {posting.location && <Chip size="small" sx={{ bgcolor: "white" }} label={posting.location} />}
-                  {posting.visit_date && <Chip size="small" sx={{ bgcolor: "white" }} label={`Date of visit: ${formatDate(posting.visit_date)}`} />}
+                  <Chip size="small" variant="outlined" label={posting.offer_label ?? (posting.type === "fulltime" ? "Full Time" : "Internship")} />
+                  {compensationText(posting.compensation) && <Chip size="small" variant="outlined" label={compensationText(posting.compensation)} />}
+                  {posting.location && <Chip size="small" variant="outlined" label={posting.location} />}
+                  {posting.visit_date && <Chip size="small" variant="outlined" label={`Date of visit: ${formatDate(posting.visit_date)}`} />}
                 </Stack>
               </Box>
             </Stack>

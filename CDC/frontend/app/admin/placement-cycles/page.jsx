@@ -29,7 +29,6 @@ import {
   TextField,
   Tooltip,
   Typography,
-  alpha,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -311,12 +310,11 @@ export default function AdminPlacementCyclesPage() {
   return (
     <Box>
       <Paper
+        elevation={0}
         sx={{
-          p: 2,
+          bgcolor: "transparent",
+          p: 0,
           mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-          color: "white",
           borderRadius: 2,
         }}
       >
@@ -327,14 +325,14 @@ export default function AdminPlacementCyclesPage() {
           spacing={2}
         >
           <Stack direction="row" spacing={2} alignItems="center">
-            <Avatar sx={{ width: 48, height: 48, bgcolor: "white", color: "primary.main" }}>
+            <Avatar sx={{ width: 48, height: 48, bgcolor: "background.paper", color: "primary.main", border: 1, borderColor: "divider" }}>
               <EventRepeatIcon />
             </Avatar>
             <Box>
               <Typography variant="h5" fontWeight={700}>
                 Placements
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              <Typography variant="body2" color="text.secondary">
                 {loading ? "Loading placements…" : `${cycles.length} placement(s) · ${totals.open} open · ${totals.students} enrolment(s)`}
               </Typography>
             </Box>
@@ -348,11 +346,7 @@ export default function AdminPlacementCyclesPage() {
               href="/admin"
               variant="outlined"
               startIcon={<ArrowBackIcon />}
-              sx={{
-                color: "white",
-                borderColor: "white",
-                "&:hover": { borderColor: "white", bgcolor: alpha("#fff", 0.1) },
-              }}
+             
             >
               Back to Dashboard
             </Button>

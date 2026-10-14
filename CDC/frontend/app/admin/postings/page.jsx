@@ -84,7 +84,6 @@ export default function AdminPostingsPage() {
             href={cycleId ? `/admin/postings/new?cycle=${cycleId}` : "/admin/postings/new"}
             variant="contained"
             startIcon={<AddIcon />}
-            sx={{ bgcolor: "common.white", color: "primary.main", "&:hover": { bgcolor: "grey.100" } }}
           >
             Add New Job
           </Button>
@@ -98,7 +97,7 @@ export default function AdminPostingsPage() {
       )}
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} useFlexGap flexWrap="wrap">
           <TextField size="small" label="Search company or profile" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: { sm: 260 } }} />
           <FormControl size="small" sx={{ minWidth: 240 }}>
             <InputLabel id="p-cycle">Placement</InputLabel>

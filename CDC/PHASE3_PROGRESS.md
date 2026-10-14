@@ -3,11 +3,11 @@ Spec: PHASE3 MASTER PROMPT v1.0 (owner's notes 08-10-2026). Branch: `phase3`. De
 Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run build`, `npm run lint`, `npx tsc --noEmit` (from CDC/frontend). Restore `CDC/qa/evidence CDC/security/evidence` after test runs.
 
 ## CURRENT STATE
-- Working on: nothing; P0 is finished and committed on branch `phase3-p0` (stacked on `phase3`; not pushed). STOPPED for the owner's "go" (next milestone: PU)
-- Last completed: P0.1 to P0.6 (P3-D30 to P3-D35)
+- Working on: nothing; PU is finished and committed on branch `phase3-pu` (stacked on `phase3-p0`; not pushed, no pull request yet). STOPPED for the owner's review (next milestone: P1, which waits for OD-16)
+- Last completed: PU.0 to PU.5 and the PU acceptance (P3-D42 to P3-D47)
 - Half-done: nothing
 - Pending commands: none
-- NEXT ACTION: wait for the owner's "go"; then PU.0 (invoke the frontend-design plugin, write `CDC/docs/ui/DESIGN_BRIEF.md`) and PU.1 (before screenshots)
+- NEXT ACTION: wait for the owner. Then push `phase3-pu` and open its pull request (base `phase3-p0`) if asked; P1 needs OD-16 answered first
 
 ## BLOCKED / QUESTIONS FOR OWNER
 - OD-16, OD-6, OD-12, OD-1 unanswered (P3-D6); owner will answer before P1. Not needed for PU.
@@ -20,6 +20,8 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - **Queue worker:** `php artisan queue:work` under a supervisor (deferred mail waits for it even in Immediate mode).
 - **New migrations (P0):** `…000040` mentor role, `…000041` Phase 3 settings, `…000042` login_logs. Run `php artisan migrate`.
 - **Client IP in the login log:** correct only when `INTERNAL_PROXY_SECRET` is the same in backend and frontend and Next.js sits behind a reverse proxy that appends the real address to `X-Forwarded-For`; otherwise every row shows the Next.js server's address (or "Forwarded address not verified").
+- **Font (PU):** Inter is fetched from Google Fonts **once, when `npm run build` runs**, and then served from this site; the build machine needs internet access, the running site makes no third-party request.
+- **Adding a page to a portal (PU):** add one line to `frontend/lib/nav/<role>.js`; the page itself needs no layout code, the shell comes from the portal's `layout`.
 - From P-1 (see `SECURITY_REPORT.md` §12.4): `TRUSTED_HOSTS`, `expose_php=Off`, `/storage/*` headers, HSTS.
 
 ## MILESTONE CHECKLIST
@@ -49,13 +51,14 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
   - [x] P0.4 migration S6 + LoginLogService (every attempt, every role, trusted IP) + `login-logs:purge`
   - [x] P0.5 admin Login Log page; student "Last login" line; audited export
   - [x] P0.6 scheduler registration + cron documented
-- [ ] PU Unified UI: left-sidebar AppShell for every portal (P3-D16, P3-D17)
-  - [ ] PU.0 frontend-design plugin → `CDC/docs/ui/DESIGN_BRIEF.md`
-  - [ ] PU.1 before screenshots (390, 1440) → `CDC/qa/screenshots/pu-before/`
-  - [ ] PU.2 `components/shared/appshell.jsx` (sidebar, rail, drawer; slim top bar; restyled `pageheader.jsx`; Inter via next/font)
-  - [ ] PU.3 admin, company, student shells on AppShell; `lib/nav/{admin,company,student,mentor}.js`
-  - [ ] PU.4 page polish: stat tiles, tables, `lib/statuscolors.js` (replaces 8 `getStatusColor` copies), forms
-  - [ ] PU.5 public pages (landing, login) in the same visual language
+- [x] PU Unified UI: left-sidebar AppShell for every portal (P3-D16, P3-D17)
+  - [x] PU.0 frontend-design plugin → `CDC/docs/ui/DESIGN_BRIEF.md`
+  - [x] PU.1 before screenshots (390, 1440) → `CDC/qa/screenshots/pu-before/`
+  - [x] PU.2 `components/shared/appshell.jsx` (sidebar, rail, drawer; slim top bar; restyled `pageheader.jsx`; Inter via next/font)
+  - [x] PU.3 admin, company, student shells on AppShell; `lib/nav/{admin,company,student,mentor}.js`
+  - [x] PU.4 page polish: stat tiles, tables, `lib/statuscolors.js` (replaces 8 `getStatusColor` copies), forms
+  - [x] PU.5 public pages (landing, login) in the same visual language
+  - [x] PU acceptance: after screenshots at 390 / 768 / 1024 / 1440 (`qa/screenshots/pu-after/`), sidebar smoke test per role (`frontend/tests/e2e/shell-nav.spec.js`), Phase 1 smoke, gates (`qa/evidence/pu_gates.txt`)
 - [ ] P1 CKEditor 5 + HTML sanitisation (🛑 OD-16)
   - [ ] P1.1 `HtmlSanitizer` · P1.2 clean at every rich-text write + `html:resanitize` · P1.3 CKEditor in `richtexteditor.tsx` (🛑) · P1.4 `safehtml.jsx` · P1.5 CSP check
 - [ ] P2 MIS data, pre-registration, secondary degrees (HTTP driver 🛑 OD-1)

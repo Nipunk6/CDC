@@ -49,24 +49,8 @@ export const toLocalInput = (value) => {
 // The value of an IST datetime-local input as an ISO string with the IST offset, for the API.
 export const fromLocalInput = (value) => (value ? `${value.length === 16 ? `${value}:00` : value}+05:30` : null);
 
-export const statusColor = (status) =>
-  ({
-    open: "success",
-    active: "success",
-    approved: "success",
-    selected: "success",
-    completed: "default",
-    closed: "default",
-    pending: "warning",
-    in_process: "info",
-    waitlisted: "info",
-    ongoing: "info",
-    applied: "primary",
-    rejected: "error",
-    suspended: "error",
-    cancelled: "error",
-    withdrawn: "default",
-  })[status] ?? "default";
+// Status colours live in lib/statuscolors.js (one map for every page); re-exported for the pages that import it here.
+export { statusColor } from "./statuscolors";
 
 export const titleCase = (value) =>
   String(value ?? "")

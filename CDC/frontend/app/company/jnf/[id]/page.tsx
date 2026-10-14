@@ -33,6 +33,7 @@ import { JnfPreview } from "@/components/forms/shared/formpreview";
 import type { ProgrammeEligibility } from "@/components/forms/shared/eligibilitygrid";
 import type { SelectionRound } from "@/components/forms/shared/selectionprocessbuilder";
 import type { Currency } from "@/components/forms/shared/currencyselector";
+import { statusColor } from "@/lib/statuscolors";
 
 type FormData = {
   companyProfile?: {
@@ -146,16 +147,6 @@ const getCurrencySymbol = (currency?: string) => {
     case "EUR": return "€";
     case "GBP": return "£";
     default: return "₹";
-  }
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "accepted": return "success";
-    case "submitted": return "warning";
-    case "under_review": return "info";
-    case "rejected": return "error";
-    default: return "default";
   }
 };
 
@@ -274,12 +265,11 @@ export default function ViewJnfPage({ params }: { params: Promise<{ id: string }
     <Box>
       {/* Header */}
       <Paper
+        elevation={0}
         sx={{
-          p: 2,
+          bgcolor: "transparent",
+          p: 0,
           mb: 3,
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-          color: "white",
           borderRadius: 2,
         }}
       >
@@ -287,7 +277,7 @@ export default function ViewJnfPage({ params }: { params: Promise<{ id: string }
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar 
               src={jnf?.company?.logo_url || formData.companyProfile?.logoUrl || undefined}
-              sx={{ width: 48, height: 48, bgcolor: "white", color: "primary.main" }}
+              sx={{ width: 48, height: 48, bgcolor: "background.paper", color: "primary.main", border: 1, borderColor: "divider" }}
             >
               {!(jnf?.company?.logo_url || formData.companyProfile?.logoUrl) && <WorkIcon />}
             </Avatar>
@@ -295,7 +285,7 @@ export default function ViewJnfPage({ params }: { params: Promise<{ id: string }
               <Typography variant="h5" fontWeight={700}>
                 {formData.jobTitle || jnf?.job_title || "JNF Details"}
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              <Typography variant="body2" color="text.secondary">
                 Submitted {jnf?.created_at ? new Date(jnf.created_at).toLocaleDateString() : "-"}
               </Typography>
             </Box>
@@ -303,15 +293,15 @@ export default function ViewJnfPage({ params }: { params: Promise<{ id: string }
           <Stack direction="row" spacing={1} alignItems="center">
             <Chip
               label={(jnf?.status ?? "").replace("_", " ").toUpperCase()}
-              color={getStatusColor(jnf?.status ?? "") as "success" | "warning" | "info" | "error" | "default"}
-              sx={{ color: "white", fontWeight: 600 }}
+              color={statusColor(jnf?.status ?? "") as "success" | "warning" | "info" | "error" | "default"}
+              sx={{ fontWeight: 600 }}
             />
             <Button
               variant="outlined"
               startIcon={<ArrowBackIcon />}
               component={Link}
               href="/company"
-              sx={{ color: "white", borderColor: "white" }}
+             
             >
               Back
             </Button>

@@ -79,7 +79,7 @@ export default function AdminPostingDetailPage({ params }) {
         backLabel="All Job Profiles"
         actions={
           <>
-            <Chip color={statusColor(posting.status)} label={postingStatusLabel(posting)} sx={{ bgcolor: "white" }} variant="outlined" />
+            <Chip color={statusColor(posting.status)} label={postingStatusLabel(posting)} variant="outlined" />
             {["open", "in_process"].includes(posting.status) && (
               <Button variant="contained" color="secondary" startIcon={<TuneIcon />} onClick={() => setEditingEligibility(true)}>
                 Edit eligibility

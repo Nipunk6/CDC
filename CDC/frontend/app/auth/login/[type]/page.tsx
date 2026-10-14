@@ -19,9 +19,7 @@ import {
   Stack,
   TextField,
   Typography,
-  alpha,
 } from "@mui/material";
-import type { Theme } from "@mui/material/styles";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -283,9 +281,7 @@ function LoginForm({ type }: { type: string }) {
   };
 
   const currentFeatures = isAdmin ? adminFeatures : isStudent ? studentFeatures : isMentor ? mentorFeatures : recruiterFeatures;
-  const leftPanelBg = isAdmin
-    ? () => `linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)` // Admin deep professional slate/dark teal
-    : (theme: Theme) => `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${alpha(theme.palette.secondary.main, 0.8)} 100%)`; // Recruiter theme color
+
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex" }}>
@@ -294,7 +290,7 @@ function LoginForm({ type }: { type: string }) {
         sx={{
           display: { xs: "none", md: "flex" },
           width: "45%",
-          background: leftPanelBg,
+          bgcolor: "primary.main",
           color: "white",
           flexDirection: "column",
           justifyContent: "center",
@@ -303,19 +299,6 @@ function LoginForm({ type }: { type: string }) {
           overflow: "hidden",
         }}
       >
-        {/* Background Pattern */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            opacity: 0.1,
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}
-        />
-
         <Stack spacing={4} sx={{ position: "relative", zIndex: 1 }}>
           {/* Logo */}
           <Box
@@ -376,7 +359,7 @@ function LoginForm({ type }: { type: string }) {
             {currentFeatures.map((feature) => (
               <Grid2 key={feature.title} size={6}>
                 <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                  <Box sx={{ color: isAdmin ? "primary.light" : "secondary.light" }}>{feature.icon}</Box>
+                  <Box sx={{ color: "common.white", opacity: 0.85 }}>{feature.icon}</Box>
                   <Box>
                     <Typography variant="subtitle2" fontWeight={600}>
                       {feature.title}

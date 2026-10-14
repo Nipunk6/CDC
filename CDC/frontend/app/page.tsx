@@ -27,6 +27,7 @@ import {
   useTheme,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import { brand } from "@/lib/theme";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import EngineeringIcon from "@mui/icons-material/Engineering";
@@ -73,11 +74,11 @@ export default function Home() {
         open={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
         PaperProps={{
-          sx: { width: 280, bgcolor: "#7B1113", color: "white" }
+          sx: { width: 280, bgcolor: brand.maroon, color: "white" }
         }}
       >
         <Box sx={{ p: 3 }}>
-          <Typography variant="h6" fontWeight={700} sx={{ mb: 3, color: "#D4A843" }}>
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 3, color: brand.gold }}>
             Navigation
           </Typography>
           <List>
@@ -90,10 +91,10 @@ export default function Home() {
                   sx={{
                     borderRadius: 1,
                     border: link.variant === "outlined" ? "1px solid rgba(255,255,255,0.2)" : "none",
-                    bgcolor: link.variant === "contained" ? "#D4A843" : "transparent",
-                    color: link.variant === "contained" ? "#3e1a00" : "white",
+                    bgcolor: link.variant === "contained" ? brand.gold : "transparent",
+                    color: link.variant === "contained" ? brand.goldInk : "white",
                     "&:hover": {
-                      bgcolor: link.variant === "contained" ? "#c9982e" : "rgba(255,255,255,0.08)",
+                      bgcolor: link.variant === "contained" ? brand.goldHover : "rgba(255,255,255,0.08)",
                     }
                   }}
                 >
@@ -112,9 +113,9 @@ export default function Home() {
       <AppBar
         position="fixed"
         sx={{
-          bgcolor: "#7B1113",
+          bgcolor: brand.maroon,
           color: "white",
-          borderBottom: "3px solid #D4A843",
+          borderBottom: `3px solid ${brand.gold}`,
         }}
         elevation={0}
       >
@@ -191,7 +192,7 @@ export default function Home() {
                   color: "white",
                   borderColor: "rgba(255,255,255,0.4)",
                   "&:hover": {
-                    borderColor: "#D4A843",
+                    borderColor: brand.gold,
                     bgcolor: "rgba(255,255,255,0.08)",
                   },
                 }}
@@ -206,7 +207,7 @@ export default function Home() {
                   color: "white",
                   borderColor: "rgba(255,255,255,0.4)",
                   "&:hover": {
-                    borderColor: "#D4A843",
+                    borderColor: brand.gold,
                     bgcolor: "rgba(255,255,255,0.08)",
                   },
                 }}
@@ -221,7 +222,7 @@ export default function Home() {
                   color: "white",
                   borderColor: "rgba(255,255,255,0.4)",
                   "&:hover": {
-                    borderColor: "#D4A843",
+                    borderColor: brand.gold,
                     bgcolor: "rgba(255,255,255,0.08)",
                   },
                 }}
@@ -236,7 +237,7 @@ export default function Home() {
                   color: "white",
                   borderColor: "rgba(255,255,255,0.4)",
                   "&:hover": {
-                    borderColor: "#D4A843",
+                    borderColor: brand.gold,
                     bgcolor: "rgba(255,255,255,0.08)",
                   },
                 }}
@@ -248,10 +249,10 @@ export default function Home() {
                 href="/company/register"
                 variant="contained"
                 sx={{
-                  bgcolor: "#D4A843",
-                  color: "#3e1a00",
+                  bgcolor: brand.gold,
+                  color: brand.goldInk,
                   fontWeight: 700,
-                  "&:hover": { bgcolor: "#c9982e" },
+                  "&:hover": { bgcolor: brand.goldHover },
                 }}
               >
                 Register Now
@@ -292,8 +293,7 @@ export default function Home() {
               content: '""',
               position: "absolute",
               inset: 0,
-              background:
-                "linear-gradient(135deg, rgba(123,17,19,0.92) 0%, rgba(90,12,14,0.85) 40%, rgba(26,35,126,0.80) 100%)",
+              bgcolor: alpha(brand.maroonDark, 0.86),
             },
           }}
         >
@@ -319,7 +319,7 @@ export default function Home() {
               <Typography
                 variant="overline"
                 sx={{
-                  color: "#D4A843",
+                  color: brand.gold,
                   letterSpacing: 3,
                   fontWeight: 600,
                   fontSize: "0.85rem",
@@ -346,7 +346,7 @@ export default function Home() {
 
               <Typography
                 sx={{
-                  color: "#D4A843",
+                  color: brand.gold,
                   fontSize: { xs: "1.1rem", sm: "1.3rem", md: "1.5rem" },
                   fontWeight: 500,
                   mt: 1.5,
@@ -384,11 +384,11 @@ export default function Home() {
                   sx={{
                     px: 4,
                     py: 1.5,
-                    bgcolor: "#D4A843",
-                    color: "#3e1a00",
+                    bgcolor: brand.gold,
+                    color: brand.goldInk,
                     fontWeight: 700,
                     fontSize: "1rem",
-                    "&:hover": { bgcolor: "#c9982e" },
+                    "&:hover": { bgcolor: brand.goldHover },
                   }}
                 >
                   Start Recruiting
@@ -405,7 +405,7 @@ export default function Home() {
                     borderColor: "rgba(255,255,255,0.5)",
                     fontWeight: 600,
                     "&:hover": {
-                      borderColor: "#D4A843",
+                      borderColor: brand.gold,
                       bgcolor: "rgba(255,255,255,0.08)",
                     },
                   }}
@@ -444,7 +444,7 @@ export default function Home() {
                   align="center"
                   sx={{
                     mt: 2,
-                    color: "#7B1113",
+                    color: brand.maroon,
                     fontWeight: 600,
                     fontStyle: "italic",
                   }}
@@ -466,7 +466,7 @@ export default function Home() {
               <Typography
                 variant="overline"
                 sx={{
-                  color: "#D4A843",
+                  color: brand.goldText,
                   fontWeight: 600,
                   letterSpacing: 2,
                 }}
@@ -510,13 +510,13 @@ export default function Home() {
       </Box>
 
       {/* ─── Director's & Chairperson's Messages ─── */}
-      <Box sx={{ py: 8, bgcolor: "#faf7f2" }}>
+      <Box sx={{ py: 8, bgcolor: brand.cream }}>
         <Container maxWidth="lg">
           <Typography
             variant="overline"
             display="block"
             textAlign="center"
-            sx={{ color: "#D4A843", fontWeight: 600, letterSpacing: 2 }}
+            sx={{ color: brand.goldText, fontWeight: 600, letterSpacing: 2 }}
           >
             Messages
           </Typography>
@@ -537,14 +537,14 @@ export default function Home() {
               <Card
                 sx={{
                   height: "100%",
-                  borderTop: "4px solid #7B1113",
+                  borderTop: `4px solid ${brand.maroon}`,
                   borderRadius: 3,
                 }}
               >
                 <CardContent sx={{ p: 4 }}>
                   <Stack direction="row" spacing={1} alignItems="center" mb={2}>
                     <FormatQuoteIcon
-                      sx={{ color: "#D4A843", fontSize: 32, transform: "scaleX(-1)" }}
+                      sx={{ color: brand.gold, fontSize: 32, transform: "scaleX(-1)" }}
                     />
                     <Typography variant="h5" fontWeight={700} color="primary">
                       Director&apos;s Message
@@ -607,14 +607,14 @@ export default function Home() {
               <Card
                 sx={{
                   height: "100%",
-                  borderTop: "4px solid #1a237e",
+                  borderTop: `4px solid ${brand.navy}`,
                   borderRadius: 3,
                 }}
               >
                 <CardContent sx={{ p: 4 }}>
                   <Stack direction="row" spacing={1} alignItems="center" mb={2}>
                     <FormatQuoteIcon
-                      sx={{ color: "#D4A843", fontSize: 32, transform: "scaleX(-1)" }}
+                      sx={{ color: brand.gold, fontSize: 32, transform: "scaleX(-1)" }}
                     />
                     <Typography variant="h5" fontWeight={700} color="secondary">
                       Chairperson (CDC)&apos;s Message
@@ -682,7 +682,7 @@ export default function Home() {
             variant="overline"
             display="block"
             textAlign="center"
-            sx={{ color: "#D4A843", fontWeight: 600, letterSpacing: 2 }}
+            sx={{ color: brand.goldText, fontWeight: 600, letterSpacing: 2 }}
           >
             Our Strengths
           </Typography>
@@ -713,25 +713,25 @@ export default function Home() {
                 icon: <VerifiedIcon sx={{ fontSize: 44 }} />,
                 title: "Century of Excellence",
                 desc: "Established in 1926, we are among India's oldest and most respected engineering institutions — celebrating 100 years of academic glory.",
-                color: "#7B1113",
+                color: brand.maroon,
               },
               {
                 icon: <EngineeringIcon sx={{ fontSize: 44 }} />,
                 title: "Unique Talent Pool",
                 desc: "Specialized programmes in Mining, Petroleum, Geology, and Geophysics — talent you won't find at any other institution.",
-                color: "#1a237e",
+                color: brand.navy,
               },
               {
                 icon: <WorkIcon sx={{ fontSize: 44 }} />,
                 title: "Industry-Ready Graduates",
                 desc: "Rigorous curriculum combined with industry internships, live projects, and cutting-edge research exposure.",
-                color: "#7B1113",
+                color: brand.maroon,
               },
               {
                 icon: <GroupsIcon sx={{ fontSize: 44 }} />,
                 title: "18+ Departments",
                 desc: "From B.Tech to Ph.D across diverse departments — find the perfect fit for every role in your organization.",
-                color: "#1a237e",
+                color: brand.navy,
               },
             ].map((item) => (
               <Grid2 key={item.title} size={{ xs: 12, sm: 6, md: 3 }}>
@@ -764,8 +764,7 @@ export default function Home() {
       <Box
         sx={{
           py: 8,
-          background:
-            "linear-gradient(135deg, #faf7f2 0%, #f5f0e8 100%)",
+          bgcolor: brand.cream,
         }}
       >
         <Container maxWidth="lg">
@@ -773,7 +772,7 @@ export default function Home() {
             variant="overline"
             display="block"
             textAlign="center"
-            sx={{ color: "#D4A843", fontWeight: 600, letterSpacing: 2 }}
+            sx={{ color: brand.goldText, fontWeight: 600, letterSpacing: 2 }}
           >
             Academics
           </Typography>
@@ -808,14 +807,11 @@ export default function Home() {
                   py: 1.5,
                   borderRadius: 2,
                   border: "1px solid",
-                  borderColor: alpha("#7B1113", 0.2),
+                  borderColor: alpha(brand.maroon, 0.2),
                   bgcolor: "white",
-                  transition: "all 0.2s ease",
                   "&:hover": {
-                    borderColor: "#7B1113",
-                    bgcolor: alpha("#7B1113", 0.04),
-                    transform: "translateY(-2px)",
-                    boxShadow: "0 4px 12px rgba(123,17,19,0.1)",
+                    borderColor: brand.maroon,
+                    bgcolor: alpha(brand.maroon, 0.04),
                   },
                 }}
               >
@@ -825,7 +821,7 @@ export default function Home() {
                       fontSize: 18,
                       mr: 1,
                       verticalAlign: "middle",
-                      color: "#7B1113",
+                      color: brand.maroon,
                     }}
                   />
                   {prog}
@@ -840,8 +836,7 @@ export default function Home() {
       <Box
         sx={{
           py: 8,
-          background:
-            "linear-gradient(135deg, #7B1113 0%, #5A0C0E 50%, #1a237e 100%)",
+          bgcolor: brand.maroon,
           color: "white",
           textAlign: "center",
           position: "relative",
@@ -853,8 +848,7 @@ export default function Home() {
             left: 0,
             right: 0,
             height: "3px",
-            background:
-              "linear-gradient(90deg, #D4A843 0%, #f0d78c 50%, #D4A843 100%)",
+            bgcolor: brand.gold,
           },
         }}
       >
@@ -873,11 +867,11 @@ export default function Home() {
               variant="contained"
               size="large"
               sx={{
-                bgcolor: "#D4A843",
-                color: "#3e1a00",
+                bgcolor: brand.gold,
+                color: brand.goldInk,
                 fontWeight: 700,
                 px: 4,
-                "&:hover": { bgcolor: "#c9982e" },
+                "&:hover": { bgcolor: brand.goldHover },
               }}
             >
               Register as Recruiter
@@ -891,7 +885,7 @@ export default function Home() {
                 color: "white",
                 borderColor: "rgba(255,255,255,0.5)",
                 "&:hover": {
-                  borderColor: "#D4A843",
+                  borderColor: brand.gold,
                   bgcolor: "rgba(255,255,255,0.08)",
                 },
               }}
@@ -903,7 +897,7 @@ export default function Home() {
       </Box>
 
       {/* ─── Footer ─── */}
-      <Box sx={{ bgcolor: "#1a1a2e", color: "grey.400", py: 5 }}>
+      <Box sx={{ bgcolor: brand.footer, color: "grey.400", py: 5 }}>
         <Container maxWidth="lg">
           <Grid2 container spacing={4}>
             <Grid2 size={{ xs: 12, md: 4 }}>
@@ -929,7 +923,7 @@ export default function Home() {
                   <Typography variant="subtitle1" color="white" fontWeight={700}>
                     Career Development Centre
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "#D4A843" }}>
+                  <Typography variant="caption" sx={{ color: brand.gold }}>
                     IIT (ISM) Dhanbad
                   </Typography>
                 </Box>
@@ -953,21 +947,21 @@ export default function Home() {
               </Typography>
               <Stack spacing={1} mt={1}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <EmailIcon sx={{ fontSize: 16, color: "#D4A843" }} />
+                  <EmailIcon sx={{ fontSize: 16, color: brand.gold }} />
                   <Typography variant="body2">cdc@iitism.ac.in</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <PhoneIcon sx={{ fontSize: 16, color: "#D4A843" }} />
+                  <PhoneIcon sx={{ fontSize: 16, color: brand.gold }} />
                   <Typography variant="body2">+91-326-223-5555</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <LocationOnIcon sx={{ fontSize: 16, color: "#D4A843" }} />
+                  <LocationOnIcon sx={{ fontSize: 16, color: brand.gold }} />
                   <Typography variant="body2">
                     Dhanbad – 826004, Jharkhand, India
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <LanguageIcon sx={{ fontSize: 16, color: "#D4A843" }} />
+                  <LanguageIcon sx={{ fontSize: 16, color: brand.gold }} />
                   <Typography
                     variant="body2"
                     component="a"
@@ -977,7 +971,7 @@ export default function Home() {
                     sx={{
                       color: "grey.400",
                       textDecoration: "none",
-                      "&:hover": { color: "#D4A843" },
+                      "&:hover": { color: brand.gold },
                     }}
                   >
                     iitism.ac.in
@@ -1017,7 +1011,7 @@ export default function Home() {
                   >
                     <Typography
                       variant="body2"
-                      sx={{ "&:hover": { color: "#D4A843" } }}
+                      sx={{ "&:hover": { color: brand.gold } }}
                     >
                       {link.label}
                     </Typography>
@@ -1046,7 +1040,7 @@ export default function Home() {
             textAlign="center"
             sx={{
               fontSize: "0.6rem",
-              color: "#1a1a2e", // Match background color to hide
+              color: brand.footer, // Match background color to hide
               userSelect: "text",
               mt: 0.5,
               cursor: "default"
