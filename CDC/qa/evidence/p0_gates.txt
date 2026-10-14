@@ -1,0 +1,44 @@
+## Phase 3 P0 "Foundations, login IP log, settings, scheduler": Definition of Done (2026-10-10, branch phase3-p0)
+Local stack: MySQL `iitism_placement`, backend `MAIL_MAILER=log` on :8000, Next.js 16.3.8 dev on :3000. No real mail sent.
+
+A5.1  MySQL (throwaway database, dropped afterwards)
+- php artisan migrate:fresh --seed                        OK, 67 migrations (new: …000040 mentor role, …000041 Phase 3 settings, …000042 login_logs)
+- db:seed --class=Phase2DemoSeeder                        OK: 120 students, 8 offers, 16 blocks; 13 Phase 3 setting rows stored by the migration
+- Phase3DemoSeeder                                         not built yet (task P13.4)
+- The three new migrations were then applied to the dev database (`php artisan migrate`).
+
+A5.2  Tests
+- php artisan test --exclude-group=qa-open (SQLite)       725 passed (10,603 assertions)
+- tests/Feature/Phase3 on MySQL                           15 passed (MentorRoleTest 3, Phase3SettingsTest 4, LoginLogTest 8)
+- qa-open                                                  unchanged: 4 security tests (SEC-003 ×2, SEC-012, SEC-013)
+
+A5.3  Frontend
+- npx tsc --noEmit clean · npm run lint 0 errors / 76 warnings · npm run test:unit 10 passed · npm run build exit 0
+- npm audit --omit=dev --audit-level=high exit 0 · composer audit --locked --no-dev exit 0
+
+A5.4  Permission matrices, now with a MENTOR actor and the login-log routes
+- QA/PermissionMatrixTest and Security/AuthorizationMatrixTest: 0 violations, 0 server errors
+- GET /admin/login-logs/export is super-admin only (403 for other admins); mentor gets 403 on every role-gated route
+
+A5.5  Acceptance, exercised live (headless Chromium, separate browser context; demo accounts from Phase2DemoSeeder and two
+      temporary .qa.test accounts that were deleted afterwards). Screenshots: qa/screenshots/p3/p0/ (1440 and 390 px).
+- Login success and failure produce one row each: student by roll (wrong password, then success), recruiter, admin, mentor.
+  The Login Log page listed all of them with role, time (IST), result and address; filter "Failed" showed only failures.
+- Correct IP: on a temporary backend with a throwaway INTERNAL_PROXY_SECRET, a login signed by the Next.js helper
+  (lib/signedclientip.js) was logged from 198.51.100.23, source `signed`, browser "Real-Browser/9"; a login with forged
+  headers was logged from the connection's own address 127.0.0.1, source `invalid_signature` (flagged), browser from the request.
+  The local env files have no INTERNAL_PROXY_SECRET, so the dev stack itself logs 127.0.0.1 / "node" (the Next.js server).
+- Purge: `php artisan login-logs:purge` → "0 login record(s) older than 180 days deleted."; the purge of older rows is covered by
+  LoginLogTest::test_purge_removes_rows_older_than_the_retention_setting_and_is_scheduled.
+- Mentor role is gated: signed-out /mentor → /auth/login/mentor?callbackUrl=%2Fmentor; mentor lands on /mentor; a mentor opening
+  /admin, /student or /company is sent to /.
+- Super admin: Download gives login-log-<date>.xlsx and writes a `login_logs.view` audit row. A normal admin sees only their own
+  and students' rows, has no Download button, and the MIS API tab is read-only for them.
+- Settings: Reminders, Rules, Login Log, MIS API tabs and "Sender mailboxes" in Mail render at both widths; saving 4 days in
+  Reminders survived a reload (then set back to 3); `setting.update` audit rows written.
+- Student profile shows "Last login: … IST from <address> · Before that: …".
+- No horizontal page scroll at 390 or 1440 on any of these screens; no console errors.
+
+A5.6  Phase 1/2 smoke
+- e2e (Playwright, dev stack): 9 passed (public pages + CSP, student login/job profiles/applications, admin job profile + Eligible list)
+- API: recruiter lists and opens a JNF (200); admin JNF and INF queues (200)

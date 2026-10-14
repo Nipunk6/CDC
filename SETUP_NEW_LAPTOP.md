@@ -201,10 +201,16 @@ php artisan serve --host=127.0.0.1 --port=8000
 php artisan queue:work
 ```
 
-**Terminal 3, scheduler** for "Schedule For Later" drive openings (from `CDC/backend`). It is optional unless you test scheduled drives:
+**Terminal 3, scheduler** (from `CDC/backend`). It opens "Schedule For Later" drives every minute and deletes old login records every night (02:30 IST). It is optional on a test laptop unless you test those:
 
 ```bash
 php artisan schedule:work
+```
+
+On the production server the scheduler runs from cron instead, once a minute:
+
+```bash
+* * * * * cd /path/to/CDC/backend && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 **Terminal 4, frontend** (from `CDC/frontend`):

@@ -6,7 +6,7 @@ declare module "next-auth" {
     accessToken?: string;
     user: {
       id: string;
-      role: "admin" | "company" | "student";
+      role: "admin" | "company" | "student" | "mentor";
       isSuperAdmin?: boolean;
       companyId?: number | null;
       rollNo?: string | null;
@@ -17,7 +17,7 @@ declare module "next-auth" {
   }
 
   interface User {
-    role: "admin" | "company" | "student";
+    role: "admin" | "company" | "student" | "mentor";
     isSuperAdmin?: boolean;
     companyId?: number | null;
     rollNo?: string | null;
@@ -27,7 +27,7 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
   interface JWT {
-    role?: "admin" | "company" | "student";
+    role?: "admin" | "company" | "student" | "mentor";
     isSuperAdmin?: boolean;
     companyId?: number | null;
     rollNo?: string | null;

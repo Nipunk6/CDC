@@ -18,6 +18,8 @@ function LoginRedirectHandler() {
       router.replace(`/auth/login/admin${query}`);
     } else if (callbackUrl.startsWith("/student")) {
       router.replace(`/auth/login/student${query}`);
+    } else if (callbackUrl.startsWith("/mentor")) {
+      router.replace(`/auth/login/mentor${query}`);
     } else {
       router.replace(`/auth/login/recruiter${query}`);
     }

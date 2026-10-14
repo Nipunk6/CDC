@@ -58,3 +58,16 @@ Artisan::command('placement:open-scheduled', function (AuditService $audit, \App
 })->purpose('Open job profiles scheduled for later and notify eligible students (S6.2)');
 
 \Illuminate\Support\Facades\Schedule::command('placement:open-scheduled')->everyMinute()->withoutOverlapping();
+
+// Phase 3 P0.4 (N4, OD-19): drop login records older than the retention setting. Runs every night from the scheduler.
+Artisan::command('login-logs:purge', function (\App\Services\SettingsService $settings, AuditService $audit) {
+    $days = max(30, (int) $settings->get('login_logs.retention_days'));
+    $deleted = \App\Models\LoginLog::query()->where('created_at', '<', now()->subDays($days))->delete();
+    if ($deleted > 0) {
+        $audit->logAs(null, null, 'login_logs.purge', null, null, ['deleted' => $deleted, 'retention_days' => $days]);
+    }
+    $this->info("{$deleted} login record(s) older than {$days} days deleted.");
+})->purpose('Delete login records older than the retention setting (Phase 3 N4)');
+
+\Illuminate\Support\Facades\Schedule::command('login-logs:purge')->dailyAt('02:30')->timezone('Asia/Kolkata')->withoutOverlapping();
+

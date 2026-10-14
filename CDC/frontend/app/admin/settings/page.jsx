@@ -31,12 +31,17 @@ import ExcelTemplateLibrary from "@/components/admin/exceltemplatelibrary";
 import { adminApi } from "@/lib/adminapi";
 import { adminUpload } from "@/lib/adminupload";
 import { notifyBrandingUpdated, useBranding } from "@/lib/branding";
+import { LoginLogTab, MisApiTab, RemindersTab, RulesTab, SenderPoolSection } from "@/components/admin/phase3settings";
 
 // The Admin hub (Superset parity S8.1): one page, a left vertical tab list (top tabs on phones).
 const TABS = [
   { key: "account", label: "Account" },
   { key: "users", label: "Users" },
   { key: "mail", label: "Mail" },
+  { key: "reminders", label: "Reminders" },
+  { key: "rules", label: "Rules" },
+  { key: "login-log", label: "Login Log" },
+  { key: "mis-api", label: "MIS API" },
   { key: "branch-manager", label: "Branch Manager" },
   { key: "excel-templates", label: "Excel Templates" },
 ];
@@ -317,6 +322,7 @@ function AdminHub() {
 
   const [settings, setSettings] = useState(null);
   const [mailQuota, setMailQuota] = useState(null);
+  const [misSecretSet, setMisSecretSet] = useState(false);
   const [branding, setBranding] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -326,6 +332,7 @@ function AdminHub() {
       .then((response) => {
         setSettings(response.settings);
         setMailQuota(response.mail_quota ?? null);
+        setMisSecretSet(Boolean(response.mis_api_secret_set));
         setBranding(response.branding ?? { display_name: null, has_logo: false });
       })
       .catch((e) => setError(e.message));
@@ -344,6 +351,13 @@ function AdminHub() {
   const onError = (message) => {
     setSuccess(null);
     setError(message);
+  };
+  // Shared by the Phase 3 sections: every save answers with the whole settings map.
+  const onSettingsSaved = (next, message, response) => {
+    setSettings(next);
+    if (response?.mail_quota) setMailQuota(response.mail_quota);
+    if (response && "mis_api_secret_set" in response) setMisSecretSet(Boolean(response.mis_api_secret_set));
+    onMessage(message);
   };
 
   return (
@@ -418,7 +432,11 @@ function AdminHub() {
                     onError={onError}
                   />
                 )}
-
+                {tab === "mail" && <SenderPoolSection settings={settings} onSaved={onSettingsSaved} onError={onError} />}
+                {tab === "reminders" && <RemindersTab settings={settings} onSaved={onSettingsSaved} onError={onError} />}
+                {tab === "rules" && <RulesTab settings={settings} onSaved={onSettingsSaved} onError={onError} />}
+                {tab === "login-log" && <LoginLogTab settings={settings} onSaved={onSettingsSaved} onError={onError} />}
+                {tab === "mis-api" && <MisApiTab settings={settings} secretSet={misSecretSet} onSaved={onSettingsSaved} onError={onError} />}
               </CardContent>
             </Card>
           )}

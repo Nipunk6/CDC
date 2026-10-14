@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureUserIsActive;
 use App\Models\StudentProfile;
 use App\Models\User;
 use App\Rules\SafePassword;
+use App\Services\LoginLogService;
 use App\Services\LoginThrottleService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -22,8 +23,10 @@ use Throwable;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly LoginThrottleService $throttle)
-    {
+    public function __construct(
+        private readonly LoginThrottleService $throttle,
+        private readonly LoginLogService $loginLog
+    ) {
     }
 
     public function login(Request $request): JsonResponse
@@ -41,6 +44,9 @@ class AuthController extends Controller
         $identifier = (string) ($validated['roll_no'] ?? $validated['email']);
         $wait = $this->throttle->retryAfter($identifier, (string) $request->ip());
         if ($wait !== null) {
+            // The password is not tried during a backoff; the account is looked up only to name it in the login log.
+            $this->loginLog->record($request, $this->resolveLoginUser($validated), $identifier, false, LoginLogService::REASON_THROTTLED);
+
             return response()->json([
                 'message' => sprintf('Too many attempts. Try again in %d second%s.', $wait, $wait === 1 ? '' : 's'),
             ], 429)->header('Retry-After', (string) $wait);
@@ -56,6 +62,7 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
             $this->throttle->recordFailure($identifier, (string) $request->ip());
+            $this->loginLog->record($request, $user, $identifier, false, $user ? LoginLogService::REASON_WRONG_PASSWORD : LoginLogService::REASON_UNKNOWN_ACCOUNT);
 
             return response()->json([
                 'message' => 'Invalid credentials.',
@@ -65,12 +72,15 @@ class AuthController extends Controller
         $this->throttle->recordSuccess($identifier, (string) $request->ip());
 
         if ($user->is_active === false) {
+            $this->loginLog->record($request, $user, $identifier, false, LoginLogService::REASON_SUSPENDED);
+
             return response()->json([
                 'message' => EnsureUserIsActive::SUSPENDED_MESSAGE,
             ], 403);
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
+        $this->loginLog->record($request, $user, $identifier, true);
 
         return response()->json([
             'message' => 'Login successful.',

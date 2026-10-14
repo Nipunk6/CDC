@@ -255,6 +255,10 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->prefix('admin')->gr
     Route::get('/proposals', [AdminProposalController::class, 'index']);
     Route::patch('/proposals/{shortlistProposal}', [AdminProposalController::class, 'update']);
 
+    // Phase 3 P0.5: the login log (super admins: everything; other admins: their own and students' rows).
+    Route::get('/login-logs', [\App\Http\Controllers\AdminLoginLogController::class, 'index']);
+    Route::get('/login-logs/export', [\App\Http\Controllers\AdminLoginLogController::class, 'export']);
+
     Route::get('/settings', [AdminSettingsController::class, 'index']);
     Route::patch('/settings', [AdminSettingsController::class, 'update']);
     Route::post('/settings/logo', [AdminSettingsController::class, 'uploadLogo']);

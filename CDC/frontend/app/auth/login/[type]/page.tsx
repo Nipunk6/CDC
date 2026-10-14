@@ -46,7 +46,7 @@ const apiBase =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
   "http://127.0.0.1:8000/api";
 
-type LoginVariant = "admin" | "recruiter" | "student";
+type LoginVariant = "admin" | "recruiter" | "student" | "mentor";
 
 // `identifier` is the email (admin/recruiter) or the roll number (student); `$isStudent` comes from the
 // form's validation context. Keeping it a single required field keeps the yup/react-hook-form types aligned.
@@ -134,6 +134,25 @@ const studentFeatures = [
   },
 ];
 
+// Phase 3 (P0.2): mentors sign in by email. Their pages arrive with the mentor milestone (P8).
+const mentorFeatures = [
+  {
+    icon: <SupervisorAccountIcon sx={{ fontSize: 28 }} />,
+    title: "Your Mentees",
+    desc: "See the students assigned to you by the CDC",
+  },
+  {
+    icon: <DescriptionIcon sx={{ fontSize: 28 }} />,
+    title: "Resume Verification",
+    desc: "Review and verify the resumes of your own mentees",
+  },
+  {
+    icon: <NotificationsActiveIcon sx={{ fontSize: 28 }} />,
+    title: "Notifications",
+    desc: "Know when a mentee uploads or replaces a resume",
+  },
+];
+
 type PageProps = {
   params: Promise<{ type: string }>;
 };
@@ -145,10 +164,11 @@ function LoginForm({ type }: { type: string }) {
   const callbackUrl = searchParams.get("callbackUrl");
 
   // Validate the type parameter
-  const variant: LoginVariant = type === "admin" ? "admin" : type === "student" ? "student" : "recruiter";
+  const variant: LoginVariant = type === "admin" ? "admin" : type === "student" ? "student" : type === "mentor" ? "mentor" : "recruiter";
   const isAdmin = variant === "admin";
   const isStudent = variant === "student";
-  const displayType = isAdmin ? "Admin" : isStudent ? "Student" : "Recruiter";
+  const isMentor = variant === "mentor";
+  const displayType = isAdmin ? "Admin" : isStudent ? "Student" : isMentor ? "Mentor" : "Recruiter";
 
   const [error, setError] = useState<string | null>(null);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
@@ -181,9 +201,11 @@ function LoginForm({ type }: { type: string }) {
       if (errorMsg.includes("admin_only") || errorMsg.includes("AdminOnlyError")) {
         setError("This account is not authorized as an administrator. Please log in from the Recruiter portal.");
       } else if (errorMsg.includes("recruiter_only") || errorMsg.includes("RecruiterOnlyError")) {
-        setError("This account is an administrator account. Please log in from the Admin portal.");
+        setError("This account is not a recruiter account. Please use the sign-in page for your own portal.");
       } else if (errorMsg.includes("student_only") || errorMsg.includes("StudentOnlyError")) {
         setError("This account is not a student account. Please log in from the Recruiter or Admin portal.");
+      } else if (errorMsg.includes("mentor_only") || errorMsg.includes("MentorOnlyError")) {
+        setError("This account is not a mentor account. Please use the sign-in page for your own portal.");
       } else {
         setError(isStudent ? "Invalid roll number or password." : "Invalid email or password.");
       }
@@ -200,6 +222,11 @@ function LoginForm({ type }: { type: string }) {
 
     if (role === "student") {
       router.replace(safeCallbackUrl(callbackUrl, "/student"));
+      return;
+    }
+
+    if (role === "mentor") {
+      router.replace(safeCallbackUrl(callbackUrl, "/mentor"));
       return;
     }
 
@@ -255,7 +282,7 @@ function LoginForm({ type }: { type: string }) {
     }
   };
 
-  const currentFeatures = isAdmin ? adminFeatures : isStudent ? studentFeatures : recruiterFeatures;
+  const currentFeatures = isAdmin ? adminFeatures : isStudent ? studentFeatures : isMentor ? mentorFeatures : recruiterFeatures;
   const leftPanelBg = isAdmin
     ? () => `linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)` // Admin deep professional slate/dark teal
     : (theme: Theme) => `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${alpha(theme.palette.secondary.main, 0.8)} 100%)`; // Recruiter theme color
@@ -336,7 +363,9 @@ function LoginForm({ type }: { type: string }) {
                 ? "Manage all recruitment processes, JNF/INF reviews, and institutional configurations from a single secure dashboard."
                 : isStudent
                   ? "Your placement season, organised. Browse job profiles, apply with verified resumes and follow every stage from one dashboard."
-                  : "Connect with India's premier engineering talent. Submit JNFs and INFs seamlessly for campus placements and internships."}
+                  : isMentor
+                    ? "Guide your mentees through placements. Review and verify the resumes of the students the CDC has assigned to you."
+                    : "Connect with India's premier engineering talent. Submit JNFs and INFs seamlessly for campus placements and internships."}
             </Typography>
           </Box>
 
@@ -466,7 +495,7 @@ function LoginForm({ type }: { type: string }) {
                     label="Email Address"
                     type="email"
                     fullWidth
-                    placeholder={isAdmin ? "admin@iitism.ac.in" : "company@example.com"}
+                    placeholder={isAdmin ? "admin@iitism.ac.in" : isMentor ? "name@iitism.ac.in" : "company@example.com"}
                     {...register("identifier")}
                     error={Boolean(errors.identifier)}
                     helperText={errors.identifier?.message}
@@ -536,6 +565,10 @@ function LoginForm({ type }: { type: string }) {
             {isStudent ? (
               <Typography variant="caption" color="text.secondary" textAlign="center">
                 Student accounts are created by CDC. Use the invitation email to set your password, then sign in with your roll number.
+              </Typography>
+            ) : isMentor ? (
+              <Typography variant="caption" color="text.secondary" textAlign="center">
+                Mentor accounts are created by CDC. Sign in with the email address CDC registered for you.
               </Typography>
             ) : !isAdmin ? (
               <>

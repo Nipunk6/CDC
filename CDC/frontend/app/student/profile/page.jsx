@@ -212,6 +212,12 @@ export default function StudentProfilePage() {
               <Typography variant="body2" color="text.secondary">
                 {student.programme} · Batch {student.graduating_batch}
               </Typography>
+              {student.last_login && (
+                <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 0.5 }}>
+                  Last login: {formatDateTime(student.last_login.at)} from {student.last_login.ip}
+                  {student.previous_login ? ` · Before that: ${formatDateTime(student.previous_login.at)} from ${student.previous_login.ip}` : ""}
+                </Typography>
+              )}
             </Box>
           </Stack>
         </CardContent>

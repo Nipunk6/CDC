@@ -682,8 +682,13 @@ class S6NotificationsTest extends TestCase
 
     public function test_T6_11_no_deadline_reminder_mails_or_schedule(): void
     {
+        // Phase 3 (owner note N6, P3-D7) replaces "no deadline reminder" (Q6.1): reminders are built in P5. Until then
+        // only their SETTINGS exist (P0.3), so nothing that could send one may exist yet: no mail, job or command.
         $hits = [];
-        foreach (['app', 'routes', 'bootstrap', 'resources/views/emails'] as $dir) {
+        foreach (['app/Mail', 'app/Jobs', 'app/Console', 'resources/views/emails'] as $dir) {
+            if (! is_dir(base_path($dir))) {
+                continue;
+            }
             $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path($dir), \FilesystemIterator::SKIP_DOTS));
             foreach ($it as $file) {
                 if ($file->isFile() && str_ends_with($file->getFilename(), '.php') && stripos((string) file_get_contents($file->getPathname()), 'remind') !== false) {
@@ -691,12 +696,14 @@ class S6NotificationsTest extends TestCase
                 }
             }
         }
-        $this->assertSame([], $hits, 'a reminder implementation exists');
+        $this->assertSame([], $hits, 'a reminder implementation exists before P5');
+        $this->assertStringNotContainsStringIgnoringCase('remind', (string) file_get_contents(base_path('routes/console.php')));
 
-        // The only scheduled task is "Schedule For Later" opening job profiles (Superset parity S6.2, D112); it sends
-        // the normal new-opening mail once, never a reminder. Anything else scheduled is still a failure.
+        // The only scheduled tasks are "Schedule For Later" (S6.2, D112; it sends the normal new-opening mail once) and
+        // the nightly login-log purge (Phase 3 P0.4), which sends nothing. Anything else scheduled is still a failure.
         $console = (string) file_get_contents(base_path('routes/console.php'));
         $console = preg_replace("/Schedule::command\\('placement:open-scheduled'\\)->everyMinute\\(\\)->withoutOverlapping\\(\\);/", '', $console);
+        $console = preg_replace("/\\\\Illuminate\\\\Support\\\\Facades\\\\Schedule::command\\('login-logs:purge'\\)->dailyAt\\('02:30'\\)->timezone\\('Asia\\/Kolkata'\\)->withoutOverlapping\\(\\);/", '', $console);
         $this->assertDoesNotMatchRegularExpression('/Schedule::|->daily|->hourly|->everyMinute|->cron\(/', $console);
         $this->assertStringNotContainsString('withSchedule', (string) file_get_contents(base_path('bootstrap/app.php')));
     }
