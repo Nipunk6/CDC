@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { signedClientIpHeaders } from "@/lib/signedclientip";
 
 const apiOrigin = (() => {
   try {
@@ -40,7 +41,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(target.toString(), { redirect: "error" });
+    // SEC-008: forward the signed client IP so the signed-files limit is per user, not per Next.js server.
+    const response = await fetch(target.toString(), { redirect: "error", headers: await signedClientIpHeaders(request.headers) });
     if (!response.ok) {
       return new NextResponse(`Failed to fetch PDF: ${response.statusText}`, { status: response.status });
     }

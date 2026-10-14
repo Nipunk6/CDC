@@ -627,3 +627,35 @@ The script is fixed, and the company password step can now be re-run. The flows 
 | QA tooling | `qa/phase1_regression.sh` (script defects), `qa/evidence/retest_*` |
 
 **Local environment after Part 10:** two new migrations were applied to the dev MySQL (`…000019`, `…000020`), and `placement:extend-offer-blocks` was run on it. E2E-1 created posting #42 (completed, 2 offers). The QA student 26QA0016 was suspended and reactivated for the session check. No real email was sent: the backend server and every worker ran with `MAIL_MAILER=log`, and the queue is empty.
+
+### 11.8 P-1 re-test note (2026-10-10)
+
+The owner approved the remaining S4/S5 findings below on 2026-10-10 (Phase 3 milestone P-1.13, branch `phase3`, pull request #1). Each fix has a test written first; decisions are in `PHASE3_DECISIONS.md` (P3-D25 to P3-D28). This note replaces the "OPEN" line for these IDs in §11.1.
+
+| ID | Status | What changed | Test |
+|---|---|---|---|
+| F-017 | **FIXED** | A duplicate apply or a duplicate announcement that slips in between the check and the insert gets a clean 409; nothing of the losing request is written | `S3…T3_6c_double_submit_race_window…`, `S5…T5_8_x_concurrent_double_publish…` |
+| F-018 | **FIXED earlier** (parity work) | A row listed twice in a results upload is reported and counted once | `S4…T4_2b_admin_upload_xlsx_reports_every_bad_row` |
+| F-019 | **FIXED** | The three columns added in Phase 2 are now the **last** three of the Phase 1 JNF/INF CSV; every original column is back in its position | `S8…T8_3b_phase1_csv_original_columns_keep_their_positions` |
+| F-021 | **FIXED** | `GET /admin/students/{id}` returns the whole blocks history (`student.placement_blocks`) | `S1…T1_4a_previous_cycle_data_visible_to_student_and_admin` |
+| F-022 | **FIXED** | The results console shows "⚠ Unverified resume" | `FixApprovedS4LeftoversTest::test_F022_…` |
+| F-026 | **FIXED** | Rejecting a resume that was approved flags its live applications again | `FixApprovedS4LeftoversTest::test_F026_…`, `S1…T1_7_extra_…` (now asserts the new behaviour) |
+| F-027 | **FIXED** | The final announcement refuses a candidate whose rejection in the final stage was already published (Re-add first) | `FixF027F035OfferGuardTest::test_F027_…` |
+| F-028 | **FIXED** | Unblock is one transaction and uses the offer-revoke rule for "placed elsewhere" flags | `FixApprovedS4LeftoversTest::test_F028_…` (2) |
+| F-033 | **FIXED** | Attendance is not changed once that student's result in the stage is published; such rolls are reported | `FixApprovedS4LeftoversTest::test_F033_…` |
+| F-035 | **FIXED** | **No offer, and no Re-add, for a student who already holds an offer in that placement cycle or has an active block that applies there.** The console disables that row and says why. The admin lifts the block or revokes the other offer first (both audited). | `FixF027F035OfferGuardTest::test_F035_…` (3) |
+| F-037 | **FIXED** | A Yes/No import cell with an unknown value ("maybe") is a row error, not a silent "No" (`pwd` and `lateral_entry`) | `S1…T1_1c_unrecognised_pwd_value_is_not_silently_coerced` |
+| F-040 | **FIXED** (with SEC-022) | No `policy-documents` show route (405, was 500); cross-tenant JNF/INF update answers 404 before validating; a blank `status` no longer causes a 500 | `PermissionMatrixTest` **0 violations** (was 5), `S0…T0_4b_extra_blank_status…`, `Security/ExistenceOracleTest` |
+| F-041 | **FIXED** | Creating a student account also creates the in-app notice "Welcome to the CDC placement portal" | `S6…T6_13_in_app_notification_for_every_student_facing_trigger` |
+| N-1 (§11.6) | **RESOLVED** | Signed client IP from Next.js, 600/min per-IP login limit, per-account backoff (SEC-008) | `Security/LoginThrottleTest` (7), `FixF016LoginThrottleTest` |
+| Daily mail cap | **DONE** | `mail_daily_recipient_cap` (default 1800); every To/BCC address counts; mail over the cap waits for the next IST day | `MailDailyCapTest` (6) |
+
+**Still open** (not approved): F-023, F-025, F-029, F-030, F-031, F-038, F-039, F-042 to F-048. F-013, F-034 and F-036 stay WONTFIX.
+
+**Gates (re-run 2026-10-10):** full suite 710 passed with `--exclude-group=qa-open`; the six QA tests that were in `qa-open` now pass and are untagged. `qa-open` still holds 4 **security** tests (SEC-003 ×2, SEC-012, SEC-013), which were not in the approved list. `tsc` clean, lint 0 errors, build exit 0, unit tests 10/10, e2e 9/9 against the production build. Detail: `qa/evidence/retest_p1_gates.txt`; matrix: `qa/evidence/retest_p1_permission_matrix.md`.
+
+**Observations:**
+- The e2e admin test clicked "New Job Profile" instead of a job profile since the parity work (stale selector); fixed in the spec.
+- Playwright 1.58.2's own browser build is still not installed on this laptop (N-3); the e2e ran with an already-installed headless Chromium through a temporary config.
+- Run on MySQL instead of SQLite, 8 tests fail for reasons inside the tests (array order, a hard-coded id, a SQLite `PRAGMA`); the product behaves the same.
+- E2E-1 (the full manual season run of §11.5) was not repeated; the changed steps are covered by the tests above, the MySQL run of those tests and the live API pass in the evidence file.

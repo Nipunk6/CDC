@@ -41,7 +41,7 @@ class FixF011InviteExpiryTest extends TestCase
 
     private function setPassword(string $token): TestResponse
     {
-        return $this->postJson('/api/auth/reset-password', ['token' => $token, 'email' => $this->link['email'], 'password' => 'NewPass123', 'password_confirmation' => 'NewPass123']);
+        return $this->postJson('/api/auth/reset-password', ['token' => $token, 'email' => $this->link['email'], 'password' => 'Vb3-Wnq8-Xd57', 'password_confirmation' => 'Vb3-Wnq8-Xd57']);
     }
 
     private function age(string $table, \DateTimeInterface $createdAt): void

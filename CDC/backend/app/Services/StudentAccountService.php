@@ -100,8 +100,10 @@ class StudentAccountService
         'current_course_name' => ['currentcoursename', 'coursename'],
     ];
 
-    public function __construct(private readonly MailDispatchService $mail)
-    {
+    public function __construct(
+        private readonly MailDispatchService $mail,
+        private readonly PortalNotificationService $notifications
+    ) {
     }
 
     /**
@@ -476,6 +478,21 @@ class StudentAccountService
     }
 
     /**
+     * A Yes/No cell: yes/y/true/1 → true; blank/no/n/false/0 → false. Anything else (e.g. "maybe") is returned as
+     * typed, so the `boolean` rule rejects the row instead of the value silently becoming "No" (QA F-037).
+     */
+    private static function yesNo(mixed $value): mixed
+    {
+        $flag = strtolower(trim((string) ($value ?? '')));
+
+        return match (true) {
+            in_array($flag, ['1', 'yes', 'y', 'true'], true) => true,
+            in_array($flag, ['', '0', 'no', 'n', 'false'], true) => false,
+            default => $value,
+        };
+    }
+
+    /**
      * Bring free-typed values (form or spreadsheet) to their stored shape before validation.
      *
      * @param  array<string, mixed>  $data
@@ -506,8 +523,7 @@ class StudentAccountService
         }
 
         if (array_key_exists('pwd', $data) && ! is_bool($data['pwd'])) {
-            $flag = strtolower((string) ($data['pwd'] ?? ''));
-            $data['pwd'] = in_array($flag, ['1', 'yes', 'y', 'true'], true);
+            $data['pwd'] = self::yesNo($data['pwd']);
         }
 
         foreach (['date_of_birth', 'course_start_date', 'course_end_date'] as $field) {
@@ -518,8 +534,7 @@ class StudentAccountService
 
         // Unlike pwd, a blank lateral_entry cell means "not a lateral entry".
         if (array_key_exists('lateral_entry', $data) && ! is_bool($data['lateral_entry'])) {
-            $flag = strtolower((string) ($data['lateral_entry'] ?? ''));
-            $data['lateral_entry'] = in_array($flag, ['1', 'yes', 'y', 'true'], true);
+            $data['lateral_entry'] = self::yesNo($data['lateral_entry']);
         }
 
         if (isset($data['previous_degree_score_type'])) {
@@ -578,11 +593,20 @@ class StudentAccountService
                 'is_active' => true,
             ]);
 
-            return StudentProfile::create(array_merge(
+            $student = StudentProfile::create(array_merge(
                 ['ongoing_backlogs' => 0, 'total_backlogs' => 0, 'pwd' => false],
                 array_intersect_key($data, array_flip((new StudentProfile())->getFillable())),
                 ['user_id' => $user->id]
             ));
+
+            // QA F-041: every student-facing mail has an in-app notice too; this is E1's, waiting at the first login.
+            $this->notifications->createInAppNotification(
+                $user,
+                'Welcome to the CDC placement portal',
+                'Your account is ready. Check your profile details and upload a resume so that you can apply when job profiles open.'
+            );
+
+            return $student;
         });
     }
 

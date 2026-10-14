@@ -113,14 +113,20 @@ class AudienceService
      */
     private function branchMatch(Builder $query, string $table, string $programme, string $branch): array
     {
-        $column = $query->getQuery()->getGrammar()->wrap("{$table}.audience_filter");
+        $grammar = $query->getQuery()->getGrammar();
+        $id = $grammar->wrap("{$table}.id");
+        $rows = $grammar->wrapTable($table);
 
-        // SQLite (tests) walks the array with json_each; MySQL 8 with JSON_TABLE (a missing or null branch reads as NULL).
-        [$from, $programmeCol, $branchCol] = $query->getConnection()->getDriverName() === 'sqlite'
-            ? ["json_each({$column}, '$.branches') as p", "json_extract(p.value, '$.programme')", "json_extract(p.value, '$.branch')"]
-            : ["json_table({$column}, '$.branches[*]' columns (programme varchar(255) path '$.programme', branch varchar(255) path '$.branch')) as p", 'p.programme', 'p.branch'];
+        // The pairs are unpacked in a subquery of its own, where the JSON function reads a table of the SAME from
+        // clause (`a`). An earlier version unpacked `{table}.audience_filter` of the OUTER query inside `exists (…)`;
+        // MySQL 8.4 answered that with no rows at all (MySQL 9 and SQLite did not), so "branches" notices and surveys
+        // reached nobody. SQLite (tests) walks the array with json_each, MySQL with JSON_TABLE; a missing or null
+        // branch reads as NULL in both.
+        [$pairs, $programmeCol, $branchCol] = $query->getConnection()->getDriverName() === 'sqlite'
+            ? ["json_each(a.audience_filter, '$.branches') as p", "json_extract(p.value, '$.programme')", "json_extract(p.value, '$.branch')"]
+            : ["json_table(a.audience_filter, '$.branches[*]' columns (programme varchar(255) path '$.programme', branch varchar(255) path '$.branch')) as p", 'p.programme', 'p.branch'];
 
-        return ["exists (select 1 from {$from} where {$programmeCol} = ? and (coalesce({$branchCol}, '') = '' or {$branchCol} = ?))", [$programme, $branch]];
+        return ["{$id} in (select a.id from {$rows} as a, {$pairs} where {$programmeCol} = ? and (coalesce({$branchCol}, '') = '' or {$branchCol} = ?))", [$programme, $branch]];
     }
 
     /**

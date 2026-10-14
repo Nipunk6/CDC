@@ -766,6 +766,7 @@ class S6NotificationsTest extends TestCase
     // T6.13 — in-app notification per student-facing trigger
     // ============================================================================================
 
+    /** QA F-041: fixed in P-1.13 (was in group qa-open until then). */
     public function test_T6_13_in_app_notification_for_every_student_facing_trigger(): void
     {
         $missing = [];

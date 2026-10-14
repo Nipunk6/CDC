@@ -24,6 +24,7 @@ use Database\Factories\StudentProfileFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -828,9 +829,8 @@ class S5ResultsBlockingTest extends TestCase
         Mail::assertQueued(OfferMail::class, 1);
 
         // DB-level guarantee: unique index on offers.application_id.
-        $unique = collect(DB::select("PRAGMA index_list('offers')"))
-            ->filter(fn ($index) => (int) $index->unique === 1)
-            ->contains(fn ($index) => collect(DB::select("PRAGMA index_info('{$index->name}')"))->pluck('name')->all() === ['application_id']);
+        $unique = collect(Schema::getIndexes('offers'))
+            ->contains(fn (array $index) => $index['unique'] && $index['columns'] === ['application_id']);
         $this->assertTrue($unique, 'offers.application_id must carry a UNIQUE index');
     }
 
@@ -838,6 +838,8 @@ class S5ResultsBlockingTest extends TestCase
      * Extra (T5.8 race): two publishes in flight for the same student (double-click / two admins). Both pass the
      * pre-transaction "already has an offer" check; the loser hits the UNIQUE index inside the transaction.
      * Simulated by committing the competing offer row right before this request's own insert.
+     *
+     * QA F-017: fixed in P-1.13 (was in group qa-open until then).
      */
     public function test_T5_8_x_concurrent_double_publish_loser_gets_clean_4xx_not_500(): void
     {

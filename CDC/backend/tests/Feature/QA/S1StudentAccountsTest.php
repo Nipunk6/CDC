@@ -478,7 +478,11 @@ class S1StudentAccountsTest extends TestCase
         }
     }
 
-    /** Extra probe: an unrecognised pwd value must not silently become "No". */
+    /**
+     * Extra probe: an unrecognised pwd value must not silently become "No".
+     *
+     * QA F-037: fixed in P-1.13 (was in group qa-open until then).
+     */
     public function test_T1_1c_unrecognised_pwd_value_is_not_silently_coerced(): void
     {
         Mail::fake();
@@ -512,15 +516,15 @@ class S1StudentAccountsTest extends TestCase
     public function test_T1_2_login_with_roll_number_case_insensitive_and_no_enumeration(): void
     {
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0100']);
-        $student->user->update(['password' => Hash::make('Secret123')]);
+        $student->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
 
         foreach (['22JE0100', '22je0100', ' 22Je0100 '] as $roll) {
-            $this->postJson('/api/auth/login', ['roll_no' => $roll, 'password' => 'Secret123'])
+            $this->postJson('/api/auth/login', ['roll_no' => $roll, 'password' => 'Kx7-Tmq9-Zr42'])
                 ->assertOk()->assertJsonPath('user.role', 'student')->assertJsonPath('user.student_profile.roll_no', '22JE0100');
         }
 
         $wrongPassword = $this->postJson('/api/auth/login', ['roll_no' => '22JE0100', 'password' => 'Nope12345']);
-        $unknownRoll = $this->postJson('/api/auth/login', ['roll_no' => '99XX9999', 'password' => 'Secret123']);
+        $unknownRoll = $this->postJson('/api/auth/login', ['roll_no' => '99XX9999', 'password' => 'Kx7-Tmq9-Zr42']);
         $this->assertSame($wrongPassword->status(), $unknownRoll->status());
         $this->assertSame($wrongPassword->json(), $unknownRoll->json());
         $this->assertSame(422, $wrongPassword->status());
@@ -532,13 +536,13 @@ class S1StudentAccountsTest extends TestCase
         $student->user->update(['is_active' => true]);
 
         // Recorded API behaviour (cross-portal guard is in the frontend auth.ts):
-        User::factory()->create(['role' => 'admin', 'email' => 'ad@qa.io', 'password' => Hash::make('Secret123')]);
-        User::factory()->create(['role' => 'company', 'email' => 'co@qa.io', 'password' => Hash::make('Secret123')]);
+        User::factory()->create(['role' => 'admin', 'email' => 'ad@qa.io', 'password' => Hash::make('Kx7-Tmq9-Zr42')]);
+        User::factory()->create(['role' => 'company', 'email' => 'co@qa.io', 'password' => Hash::make('Kx7-Tmq9-Zr42')]);
         // an admin / company email typed into the roll-number field does not log in
-        $this->postJson('/api/auth/login', ['roll_no' => 'ad@qa.io', 'password' => 'Secret123'])->assertStatus(422)->assertJsonPath('message', 'Invalid credentials.');
-        $this->postJson('/api/auth/login', ['roll_no' => 'co@qa.io', 'password' => 'Secret123'])->assertStatus(422)->assertJsonPath('message', 'Invalid credentials.');
+        $this->postJson('/api/auth/login', ['roll_no' => 'ad@qa.io', 'password' => 'Kx7-Tmq9-Zr42'])->assertStatus(422)->assertJsonPath('message', 'Invalid credentials.');
+        $this->postJson('/api/auth/login', ['roll_no' => 'co@qa.io', 'password' => 'Kx7-Tmq9-Zr42'])->assertStatus(422)->assertJsonPath('message', 'Invalid credentials.');
         // a student can also authenticate with their institute email through the email field (API allows it)
-        $this->postJson('/api/auth/login', ['email' => $student->institute_email, 'password' => 'Secret123'])->assertOk()->assertJsonPath('user.role', 'student');
+        $this->postJson('/api/auth/login', ['email' => $student->institute_email, 'password' => 'Kx7-Tmq9-Zr42'])->assertOk()->assertJsonPath('user.role', 'student');
     }
 
     // ------------------------------------------------------------------ T1.3a
@@ -574,8 +578,8 @@ class S1StudentAccountsTest extends TestCase
 
         // The link really sets the password; then roll-number login works.
         $this->app['auth']->forgetGuards();
-        $this->postJson('/api/auth/reset-password', ['token' => $query['token'], 'email' => $query['email'], 'password' => 'NewPass123', 'password_confirmation' => 'NewPass123'])->assertOk();
-        $this->postJson('/api/auth/login', ['roll_no' => '24qa0459', 'password' => 'NewPass123'])->assertOk();
+        $this->postJson('/api/auth/reset-password', ['token' => $query['token'], 'email' => $query['email'], 'password' => 'Vb3-Wnq8-Xd57', 'password_confirmation' => 'Vb3-Wnq8-Xd57'])->assertOk();
+        $this->postJson('/api/auth/login', ['roll_no' => '24qa0459', 'password' => 'Vb3-Wnq8-Xd57'])->assertOk();
     }
 
     // ------------------------------------------------------------------ T1.3b
@@ -591,7 +595,7 @@ class S1StudentAccountsTest extends TestCase
         parse_str((string) parse_url(Mail::queued(StudentInvitationMail::class)->sole()->setPasswordUrl, PHP_URL_QUERY), $first);
 
         DB::table('student_invite_tokens')->where('email', $profile->user->email)->update(['created_at' => now()->subDays(7)->subMinute()]);
-        $this->postJson('/api/auth/reset-password', ['token' => $first['token'], 'email' => $first['email'], 'password' => 'NewPass123', 'password_confirmation' => 'NewPass123'])
+        $this->postJson('/api/auth/reset-password', ['token' => $first['token'], 'email' => $first['email'], 'password' => 'Vb3-Wnq8-Xd57', 'password_confirmation' => 'Vb3-Wnq8-Xd57'])
             ->assertStatus(422)->assertJsonPath('message', 'The password reset link is invalid or has expired.');
 
         // Resend exists, works and is audited.
@@ -605,7 +609,7 @@ class S1StudentAccountsTest extends TestCase
         parse_str((string) parse_url(Mail::queued(StudentInvitationMail::class)->last()->setPasswordUrl, PHP_URL_QUERY), $second);
         $this->assertNotSame($first['token'], $second['token']);
         $this->app['auth']->forgetGuards();
-        $this->postJson('/api/auth/reset-password', ['token' => $second['token'], 'email' => $second['email'], 'password' => 'NewPass123', 'password_confirmation' => 'NewPass123'])->assertOk();
+        $this->postJson('/api/auth/reset-password', ['token' => $second['token'], 'email' => $second['email'], 'password' => 'Vb3-Wnq8-Xd57', 'password_confirmation' => 'Vb3-Wnq8-Xd57'])->assertOk();
 
         // Self-service fallback quoted in E1: forgot password by roll number.
         $this->postJson('/api/auth/forgot-password', ['roll_no' => '24qa0459'])->assertOk();
@@ -613,6 +617,7 @@ class S1StudentAccountsTest extends TestCase
 
     // ------------------------------------------------------------------ T1.4a
 
+    /** QA F-021: fixed in P-1.13 (was in group qa-open until then). */
     public function test_T1_4a_previous_cycle_data_visible_to_student_and_admin(): void
     {
         Mail::fake();
@@ -857,7 +862,7 @@ class S1StudentAccountsTest extends TestCase
         $logA = $logs->firstWhere('subject_id', $a->id);
         $this->assertEquals('7.00', $logA->before['current_cgpa']);
         $this->assertEquals('7.40', $logA->after['current_cgpa']);
-        $this->assertSame(['current_cgpa', 'ongoing_backlogs', 'total_backlogs'], array_keys($logA->after));
+        $this->assertEqualsCanonicalizing(['current_cgpa', 'ongoing_backlogs', 'total_backlogs'], array_keys($logA->after)); // key order is the database's
 
         // Direct service call (the future institute-DB hook) with extra keys.
         app(StudentAcademicSyncService::class)->apply([
@@ -912,9 +917,8 @@ class S1StudentAccountsTest extends TestCase
     }
 
     /**
-     * NEEDS-OWNER-DECISION (recorded behaviour): B3 sets the flag at apply time when the chosen resume is not approved and
-     * clears it when the resume becomes approved; it does not say what happens when an APPROVED resume attached to a live
-     * application is later REJECTED. Today the application stays unflagged, so admins see no warning for it.
+     * QA F-026 (owner approved, fixed in P-1.13): when an APPROVED resume attached to a live application is later
+     * REJECTED, the application is flagged as using an unverified resume again, so admins see the warning.
      */
     public function test_T1_7_extra_rejecting_an_already_approved_attached_resume_records_behaviour(): void
     {
@@ -934,8 +938,8 @@ class S1StudentAccountsTest extends TestCase
         $this->patchJson("/api/admin/resumes/{$approved->id}", ['status' => 'rejected', 'admin_remark' => 'Fake internship listed'])->assertOk();
 
         $this->assertSame('rejected', $approved->fresh()->status);
-        $this->assertFalse(Application::sole()->used_unverified_resume, 'recorded: the live application is NOT re-flagged when its resume is rejected');
-        $this->getJson("/api/admin/postings/{$posting->id}/pipeline")->assertJsonPath('applications.0.used_unverified_resume', false)
+        $this->assertTrue(Application::sole()->used_unverified_resume, 'the live application is re-flagged when its resume is rejected (F-026)');
+        $this->getJson("/api/admin/postings/{$posting->id}/pipeline")->assertJsonPath('applications.0.used_unverified_resume', true)
             ->assertJsonPath('applications.0.resume.status', 'rejected');
     }
 
@@ -946,8 +950,8 @@ class S1StudentAccountsTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $adminToken = $admin->createToken('qa')->plainTextToken;
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0800']);
-        $student->user->update(['password' => Hash::make('Secret123')]);
-        $studentToken = $this->postJson('/api/auth/login', ['roll_no' => '22JE0800', 'password' => 'Secret123'])->assertOk()->json('token');
+        $student->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
+        $studentToken = $this->postJson('/api/auth/login', ['roll_no' => '22JE0800', 'password' => 'Kx7-Tmq9-Zr42'])->assertOk()->json('token');
 
         $this->bearer($studentToken)->getJson('/api/student/profile')->assertOk();
         $this->bearer($adminToken)->patchJson("/api/admin/students/{$student->id}/suspend")->assertOk();
@@ -966,11 +970,11 @@ class S1StudentAccountsTest extends TestCase
         $adminToken = $admin->createToken('qa')->plainTextToken;
         $cycle = $this->cycle();
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0801']);
-        $student->user->update(['password' => Hash::make('Secret123')]);
+        $student->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
         $peer = StudentProfile::factory()->create();
         $this->enrol($student, $cycle);
         $this->enrol($peer, $cycle);
-        $studentToken = $this->postJson('/api/auth/login', ['roll_no' => '22JE0801', 'password' => 'Secret123'])->assertOk()->json('token');
+        $studentToken = $this->postJson('/api/auth/login', ['roll_no' => '22JE0801', 'password' => 'Kx7-Tmq9-Zr42'])->assertOk()->json('token');
 
         $this->bearer($adminToken)->patchJson("/api/admin/students/{$student->id}/suspend")->assertOk();
         $this->assertFalse($student->user->fresh()->is_active);
@@ -980,7 +984,7 @@ class S1StudentAccountsTest extends TestCase
 
         $this->app['auth']->forgetGuards();
         $this->flushHeaders();
-        $this->postJson('/api/auth/login', ['roll_no' => '22JE0801', 'password' => 'Secret123'])
+        $this->postJson('/api/auth/login', ['roll_no' => '22JE0801', 'password' => 'Kx7-Tmq9-Zr42'])
             ->assertStatus(403)->assertJsonPath('message', 'Account suspended. Contact CDC.');
 
         // Excluded from eligibility and the E2 audience.
@@ -997,7 +1001,7 @@ class S1StudentAccountsTest extends TestCase
         $this->bearer($adminToken)->patchJson("/api/admin/students/{$student->id}/reactivate")->assertOk();
         $this->app['auth']->forgetGuards();
         $this->flushHeaders();
-        $newToken = $this->postJson('/api/auth/login', ['roll_no' => '22JE0801', 'password' => 'Secret123'])->assertOk()->json('token');
+        $newToken = $this->postJson('/api/auth/login', ['roll_no' => '22JE0801', 'password' => 'Kx7-Tmq9-Zr42'])->assertOk()->json('token');
         $this->bearer($newToken)->getJson('/api/student/profile')->assertOk();
         $this->assertTrue($eligibility->check($student->fresh()->load('user'), $posting)['eligible']);
 

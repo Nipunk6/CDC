@@ -1,4 +1,5 @@
 import { getSession } from "next-auth/react";
+import { signOutOnUnauthorized } from "@/lib/signoutonunauthorized";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -21,6 +22,7 @@ export async function adminApi<T>(path: string, init?: RequestInit): Promise<T> 
   });
 
   if (!response.ok) {
+    signOutOnUnauthorized(response.status, "/auth/login/admin");
     const payload = (await response.json().catch(() => ({}))) as { message?: string };
     throw new Error(payload.message ?? "Request failed.");
   }
@@ -45,6 +47,7 @@ export async function adminDownload(path: string, fallbackFileName: string): Pro
   });
 
   if (!response.ok) {
+    signOutOnUnauthorized(response.status, "/auth/login/admin");
     const payload = (await response.json().catch(() => ({}))) as { message?: string };
     throw new Error(payload.message ?? "Download failed.");
   }

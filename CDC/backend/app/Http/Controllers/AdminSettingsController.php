@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\MailQuotaService;
 use App\Services\SettingsService;
 use App\Support\Branding;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,8 @@ class AdminSettingsController extends Controller
     /** Keys the Settings page may write, with their validation rules. Add a row here to add a setting. */
     private const EDITABLE = [
         'mail_mode' => ['required', 'in:queued,sync'],
+        // P-1.2: recipients (To + BCC) portal mail may use per IST day; 0 = no cap.
+        'mail_daily_recipient_cap' => ['required', 'integer', 'min:0', 'max:100000'],
         // Account tab (S8.1): blank clears it and the shells fall back to their built-in text.
         'institute_name' => ['nullable', 'string', 'max:150'],
     ];
@@ -26,8 +29,10 @@ class AdminSettingsController extends Controller
     /** Stored keys the generic settings map leaves out (the logo is exposed only as `branding.has_logo`). */
     private const HIDDEN = ['account_logo'];
 
-    public function __construct(private readonly SettingsService $settings)
-    {
+    public function __construct(
+        private readonly SettingsService $settings,
+        private readonly MailQuotaService $quota
+    ) {
     }
 
     public function index(): JsonResponse
@@ -36,6 +41,7 @@ class AdminSettingsController extends Controller
             'settings' => $this->publicSettings(),
             'editable' => array_keys(self::EDITABLE),
             'branding' => Branding::payload(),
+            'mail_quota' => $this->quota->usage(),
         ]);
     }
 
@@ -66,6 +72,7 @@ class AdminSettingsController extends Controller
             'message' => 'Settings saved.',
             'settings' => $this->publicSettings(),
             'branding' => Branding::payload(),
+            'mail_quota' => $this->quota->usage(),
         ]);
     }
 

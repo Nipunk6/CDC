@@ -17,6 +17,7 @@ use Throwable;
  * `mail_mode` setting: `queued` pushes onto the database queue (production
  * must run `php artisan queue:work`), `sync` sends inline like Phase 1.
  * Broadcasts use `sendBulk()` (one BCC message per batch); personal mails use `send()`.
+ * Both respect the daily recipient cap (MailQuotaService, P-1.2): over the cap, mail is queued for a later IST day.
  */
 class MailDispatchService
 {
@@ -25,7 +26,8 @@ class MailDispatchService
 
     public function __construct(
         private readonly SettingsService $settings,
-        private readonly PortalNotificationService $notifications
+        private readonly PortalNotificationService $notifications,
+        private readonly MailQuotaService $quota
     ) {
     }
 
@@ -35,8 +37,10 @@ class MailDispatchService
     public function send(User|string $to, Mailable $mailable, string $subject, string $template, array $context = []): void
     {
         $context = self::context($context);
+        // Daily recipient cap (P-1.2): null = may go now; otherwise the UTC time it is due on a later IST day.
+        $when = $this->quota->reserve(1);
 
-        if ($this->mode() === 'sync') {
+        if ($this->mode() === 'sync' && $when === null) {
             if ($to instanceof User) {
                 $this->notifications->sendLoggedEmail($to, $mailable, $subject, $template, $context);
 
@@ -59,10 +63,13 @@ class MailDispatchService
             'template' => $template,
             'message_ref' => $ref,
             'status' => 'queued',
+            'scheduled_for' => $when,
         ] + $context);
 
         try {
-            Mail::to($email)->queue($mailable->metadata(self::LOG_REF, $ref));
+            $pending = Mail::to($email);
+            $message = $mailable->metadata(self::LOG_REF, $ref);
+            $when ? $pending->later($when, $message) : $pending->queue($message);
         } catch (Throwable $exception) {
             $log->update(['status' => 'failed', 'error_message' => $exception->getMessage()]);
         }
@@ -81,11 +88,17 @@ class MailDispatchService
         $context = self::context($context) + ['job_posting_id' => null, 'kind' => null];
         $recipients = collect($users)->filter(fn ($user) => $user instanceof User && filled($user->email))->unique('email')->values();
 
-        foreach ($recipients->chunk($this->batchSize()) as $batch) {
+        // Daily recipient cap (P-1.2): every BCC address plus the portal's own To counts, so a batch never exceeds
+        // the cap and a full day pushes the rest to later IST days instead of dropping it.
+        $cap = $this->quota->cap();
+        $size = $cap > 0 ? max(1, min($this->batchSize(), $cap - 1)) : $this->batchSize();
+
+        foreach ($recipients->chunk($size) as $batch) {
             $ref = (string) Str::uuid();
             $message = (clone $mailable)->metadata(self::LOG_REF, $ref);
             $pending = Mail::to((string) config('mail.from.address'))->bcc($batch->pluck('email')->all());
-            $sync = $this->mode() === 'sync';
+            $when = $this->quota->reserve($batch->count() + 1);
+            $sync = $this->mode() === 'sync' && $when === null;
 
             // One log row per student, so the email log still answers "was X told?". Written before the push,
             // so a worker that sends at once still finds the rows to mark sent.
@@ -99,6 +112,7 @@ class MailDispatchService
                 'status' => 'queued',
                 'job_posting_id' => $context['job_posting_id'],
                 'kind' => $context['kind'],
+                'scheduled_for' => $when,
                 'created_at' => $now,
                 'updated_at' => $now,
             ])->all());
@@ -107,6 +121,8 @@ class MailDispatchService
                 if ($sync) {
                     $pending->send($message);
                     EmailLog::where('message_ref', $ref)->where('status', 'queued')->update(['status' => 'sent', 'sent_at' => now()]);
+                } elseif ($when) {
+                    $pending->later($when, $message);
                 } else {
                     $pending->queue($message);
                 }

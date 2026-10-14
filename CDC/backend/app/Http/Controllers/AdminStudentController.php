@@ -187,6 +187,13 @@ class AdminStudentController extends Controller
                 'cycle_name' => $o->placementCycle?->name,
             ]);
 
+        // QA F-021: the full blocks history (active and lifted), in the same shape as GET /admin/blocks.
+        $blocks = $studentProfile->placementBlocks()
+            ->with(['placementCycle:id,name', 'offer:id,offer_type,job_posting_id', 'blockedBy:id,name', 'unblockedBy:id,name'])
+            ->latest('id')
+            ->get()
+            ->map(fn (\App\Models\PlacementBlock $b) => $b->toArray() + ['message' => $b->message()]);
+
         // S4.5: summary card, Placements section (per cycle, with stage attendance) and Resumes & Documents.
         $resumes = $studentProfile->resumes()
             ->with('reviewedBy:id,name')
@@ -198,6 +205,7 @@ class AdminStudentController extends Controller
             'student' => $this->detailPayload($studentProfile) + [
                 'applications' => $applications,
                 'offers' => $offers,
+                'placement_blocks' => $blocks,
                 'summary' => [
                     'cgpa' => $studentProfile->current_cgpa,
                     'applications_count' => $applications->where('status', 'applied')->count(),

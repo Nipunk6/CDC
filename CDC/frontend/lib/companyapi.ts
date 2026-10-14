@@ -1,4 +1,5 @@
 import { getSession } from "next-auth/react";
+import { signOutOnUnauthorized } from "@/lib/signoutonunauthorized";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -21,6 +22,7 @@ export async function companyApi<T>(path: string, init?: RequestInit): Promise<T
   });
 
   if (!response.ok) {
+    signOutOnUnauthorized(response.status, "/auth/login/recruiter");
     const payload = (await response.json().catch(() => ({}))) as { message?: string };
     throw new Error(payload.message ?? "Request failed.");
   }
@@ -49,6 +51,7 @@ export async function companyFileUpload(file: File): Promise<{ file: { path: str
   });
 
   if (!response.ok) {
+    signOutOnUnauthorized(response.status, "/auth/login/recruiter");
     const payload = (await response.json().catch(() => ({}))) as { message?: string };
     throw new Error(payload.message ?? "Upload failed.");
   }
@@ -79,6 +82,7 @@ export async function companyLogoUpload(
   });
 
   if (!response.ok) {
+    signOutOnUnauthorized(response.status, "/auth/login/recruiter");
     const payload = (await response.json().catch(() => ({}))) as { message?: string };
     throw new Error(payload.message ?? "Logo upload failed.");
   }

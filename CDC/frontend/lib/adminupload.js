@@ -1,4 +1,5 @@
 import { getSession } from "next-auth/react";
+import { signOutOnUnauthorized } from "@/lib/signoutonunauthorized";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -24,6 +25,7 @@ export async function adminUpload(path, formData, method = "POST") {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    signOutOnUnauthorized(response.status, "/auth/login/admin");
     throw new Error(payload.message ?? "Upload failed.");
   }
   return payload;
@@ -36,6 +38,7 @@ export async function adminBlobUrl(path) {
     headers: { Accept: "*/*", Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
+    signOutOnUnauthorized(response.status, "/auth/login/admin");
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.message ?? "Could not load the file.");
   }

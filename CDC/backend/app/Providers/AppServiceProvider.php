@@ -38,18 +38,21 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(MessageSent::class, [MailDispatchService::class, 'markSent']);
         Event::listen(JobFailed::class, [MailDispatchService::class, 'markFailed']);
 
+        // A signed-in user gets 300 requests a minute of their own (an admin page makes several calls at once and
+        // 60 a minute stopped normal work); a guest stays at 60 a minute per address (owner decision 2026-10-12).
         RateLimiter::for('api', function (Request $request) {
-            $key = $request->user()?->id ?? $request->ip();
+            $user = $request->user();
 
-            return Limit::perMinute(60)->by((string) $key);
+            return $user
+                ? Limit::perMinute(300)->by('user:'.$user->id)
+                : Limit::perMinute(60)->by('ip:'.$request->ip());
         });
 
-        // Per-account login budget (QA F-016): guessing one roll number / email is slowed down whatever the source
-        // IP. The per-IP `api` bucket still applies on top.
-        RateLimiter::for('login', function (Request $request) {
-            $account = strtolower(trim((string) ($request->input('roll_no') ?: $request->input('email'))));
-
-            return Limit::perMinute(10)->by('login:'.$account);
+        // Login's own per-IP budget (SEC-008 / QA N-1): a campus shares a few NAT addresses, so login is not in the
+        // 60/min `api` bucket. The IP is the signed client IP forwarded by the Next.js server (TrustSignedClientIp).
+        // Guessing at one account is slowed by LoginThrottleService's short per-account backoff (no hard lockout).
+        RateLimiter::for('login-ip', function (Request $request) {
+            return Limit::perMinute(600)->by('login-ip:'.$request->ip());
         });
 
         // Signed resume links: admin previews all arrive from the Next.js server's IP, and exported

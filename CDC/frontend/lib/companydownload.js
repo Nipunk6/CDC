@@ -1,4 +1,5 @@
 import { getSession } from "next-auth/react";
+import { signOutOnUnauthorized } from "@/lib/signoutonunauthorized";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
@@ -20,6 +21,7 @@ export async function companyDownload(path, fallbackFileName) {
   });
 
   if (!response.ok) {
+    signOutOnUnauthorized(response.status, "/auth/login/recruiter");
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.message ?? "Download failed.");
   }

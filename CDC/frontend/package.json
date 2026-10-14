@@ -10,7 +10,8 @@
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test tests/e2e/smoke.spec.ts",
     "test:e2e:student": "playwright test tests/e2e/student-portal.spec.js --project=chromium",
-    "test:perf": "playwright test tests/performance/navigation.perf.spec.ts"
+    "test:perf": "playwright test tests/performance/navigation.perf.spec.ts",
+    "test:unit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests-unit/**/*.test.mjs\""
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
@@ -21,12 +22,9 @@
     "@mui/icons-material": "^6.5.0",
     "@mui/material": "^6.5.0",
     "@mui/x-charts": "^7.29.1",
-    "@mui/x-data-grid": "^8.28.1",
-    "axios": "^1.14.0",
-    "date-fns": "^4.1.0",
     "libphonenumber-js": "^1.12.42",
-    "next": "16.2.1",
-    "next-auth": "^5.0.0-beta.30",
+    "next": "16.3.8",
+    "next-auth": "^5.0.0-beta.32",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",
@@ -44,5 +42,8 @@
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "eslint-plugin-react-hooks": "7.0.1"
   }
 }

@@ -45,8 +45,8 @@ class CompanyRegistrationNotificationTest extends TestCase
             'poc1_designation' => 'Coordinator',
             'poc1_email' => 'poc1@acme.example',
             'poc1_mobile' => '9876543212',
-            'password' => 'Secret123!',
-            'password_confirmation' => 'Secret123!',
+            'password' => 'Kx7-Tmq9-Zr42!',
+            'password_confirmation' => 'Kx7-Tmq9-Zr42!',
         ];
 
         $response = $this->postJson('/api/auth/company/register', $payload);

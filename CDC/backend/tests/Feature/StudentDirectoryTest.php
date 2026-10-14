@@ -272,8 +272,8 @@ class StudentDirectoryTest extends TestCase
         $this->patchJson($url, ['status' => 'suspended'])->assertOk()->assertJsonPath('enrollment.status', 'suspended');
 
         $log = AuditLog::where('action', 'cycle.enrollment_status')->sole();
-        $this->assertSame(['student_profile_id' => $student->id, 'status' => 'active'], $log->before);
-        $this->assertSame(['student_profile_id' => $student->id, 'status' => 'suspended'], $log->after);
+        $this->assertEquals(['student_profile_id' => $student->id, 'status' => 'active'], $log->before); // key order is the database's
+        $this->assertEquals(['student_profile_id' => $student->id, 'status' => 'suspended'], $log->after);
         $this->assertSame(CycleEnrollment::class, $log->subject_type);
 
         // The job profile stays on the board, ineligible, with the reason; apply is refused with the same reason.

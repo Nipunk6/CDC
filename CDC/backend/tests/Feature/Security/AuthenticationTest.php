@@ -3,17 +3,23 @@
 namespace Tests\Feature\Security;
 
 use App\Mail\PasswordResetLinkMail;
+use App\Mail\PortalNoticeMail;
+use App\Mail\RecruiterEmailVerificationMail;
 use App\Mail\StudentInvitationMail;
 use App\Models\Company;
 use App\Models\RecruiterEmailVerification;
 use App\Models\StudentProfile;
 use App\Models\User;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Middleware\TrustHosts;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Group;
@@ -51,14 +57,18 @@ class AuthenticationTest extends TestCase
 
     // ---------------------------------------------------------------- A3.1 / A3.2 enumeration
 
-    /** SEC finding (timing oracle): an unknown account must cost the same as a known one with a wrong password. */
+    /**
+     * SEC finding (timing oracle): an unknown account must cost the same as a known one with a wrong password.
+     *
+     * SEC-003: fixed in P-1.14 (was in group qa-open until then).
+     */
     public function test_A3_1_failed_login_timing_does_not_reveal_whether_the_account_exists(): void
     {
         // Factory first (it caches its own cost-4 hash in a static), then production cost for this account only.
         $known = StudentProfile::factory()->create(['roll_no' => '22JE0001']);
         config(['hashing.bcrypt.rounds' => 12]);
         app('hash')->forgetDrivers();
-        $known->user->update(['password' => Hash::make('Secret123')]);
+        $known->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
         $this->assertSame(12, password_get_info($known->user->fresh()->password)['options']['cost']);
 
         $time = function (array $body): float {
@@ -77,7 +87,11 @@ class AuthenticationTest extends TestCase
         $this->assertLessThan(50, $gap, sprintf('known accounts answer %.0f ms slower than unknown ones (bcrypt only runs for existing users)', $gap));
     }
 
-    /** SEC finding: the second reset request for an existing account answers 429, an unknown account never does. */
+    /**
+     * SEC finding: the second reset request for an existing account answers 429, an unknown account never does.
+     *
+     * SEC-003: fixed in P-1.14 (was in group qa-open until then).
+     */
     public function test_A3_2_forgot_password_responses_are_identical_for_existing_and_unknown_accounts(): void
     {
         StudentProfile::factory()->create(['roll_no' => '22JE0002']);
@@ -87,6 +101,109 @@ class AuthenticationTest extends TestCase
         ];
 
         $this->assertSame($sequence(['roll_no' => '99ZZ0002']), $sequence(['roll_no' => '22JE0002']), 'existing account is distinguishable by the reset throttle');
+    }
+
+    /** SEC-003 (P-1.14): a mail fault or a revoked invitation looks exactly like "sent" too. */
+    public function test_A3_2_forgot_password_never_answers_differently_for_an_existing_account(): void
+    {
+        StudentProfile::factory()->create(['roll_no' => '22JE0003']);
+        $unknown = $this->postJson('/api/auth/forgot-password', ['roll_no' => '99ZZ0003']);
+        $known = $this->postJson('/api/auth/forgot-password', ['roll_no' => '22JE0003']);
+        $again = $this->postJson('/api/auth/forgot-password', ['roll_no' => '22JE0003']); // throttled by the broker
+
+        foreach ([$known, $again] as $response) {
+            $this->assertSame($unknown->status(), $response->status());
+            $this->assertSame($unknown->getContent(), $response->getContent());
+        }
+        Mail::assertSent(PasswordResetLinkMail::class, 1); // the throttled repeat sends nothing
+    }
+
+    // ---------------------------------------------------------------- A3.3 recruiter registration enumeration
+
+    /**
+     * SEC-003 (P-1.14): asking for a verification link looks the same for an address that already has an account as
+     * for a new one. The new address gets the link; the existing owner gets a notice instead.
+     */
+    public function test_A3_3_verification_link_response_is_identical_for_registered_and_new_addresses(): void
+    {
+        config(['services.recruiter_email.dns_check' => false]);
+        User::factory()->create(['role' => 'company', 'email' => 'taken@co.qa.test', 'name' => 'Asha Rao']);
+        Company::create(['name' => 'Legacy', 'hr_name' => 'HR', 'hr_email' => 'legacy@co.qa.test']);
+
+        $shape = function (string $email) {
+            $response = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => $email, 'name' => 'Someone']);
+            $body = $response->json();
+            $this->assertIsString($body['status_token'] ?? null, $email);
+            $this->assertSame(40, strlen($body['status_token']), $email);
+            unset($body['status_token']);
+
+            return [$response->status(), $body];
+        };
+
+        $new = $shape('new@co.qa.test');
+        $this->assertSame(200, $new[0]);
+        $this->assertSame($new, $shape('taken@co.qa.test'), 'an address with a user account');
+        $this->assertSame($new, $shape('legacy@co.qa.test'), 'an address used as a company HR email');
+
+        Mail::assertSent(RecruiterEmailVerificationMail::class, fn ($m) => $m->hasTo('new@co.qa.test'));
+        Mail::assertSent(RecruiterEmailVerificationMail::class, 1);
+        Mail::assertSent(PortalNoticeMail::class, fn ($m) => $m->hasTo('taken@co.qa.test') && str_contains($m->render(), 'already has an account'));
+        Mail::assertSent(PortalNoticeMail::class, fn ($m) => $m->hasTo('legacy@co.qa.test'));
+        $this->assertSame(['new@co.qa.test'], RecruiterEmailVerification::pluck('email')->all(), 'no verification is started for a registered address');
+
+        // The 10-minute cooldown answers the same for both as well.
+        $repeatNew = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'new@co.qa.test']);
+        $repeatTaken = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'taken@co.qa.test']);
+        $this->assertSame(429, $repeatNew->status());
+        $this->assertSame([$repeatNew->status(), $repeatNew->json('message')], [$repeatTaken->status(), $repeatTaken->json('message')]);
+    }
+
+    /** SEC-003 (P-1.14): the status check needs the token given to the browser that asked for the link. */
+    public function test_A3_3_verification_status_needs_the_status_token(): void
+    {
+        config(['services.recruiter_email.dns_check' => false, 'app.url' => 'http://localhost']);
+        User::factory()->create(['role' => 'company', 'email' => 'taken@co.qa.test']);
+        $statusToken = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'new@co.qa.test'])->assertOk()->json('status_token');
+        $fakeToken = $this->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'taken@co.qa.test'])->assertOk()->json('status_token');
+        $status = fn (array $query) => $this->getJson('/api/auth/company/recruiter-email/verification-status?'.http_build_query($query));
+
+        $status(['email' => 'new@co.qa.test'])->assertStatus(422)->assertJsonValidationErrors('status_token');
+        $status(['email' => 'new@co.qa.test', 'status_token' => $statusToken])->assertOk()->assertJson(['verified' => false]);
+
+        // The recruiter clicks the emailed link.
+        $link = null;
+        Mail::assertSent(RecruiterEmailVerificationMail::class, function (RecruiterEmailVerificationMail $m) use (&$link) {
+            $link = $m->verifyUrl;
+
+            return true;
+        });
+        $this->get(str_replace('http://localhost', '', $link))->assertSee('verified successfully');
+
+        $status(['email' => 'new@co.qa.test', 'status_token' => $statusToken])->assertOk()->assertJson(['verified' => true]);
+        $status(['email' => 'new@co.qa.test', 'status_token' => str_repeat('x', 40)])->assertOk()->assertJson(['verified' => false]);
+        $status(['email' => 'taken@co.qa.test', 'status_token' => $fakeToken])->assertOk()->assertJson(['verified' => false]);
+        $status(['email' => 'nobody@co.qa.test', 'status_token' => $statusToken])->assertOk()->assertJson(['verified' => false]);
+    }
+
+    /** SEC-003 (P-1.14): registering with an address that already has an account says only "verify the email first". */
+    public function test_A3_3_registration_does_not_say_that_an_address_is_registered(): void
+    {
+        Storage::fake('public');
+        User::factory()->create(['role' => 'company', 'email' => 'taken@co.qa.test']);
+        $payload = fn (string $email) => [
+            'company_name' => 'Acme', 'website' => 'https://acme.example', 'sector' => 'IT', 'company_logo' => UploadedFile::fake()->image('logo.png', 64, 64),
+            'recruiter_name' => 'Asha Rao', 'recruiter_designation' => 'HR', 'hr_email' => $email, 'hr_phone' => '9876543210',
+            'head_name' => 'Head', 'head_designation' => 'Lead', 'head_email' => 'head@acme.example', 'head_mobile' => '9876543211',
+            'poc1_name' => 'Poc', 'poc1_designation' => 'HR', 'poc1_email' => 'poc@acme.example', 'poc1_mobile' => '9876543212',
+            'password' => 'Zx9!kLm2#Qw', 'password_confirmation' => 'Zx9!kLm2#Qw',
+        ];
+
+        $taken = $this->post('/api/auth/company/register', $payload('taken@co.qa.test'), ['Accept' => 'application/json']);
+        $fresh = $this->post('/api/auth/company/register', $payload('fresh@co.qa.test'), ['Accept' => 'application/json']);
+
+        $this->assertSame(422, $taken->status());
+        $this->assertSame([$fresh->status(), $fresh->getContent()], [$taken->status(), $taken->getContent()]);
+        $this->assertStringNotContainsString('already been registered', $taken->getContent());
     }
 
     // ---------------------------------------------------------------- A3.4 password policy
@@ -100,7 +217,11 @@ class AuthenticationTest extends TestCase
         }
     }
 
-    /** SEC finding (Low): no compromised-password or personal-information check. */
+    /**
+     * SEC finding (Low): no compromised-password or personal-information check.
+     *
+     * SEC-012: fixed in P-1.14 (was in group qa-open until then).
+     */
     public function test_A3_4_common_or_personal_passwords_are_rejected(): void
     {
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0003', 'full_name' => 'Asha Verma']);
@@ -114,6 +235,27 @@ class AuthenticationTest extends TestCase
         $this->assertSame([], $accepted, 'weak/common/personal passwords accepted');
     }
 
+    /** SEC-012 (P-1.14): the same rule on company registration; a strong unrelated password still passes the rule. */
+    public function test_A3_4_registration_rejects_common_and_personal_passwords_and_accepts_a_strong_one(): void
+    {
+        Storage::fake('public');
+        RecruiterEmailVerification::create(['email' => 'asha.rao@acme.qa.test', 'token_hash' => hash('sha256', 'x'), 'expires_at' => now()->addHour(), 'verified_at' => now()]);
+        $register = fn (string $password) => $this->post('/api/auth/company/register', [
+            'company_name' => 'Acme', 'website' => 'https://acme.example', 'sector' => 'IT', 'company_logo' => UploadedFile::fake()->image('logo.png', 64, 64),
+            'recruiter_name' => 'Asha Rao', 'recruiter_designation' => 'HR', 'hr_email' => 'asha.rao@acme.qa.test', 'hr_phone' => '9876543210',
+            'head_name' => 'Head', 'head_designation' => 'Lead', 'head_email' => 'head@acme.example', 'head_mobile' => '9876543211',
+            'poc1_name' => 'Poc', 'poc1_designation' => 'HR', 'poc1_email' => 'poc@acme.example', 'poc1_mobile' => '9876543212',
+            'password' => $password, 'password_confirmation' => $password,
+        ], ['Accept' => 'application/json']);
+
+        foreach (['Password1', 'Qwerty2026', 'Dragon!99', 'AshaRao2026', 'xAsha.Rao77'] as $weak) {
+            $register($weak)->assertStatus(422)->assertJsonValidationErrors('password');
+        }
+        $this->assertSame(0, Company::count());
+
+        $register('Tr4vel-Kettle-93')->assertCreated();
+    }
+
     // ---------------------------------------------------------------- A3.5 reset flow
 
     public function test_A3_5_reset_token_is_single_use_email_bound_expiring_and_revokes_api_tokens(): void
@@ -123,14 +265,14 @@ class AuthenticationTest extends TestCase
         $oldToken = $a->createToken('auth-token')->plainTextToken;
 
         $tokenA = Password::broker()->createToken($a);
-        $this->reset('b@co.test', $tokenA, 'NewPass123')->assertStatus(422); // A's token with B's email
-        $this->reset('a@co.test', $tokenA, 'NewPass123')->assertOk();
-        $this->reset('a@co.test', $tokenA, 'NewPass456')->assertStatus(422); // reuse
+        $this->reset('b@co.test', $tokenA, 'Vb3-Wnq8-Xd57')->assertStatus(422); // A's token with B's email
+        $this->reset('a@co.test', $tokenA, 'Vb3-Wnq8-Xd57')->assertOk();
+        $this->reset('a@co.test', $tokenA, 'Hg5-Jzp2-Lc86')->assertStatus(422); // reuse
         $this->bearer($oldToken)->getJson('/api/auth/user')->assertUnauthorized(); // old API tokens revoked
 
         $tokenB = Password::broker()->createToken($b);
         DB::table('password_reset_tokens')->where('email', 'b@co.test')->update(['created_at' => now()->subMinutes(61)]);
-        $this->reset('b@co.test', $tokenB, 'NewPass123')->assertStatus(422); // expired
+        $this->reset('b@co.test', $tokenB, 'Vb3-Wnq8-Xd57')->assertStatus(422); // expired
     }
 
     public function test_A3_5_reset_link_is_built_from_config_not_from_host_headers(): void
@@ -166,9 +308,9 @@ class AuthenticationTest extends TestCase
         $this->assertStringNotContainsString('8.73', $html);
         $this->assertStringNotContainsString('9876501234', $html);
 
-        $this->reset($first['email'], $first['token'], 'NewPass123')->assertStatus(422); // superseded
-        $this->reset($second['email'], $second['token'], 'NewPass123')->assertOk();
-        $this->reset($second['email'], $second['token'], 'NewPass456')->assertStatus(422); // single use
+        $this->reset($first['email'], $first['token'], 'Vb3-Wnq8-Xd57')->assertStatus(422); // superseded
+        $this->reset($second['email'], $second['token'], 'Vb3-Wnq8-Xd57')->assertOk();
+        $this->reset($second['email'], $second['token'], 'Hg5-Jzp2-Lc86')->assertStatus(422); // single use
     }
 
     // ---------------------------------------------------------------- A3.7 account state
@@ -203,9 +345,9 @@ class AuthenticationTest extends TestCase
     public function test_A3_8_api_token_of_one_role_never_reaches_another_roles_routes(): void
     {
         $student = StudentProfile::factory()->create(['roll_no' => '22JE0005']);
-        $student->user->update(['password' => Hash::make('Secret123')]);
+        $student->user->update(['password' => Hash::make('Kx7-Tmq9-Zr42')]);
         // The API issues a token whatever "portal" the user came from (portal choice is UI-only by design)…
-        $token = $this->postJson('/api/auth/login', ['roll_no' => '22JE0005', 'password' => 'Secret123'])->assertOk()->json('token');
+        $token = $this->postJson('/api/auth/login', ['roll_no' => '22JE0005', 'password' => 'Kx7-Tmq9-Zr42'])->assertOk()->json('token');
         // …but the role boundary holds.
         $this->bearer($token)->getJson('/api/company/postings')->assertForbidden();
         $this->bearer($token)->getJson('/api/admin/students')->assertForbidden();
@@ -229,13 +371,60 @@ class AuthenticationTest extends TestCase
         $this->assertNull(RecruiterEmailVerification::where('email', 'hr@late.test')->value('verified_at'));
     }
 
-    /** SEC finding (Low): a verification link keeps working after it was used, until it expires. */
+    /** SEC-014 (P-1.12): a verification link works once; the address stays verified. */
     public function test_A3_9_verification_link_is_single_use(): void
     {
         $token = Str::random(64);
         RecruiterEmailVerification::create(['email' => 'hr@twice.test', 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(30)]);
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertSee('verified successfully');
         $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertDontSee('verified successfully');
+        $this->assertNotNull(RecruiterEmailVerification::where('email', 'hr@twice.test')->value('verified_at'));
+    }
+
+    /** SEC-014 / Phase 1 B7 (P-1.12): once verified, the address stays verified for 24 hours, not just the link's 30 minutes. */
+    public function test_A3_9_verified_address_outlives_the_link_lifetime(): void
+    {
+        config(['services.recruiter_email.dns_check' => false]);
+        $token = Str::random(64);
+        RecruiterEmailVerification::create(['email' => 'hr@slow.qa.test', 'token_hash' => hash('sha256', $token), 'status_token_hash' => hash('sha256', 'browser-status-token'), 'expires_at' => now()->addMinutes(30)]);
+        $this->get('/api/auth/company/recruiter-email/verify?token='.$token)->assertSee('verified successfully');
+        $status = '/api/auth/company/recruiter-email/verification-status?email=hr@slow.qa.test&status_token=browser-status-token';
+
+        $this->travel(2)->hours();
+        $this->getJson($status)->assertOk()->assertJson(['verified' => true]);
+
+        $this->travel(23)->hours();
+        $this->getJson($status)->assertOk()->assertJson(['verified' => false]);
+    }
+
+    /** SEC-007 (P-1.10): the emailed link is built from APP_URL, never from the Host / X-Forwarded-Host headers. */
+    public function test_A3_9_verification_link_uses_configured_origin(): void
+    {
+        config(['app.url' => 'https://api.cdc.test', 'services.recruiter_email.dns_check' => false]);
+
+        $this->withHeaders(['Host' => 'evil.example', 'X-Forwarded-Host' => 'evil.example', 'X-Forwarded-Proto' => 'https'])
+            ->postJson('/api/auth/company/recruiter-email/verification-link', ['email' => 'hr@newco.qa.test', 'name' => 'Asha'])
+            ->assertOk();
+
+        Mail::assertSent(RecruiterEmailVerificationMail::class, fn (RecruiterEmailVerificationMail $m) => str_starts_with($m->verifyUrl, 'https://api.cdc.test/api/auth/company/recruiter-email/verify?token=')
+            && ! str_contains($m->verifyUrl, 'evil'));
+    }
+
+    /** SEC-007 (P-1.10): Laravel's TrustHosts runs globally; trusted hosts are APP_URL's host (+ subdomains) and the exact names in TRUSTED_HOSTS. */
+    public function test_A3_9_trusted_hosts_come_from_config_and_are_exact(): void
+    {
+        $this->assertContains(TrustHosts::class, app(HttpKernel::class)->getGlobalMiddleware());
+
+        config(['app.url' => 'https://api.cdc.test', 'app.trusted_hosts' => ['portal.cdc.test']]);
+        $patterns = app(TrustHosts::class)->hosts();
+        // Symfony's Request::setTrustedHosts() wraps every pattern as {pattern}i.
+        $trusted = fn (string $host): bool => collect($patterns)->contains(fn (?string $p) => $p !== null && preg_match('{'.$p.'}i', $host) === 1);
+
+        $this->assertTrue($trusted('api.cdc.test'));
+        $this->assertTrue($trusted('portal.cdc.test'));
+        $this->assertFalse($trusted('evil.example'));
+        $this->assertFalse($trusted('portal.cdc.test.evil.example'), 'configured names are anchored, not substrings');
+        $this->assertFalse($trusted('xportal.cdc.test'));
     }
 
     // ---------------------------------------------------------------- A3.10 super-admin protection

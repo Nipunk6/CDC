@@ -9,11 +9,14 @@ use App\Models\JobPosting;
 use App\Models\Offer;
 use App\Models\PlacementBlock;
 use App\Models\PostingRound;
+use App\Models\StudentProfile;
 use App\Services\AuditService;
 use App\Services\BlockingPolicy;
 use App\Services\MailDispatchService;
 use App\Services\PipelineService;
 use App\Services\PortalNotificationService;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -68,7 +71,10 @@ class AdminResultController extends Controller
                 'result' => $row->result,
                 'published' => $row->isPublished(),
                 'placed_elsewhere_flag' => $row->application->placed_elsewhere_flag,
+                'used_unverified_resume' => (bool) $row->application->used_unverified_resume, // QA F-022
                 'active_blocks' => ($activeBlocks[$student->id] ?? collect())->map(fn (PlacementBlock $b) => $b->message())->values(),
+                // Why this candidate cannot be offered right now (QA F-035); the console disables their row.
+                'offer_refusal' => $row->application->offer ? null : $this->policy->offerRefusal($student, $jobPosting, $row->application_id),
                 'offer' => $row->application->offer,
                 'suggested' => [
                     'offer_type' => $defaultType,
@@ -168,10 +174,20 @@ class AdminResultController extends Controller
 
         // Offers only for the final round's pool or people already decided in it (no skipping earlier rejections, D84).
         $poolIds = $this->pipeline->pool($final)->pluck('id')->all();
-        $finalIds = $final->results()->pluck('application_id')->all();
+        $finalRows = $final->results()->get()->keyBy('application_id');
+        $finalIds = $finalRows->keys()->all();
         foreach ($applications as $application) {
             if (! in_array($application->id, $poolIds, true) && ! in_array($application->id, $finalIds, true)) {
                 return response()->json(['message' => "{$application->studentProfile->roll_no} did not reach the final stage. Use Re-add on the stage where they were not selected."], 422);
+            }
+            // QA F-027: a rejection already published in the final stage is undone only through Re-add (company told, audited).
+            $finalRow = $finalRows->get($application->id);
+            if ($finalRow && $finalRow->result === 'rejected' && $finalRow->isPublished()) {
+                return response()->json(['message' => "{$application->studentProfile->roll_no} was not selected in the final stage. Use Re-add on that stage first."], 422);
+            }
+            // QA F-035 (owner rule): never a second offer in the cycle, never an offer through an active block.
+            if ($refusal = $this->policy->offerRefusal($application->studentProfile, $jobPosting, $application->id)) {
+                return response()->json(['message' => $refusal], 422);
             }
         }
 
@@ -186,96 +202,110 @@ class AdminResultController extends Controller
         $admin = $request->user();
         $rejectRemaining = (bool) ($validated['reject_remaining'] ?? true);
 
-        [$offers, $blocks, $flagged, $published, $blockScopes] = DB::transaction(function () use ($validated, $applications, $final, $jobPosting, $company, $now, $admin, $rejectRemaining) {
-            $offers = collect();
-            $blocks = collect();
-            $flagged = 0;
-            $blockScopes = [];
+        try {
+            [$offers, $blocks, $flagged, $published, $blockScopes] = DB::transaction(function () use ($validated, $applications, $final, $jobPosting, $company, $now, $admin, $rejectRemaining) {
+                $offers = collect();
+                $blocks = collect();
+                $flagged = 0;
+                $blockScopes = [];
 
-            foreach ($validated['selections'] as $selection) {
-                /** @var Application $application */
-                $application = $applications->get($selection['application_id']);
-
-                ApplicationRoundResult::query()->updateOrCreate(
-                    ['application_id' => $application->id, 'posting_round_id' => $final->id],
-                    ['result' => 'selected', 'published_at' => $now, 'decided_by' => $admin->id]
-                );
-
-                $offer = Offer::create([
-                    'application_id' => $application->id,
-                    'student_profile_id' => $application->student_profile_id,
-                    'company_id' => $company->id,
-                    'job_posting_id' => $jobPosting->id,
-                    'placement_cycle_id' => $jobPosting->placement_cycle_id,
-                    'offer_type' => $selection['offer_type'],
-                    'ctc_annual' => $selection['ctc_annual'] ?? null,
-                    'stipend_monthly' => $selection['stipend_monthly'] ?? null,
-                    'currency' => (string) ($jobPosting->formData()['currency'] ?? 'INR'),
-                    'announced_by' => $admin->id,
-                    'announced_at' => $now,
-                ]);
-                $offers->push($offer);
-
-                if ($selection['block']) {
-                    $scope = $selection['block_scope'] ?? ($this->policy->suggest($selection['offer_type'])['scope'] ?? 'all');
-                    $blockScopes[$offer->id] = $scope;
-                    // Owner decision (QA F-004): "completely" reaches every cycle the student is enrolled in;
-                    // internship offers reach the internship cycle(s) only.
-                    foreach ($this->policy->targets($application->studentProfile, $jobPosting->placementCycle, $scope) as $target) {
-                        $block = PlacementBlock::create([
-                            'student_profile_id' => $application->student_profile_id,
-                            'placement_cycle_id' => $target['placement_cycle_id'],
-                            'scope' => $target['scope'],
-                            'reason' => 'offer',
-                            'offer_id' => $offer->id,
-                            'active' => true,
-                            'blocked_by' => $admin->id,
-                        ]);
-                        $blocks->push($block);
-                        $flagged += $this->policy->flagLiveApplications($application->student_profile_id, $target['placement_cycle_id'], $target['scope'], $application->id);
+                // Same check again under a row lock, so two announcements at the same moment cannot both offer one student.
+                StudentProfile::query()->whereIn('id', $applications->pluck('student_profile_id'))->lockForUpdate()->get();
+                foreach ($applications as $application) {
+                    if ($refusal = $this->policy->offerRefusal($application->studentProfile, $jobPosting, $application->id)) {
+                        throw new HttpResponseException(response()->json(['message' => $refusal], 422));
                     }
                 }
-            }
 
-            // Everyone else in the final round: publish their drafts; the rest of the pool is not selected.
-            if ($rejectRemaining) {
-                $existing = $final->results()->get()->keyBy('application_id');
-                foreach ($this->pipeline->pool($final) as $candidate) {
-                    $row = $existing->get($candidate->id);
-                    if (! $row) {
-                        ApplicationRoundResult::create([
-                            'application_id' => $candidate->id,
-                            'posting_round_id' => $final->id,
-                            'result' => 'rejected',
-                            'decided_by' => $admin->id,
-                        ]);
-                    } elseif ($row->result === 'pending' && ! $row->isPublished()) {
-                        $row->update(['result' => 'rejected', 'decided_by' => $admin->id]);
+                foreach ($validated['selections'] as $selection) {
+                    /** @var Application $application */
+                    $application = $applications->get($selection['application_id']);
+
+                    ApplicationRoundResult::query()->updateOrCreate(
+                        ['application_id' => $application->id, 'posting_round_id' => $final->id],
+                        ['result' => 'selected', 'published_at' => $now, 'decided_by' => $admin->id]
+                    );
+
+                    $offer = Offer::create([
+                        'application_id' => $application->id,
+                        'student_profile_id' => $application->student_profile_id,
+                        'company_id' => $company->id,
+                        'job_posting_id' => $jobPosting->id,
+                        'placement_cycle_id' => $jobPosting->placement_cycle_id,
+                        'offer_type' => $selection['offer_type'],
+                        'ctc_annual' => $selection['ctc_annual'] ?? null,
+                        'stipend_monthly' => $selection['stipend_monthly'] ?? null,
+                        'currency' => (string) ($jobPosting->formData()['currency'] ?? 'INR'),
+                        'announced_by' => $admin->id,
+                        'announced_at' => $now,
+                    ]);
+                    $offers->push($offer);
+
+                    if ($selection['block']) {
+                        $scope = $selection['block_scope'] ?? ($this->policy->suggest($selection['offer_type'])['scope'] ?? 'all');
+                        $blockScopes[$offer->id] = $scope;
+                        // Owner decision (QA F-004): "completely" reaches every cycle the student is enrolled in;
+                        // internship offers reach the internship cycle(s) only.
+                        foreach ($this->policy->targets($application->studentProfile, $jobPosting->placementCycle, $scope) as $target) {
+                            $block = PlacementBlock::create([
+                                'student_profile_id' => $application->student_profile_id,
+                                'placement_cycle_id' => $target['placement_cycle_id'],
+                                'scope' => $target['scope'],
+                                'reason' => 'offer',
+                                'offer_id' => $offer->id,
+                                'active' => true,
+                                'blocked_by' => $admin->id,
+                            ]);
+                            $blocks->push($block);
+                            $flagged += $this->policy->flagLiveApplications($application->student_profile_id, $target['placement_cycle_id'], $target['scope'], $application->id);
+                        }
                     }
                 }
-            }
 
-            $selectedIds = array_column($validated['selections'], 'application_id');
-            $published = $final->results()
-                ->whereNull('published_at')
-                ->where('result', '!=', 'pending')
-                ->whereNotIn('application_id', $selectedIds)
-                ->whereHas('application', fn ($q) => $q->where('status', 'applied'))
-                ->get();
-            foreach ($published as $row) {
-                // A final-round "selected" draft without an offer is announced as not selected.
-                if ($row->result === 'selected') {
-                    $row->result = 'rejected';
+                // Everyone else in the final round: publish their drafts; the rest of the pool is not selected.
+                if ($rejectRemaining) {
+                    $existing = $final->results()->get()->keyBy('application_id');
+                    foreach ($this->pipeline->pool($final) as $candidate) {
+                        $row = $existing->get($candidate->id);
+                        if (! $row) {
+                            ApplicationRoundResult::create([
+                                'application_id' => $candidate->id,
+                                'posting_round_id' => $final->id,
+                                'result' => 'rejected',
+                                'decided_by' => $admin->id,
+                            ]);
+                        } elseif ($row->result === 'pending' && ! $row->isPublished()) {
+                            $row->update(['result' => 'rejected', 'decided_by' => $admin->id]);
+                        }
+                    }
                 }
-                $row->published_at = $now;
-                $row->save();
-            }
 
-            $final->update(['status' => 'completed']);
-            $jobPosting->update(['status' => 'completed']);
+                $selectedIds = array_column($validated['selections'], 'application_id');
+                $published = $final->results()
+                    ->whereNull('published_at')
+                    ->where('result', '!=', 'pending')
+                    ->whereNotIn('application_id', $selectedIds)
+                    ->whereHas('application', fn ($q) => $q->where('status', 'applied'))
+                    ->get();
+                foreach ($published as $row) {
+                    // A final-round "selected" draft without an offer is announced as not selected.
+                    if ($row->result === 'selected') {
+                        $row->result = 'rejected';
+                    }
+                    $row->published_at = $now;
+                    $row->save();
+                }
 
-            return [$offers, $blocks, $flagged, $published, $blockScopes];
-        });
+                $final->update(['status' => 'completed']);
+                $jobPosting->update(['status' => 'completed']);
+
+                return [$offers, $blocks, $flagged, $published, $blockScopes];
+            });
+        } catch (UniqueConstraintViolationException) {
+            // QA F-017: another admin announced the same result between our checks and our insert. Nothing of ours
+            // was written (the transaction rolled back); the unique key kept one offer per application.
+            return response()->json(['message' => 'These results were announced a moment ago by someone else. Reload the page to see them.'], 409);
+        }
 
         foreach ($offers as $offer) {
             $this->audit->log($request, 'offer.create', $offer, null, $offer->only(['application_id', 'student_profile_id', 'offer_type', 'ctc_annual', 'stipend_monthly']));

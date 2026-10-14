@@ -109,7 +109,8 @@ class FixF004BlockingTest extends TestCase
 
     private function blockedCycles(): array
     {
-        return PlacementBlock::where('student_profile_id', $this->student->id)->where('active', true)->pluck('scope', 'placement_cycle_id')->all();
+        // Ordered, so the result does not depend on the order the database happens to return rows in.
+        return PlacementBlock::where('student_profile_id', $this->student->id)->where('active', true)->orderBy('placement_cycle_id')->pluck('scope', 'placement_cycle_id')->all();
     }
 
     public function test_full_time_offer_blocks_the_student_completely(): void
@@ -130,7 +131,7 @@ class FixF004BlockingTest extends TestCase
         $inf = $this->float('inf', $this->intern);
         $this->announce($inf, $this->apply($inf), 'intern_ppo');
 
-        $this->assertSame([$this->intern->id => 'all', $this->ft->id => 'all'], $this->blockedCycles());
+        $this->assertEquals([$this->intern->id => 'all', $this->ft->id => 'all'], $this->blockedCycles());
         $this->assertFalse($this->eligible($this->float('jnf', $this->ft)), 'a student who accepted a PPO is out of full-time placements');
     }
 
@@ -227,7 +228,7 @@ class FixF004BlockingTest extends TestCase
         $this->assertSame([$this->intern->id => 'all'], $this->blockedCycles());
 
         $this->artisan('placement:extend-offer-blocks')->expectsOutput('1 block(s) added, 1 live application(s) flagged as placed elsewhere.')->assertSuccessful();
-        $this->assertSame([$this->intern->id => 'all', $this->ft->id => 'all'], $this->blockedCycles());
+        $this->assertEquals([$this->intern->id => 'all', $this->ft->id => 'all'], $this->blockedCycles());
         $this->assertTrue($jnfApp->fresh()->placed_elsewhere_flag);
         $this->assertSame(1, AuditLog::where('action', 'block.create')->where('after->via', 'extend-offer-blocks')->count());
 

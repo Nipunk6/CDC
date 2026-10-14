@@ -133,6 +133,9 @@ class AdminResumeController extends Controller
             // B3: approving a resume clears the unverified flag on every application that uses it.
             if ($validated['status'] === 'approved') {
                 $resume->applications()->update(['used_unverified_resume' => false]);
+            } else {
+                // QA F-026: rejecting it (also after an earlier approval) flags the live applications that use it again.
+                $resume->applications()->where('status', 'applied')->update(['used_unverified_resume' => true]);
             }
 
             return false;

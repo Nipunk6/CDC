@@ -78,7 +78,7 @@ class CompanyJnfController extends Controller
             return response()->json(['message' => 'Company profile not found.'], 404);
         }
 
-        $status = $request->input('status', 'draft');
+        $status = $request->input('status') ?? 'draft'; // F-040: an explicit null/blank status means the default
         $validated = $request->validated();
         unset($validated['admin_remarks']); // companies never write admin remarks
 
@@ -142,7 +142,7 @@ class CompanyJnfController extends Controller
         }
 
         $oldStatus = (string) $jnf->status;
-        $newStatus = (string) $request->input('status', $oldStatus);
+        $newStatus = (string) ($request->input('status') ?? $oldStatus); // F-040: null/blank keeps the current status
         $validated = $request->validated();
         unset($validated['admin_remarks']); // companies never write admin remarks
 
@@ -234,7 +234,8 @@ class CompanyJnfController extends Controller
         }
 
         $validated = $request->validate([
-            'id' => ['nullable', 'integer', 'exists:jnfs,id'],
+            // SEC-022: no `exists` rule — an unknown id and another company's id both get "JNF not found." below.
+            'id' => ['nullable', 'integer'],
             'job_title' => ['required', 'string', 'max:255'],
             'job_description' => ['required', 'string', 'max:5000'],
             'job_location' => ['nullable', 'string', 'max:255'],

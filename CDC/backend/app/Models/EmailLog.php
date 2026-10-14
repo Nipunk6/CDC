@@ -26,6 +26,7 @@ class EmailLog extends Model
         'status',
         'error_message',
         'sent_at',
+        'scheduled_for',
     ];
 
     /**
@@ -37,6 +38,7 @@ class EmailLog extends Model
     {
         return [
             'sent_at' => 'datetime',
+            'scheduled_for' => 'datetime',
         ];
     }
 

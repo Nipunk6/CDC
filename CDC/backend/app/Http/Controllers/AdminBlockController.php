@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\PlacementBlock;
 use App\Services\AuditService;
+use App\Services\BlockingPolicy;
 use App\Services\PortalNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Placement blocks (spec B4 / M7.3). Admin is god: manual/debarred blocks and unblocking at any time.
@@ -16,7 +18,8 @@ class AdminBlockController extends Controller
 {
     public function __construct(
         private readonly AuditService $audit,
-        private readonly PortalNotificationService $notifications
+        private readonly PortalNotificationService $notifications,
+        private readonly BlockingPolicy $policy
     ) {
     }
 
@@ -94,26 +97,18 @@ class AdminBlockController extends Controller
             return response()->json(['message' => 'This block is already lifted.'], 422);
         }
 
-        $placementBlock->update([
-            'active' => false,
-            'unblocked_by' => $request->user()->id,
-            'unblocked_at' => now(),
-        ]);
+        // QA F-028: lifting the block and clearing "placed elsewhere" flags happen together or not at all. The flags
+        // go by the same rule as an offer revoke: a remaining "all" block keeps them, a remaining internships-only
+        // block keeps them on internship postings only.
+        $cleared = DB::transaction(function () use ($placementBlock, $request): int {
+            $placementBlock->update([
+                'active' => false,
+                'unblocked_by' => $request->user()->id,
+                'unblocked_at' => now(),
+            ]);
 
-        // Nothing else blocks everything in this cycle → the student's other live applications are no longer "placed elsewhere".
-        $stillBlocked = PlacementBlock::query()
-            ->where('student_profile_id', $placementBlock->student_profile_id)
-            ->where('placement_cycle_id', $placementBlock->placement_cycle_id)
-            ->where('active', true)
-            ->exists();
-        $cleared = 0;
-        if (! $stillBlocked) {
-            $cleared = \App\Models\Application::query()
-                ->where('student_profile_id', $placementBlock->student_profile_id)
-                ->where('placed_elsewhere_flag', true)
-                ->whereHas('jobPosting', fn ($q) => $q->where('placement_cycle_id', $placementBlock->placement_cycle_id))
-                ->update(['placed_elsewhere_flag' => false]);
-        }
+            return $this->policy->reconcileFlags($placementBlock->student_profile_id, [$placementBlock->placement_cycle_id]);
+        });
 
         $this->audit->log($request, 'block.remove', $placementBlock, ['active' => true], ['active' => false, 'placed_elsewhere_flags_cleared' => $cleared]);
 

@@ -8,8 +8,8 @@ import FitScreenIcon from "@mui/icons-material/FitScreen";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 
-// Basic worker setup
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// SEC-018: the pdf.js worker is bundled with the app (same version as react-pdf's pdfjs-dist), not loaded from a CDN.
+pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 
 const BASE_WIDTH = 800;
 const MIN_ZOOM = 0.5;

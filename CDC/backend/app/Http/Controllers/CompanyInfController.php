@@ -78,7 +78,7 @@ class CompanyInfController extends Controller
             return response()->json(['message' => 'Company profile not found.'], 404);
         }
 
-        $status = $request->input('status', 'draft');
+        $status = $request->input('status') ?? 'draft'; // F-040: an explicit null/blank status means the default
         $validated = $request->validated();
         unset($validated['admin_remarks']); // companies never write admin remarks
 
@@ -142,7 +142,7 @@ class CompanyInfController extends Controller
         }
 
         $oldStatus = (string) $inf->status;
-        $newStatus = (string) $request->input('status', $oldStatus);
+        $newStatus = (string) ($request->input('status') ?? $oldStatus); // F-040: null/blank keeps the current status
         $validated = $request->validated();
         unset($validated['admin_remarks']); // companies never write admin remarks
 
@@ -234,7 +234,8 @@ class CompanyInfController extends Controller
         }
 
         $validated = $request->validate([
-            'id' => ['nullable', 'integer', 'exists:infs,id'],
+            // SEC-022: no `exists` rule — an unknown id and another company's id both get "INF not found." below.
+            'id' => ['nullable', 'integer'],
             'internship_title' => ['required', 'string', 'max:255'],
             'internship_description' => ['required', 'string', 'max:5000'],
             'internship_location' => ['nullable', 'string', 'max:255'],

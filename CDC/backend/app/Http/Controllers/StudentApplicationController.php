@@ -11,6 +11,7 @@ use App\Services\EligibilityService;
 use App\Services\MailDispatchService;
 use App\Services\PortalNotificationService;
 use App\Support\PostingPresenter;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,38 +87,44 @@ class StudentApplicationController extends Controller
             return response()->json(['message' => $answers, 'errors' => ['answers' => [$answers]]], 422);
         }
 
-        $result = DB::transaction(function () use ($student, $jobPosting, $resume, $answers) {
-            $existing = Application::query()
-                ->where('job_posting_id', $jobPosting->id)
-                ->where('student_profile_id', $student->id)
-                ->lockForUpdate()
-                ->first();
+        try {
+            $result = DB::transaction(function () use ($student, $jobPosting, $resume, $answers) {
+                $existing = Application::query()
+                    ->where('job_posting_id', $jobPosting->id)
+                    ->where('student_profile_id', $student->id)
+                    ->lockForUpdate()
+                    ->first();
 
-            if ($existing && $existing->status === 'applied') {
-                return null;
-            }
+                if ($existing && $existing->status === 'applied') {
+                    return null;
+                }
 
-            $attributes = [
-                'resume_id' => $resume->id,
-                'status' => 'applied',
-                'used_unverified_resume' => $resume->status !== 'approved',
-                'answers' => $answers,
-                'applied_at' => now(),
-                'withdrawn_at' => null,
-            ];
+                $attributes = [
+                    'resume_id' => $resume->id,
+                    'status' => 'applied',
+                    'used_unverified_resume' => $resume->status !== 'approved',
+                    'answers' => $answers,
+                    'applied_at' => now(),
+                    'withdrawn_at' => null,
+                ];
 
-            if ($existing) {
-                $existing->update($attributes);
+                if ($existing) {
+                    $existing->update($attributes);
 
-                return $existing;
-            }
+                    return $existing;
+                }
 
-            return Application::create($attributes + [
-                'job_posting_id' => $jobPosting->id,
-                'student_profile_id' => $student->id,
-                'placed_elsewhere_flag' => false,
-            ]);
-        });
+                return Application::create($attributes + [
+                    'job_posting_id' => $jobPosting->id,
+                    'student_profile_id' => $student->id,
+                    'placed_elsewhere_flag' => false,
+                ]);
+            });
+        } catch (UniqueConstraintViolationException) {
+            // QA F-017: a second submit of the same application got in between our read and our insert (double click,
+            // two tabs). The unique key kept one row; answer like any other "already applied".
+            $result = null;
+        }
 
         if (! $result) {
             return response()->json(['message' => 'You have already applied. You can change your resume or answers instead.'], 409);

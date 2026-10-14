@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    // SEC-008: the Next.js server signs the real client IP with this shared secret (same value as the frontend's
+    // INTERNAL_PROXY_SECRET). Empty = forwarded IPs are never trusted.
+    'internal_proxy' => [
+        'secret' => env('INTERNAL_PROXY_SECRET', ''),
+        'max_skew_seconds' => 120,
+    ],
+
+    // Recruiter email addresses are checked for DNS records (`email:rfc,dns`). Tests switch this off so they never
+    // depend on live DNS (SEC-007 / SEC-010 test seam).
+    'recruiter_email' => [
+        'dns_check' => (bool) env('RECRUITER_EMAIL_DNS_CHECK', true),
+    ],
+
 ];
