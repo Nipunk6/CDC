@@ -124,6 +124,10 @@ php artisan db:seed --class=Phase2DemoSeeder
 ```
 
 ```bash
+php artisan db:seed --class=StaffRolesDemoSeeder
+```
+
+```bash
 php artisan storage:link
 ```
 
@@ -131,6 +135,7 @@ What these do:
 - `key:generate` writes `APP_KEY` into `.env`.
 - `migrate --seed` creates all tables, the programme/branch catalogue, the default settings and the super admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD`.
 - `Phase2DemoSeeder` adds demo data: 2 placement cycles, 120 students, 3 companies, drives at different stages, offers, a notice, a survey and an Excel template. It sends no emails.
+- `StaffRolesDemoSeeder` adds two staff roles ("Company Admin" and "Dept FIC"), a demo Company Admin, one Dept FIC per B.Tech department, and enough demo students that every department has at least three. Run it after `Phase2DemoSeeder`.
 - `storage:link` makes company logos and policy PDFs viewable.
 
 To start again from an empty database later, run:
@@ -223,14 +228,18 @@ Then open **http://127.0.0.1:3000**.
 
 ---
 
-## 7. Demo logins (local only, created by `Phase2DemoSeeder`)
+## 7. Demo logins (local only, created by `Phase2DemoSeeder` and `StaffRolesDemoSeeder`)
 
 | Role | Login page | Username | Password |
 |---|---|---|---|
 | Admin (demo super admin) | Admin Login | `admin@cdc-demo.test` | `Admin@2026` |
 | Admin (your own) | Admin Login | `ADMIN_EMAIL` from `.env` | `ADMIN_PASSWORD` from `.env` |
-| Student | Student Login | roll number, e.g. `23JE0101` | `Student@2026` |
+| Student | Student Login | roll number, e.g. `23XY0104` | `Student@2026` |
 | Company recruiter | Recruiter Login | `hr@nimbus.demo` (also `hr@vertex.demo`, `hr@helix.demo`) | `Company@2026` |
+| Staff: Company Admin | Admin Login | `company.admin@cdc-demo.test` | `Staff@2026` |
+| Staff: Dept FIC (one per B.Tech department) | Admin Login | `fic.<department>@cdc-demo.test`, e.g. `fic.mining-engineering@cdc-demo.test` | `Staff@2026` |
+
+Staff roles: a super admin manages them under **Users & Roles** (sidebar, Settings). The queue worker must run for invitation emails to go out.
 
 These are test passwords for local demo data only. They don't exist in production.
 

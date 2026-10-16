@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminAccessController;
 use App\Http\Controllers\AdminCompanyController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFormReviewController;
@@ -94,7 +95,24 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->get('/admin/ping', 
     ]);
 });
 
-Route::middleware(['auth:sanctum', 'active', 'role:admin'])->prefix('admin')->group(function () {
+// Staff roles: `staff` checks each route's permission (App\Support\StaffPermissions::RULES); super admins pass.
+Route::middleware(['auth:sanctum', 'active', 'role:admin', 'staff'])->prefix('admin')->group(function () {
+    Route::get('/me/access', [AdminAccessController::class, 'me']);
+    Route::get('/roles', [AdminAccessController::class, 'roles']);
+    Route::post('/roles', [AdminAccessController::class, 'storeRole']);
+    Route::patch('/roles/{staffRole}', [AdminAccessController::class, 'updateRole']);
+    Route::delete('/roles/{staffRole}', [AdminAccessController::class, 'destroyRole']);
+    Route::post('/roles/{staffRole}/duplicate', [AdminAccessController::class, 'duplicateRole']);
+    Route::get('/manage-admins/{user}/access', [AdminAccessController::class, 'userAccess']);
+    Route::put('/manage-admins/{user}/access', [AdminAccessController::class, 'updateUserAccess']);
+    Route::patch('/manage-admins/{user}/role', [AdminAccessController::class, 'assignRole']);
+    Route::patch('/manage-admins/{user}/role-status', [AdminAccessController::class, 'roleStatus']);
+    Route::post('/manage-admins/{user}/transfer-role', [AdminAccessController::class, 'transferRole']);
+    Route::put('/manage-admins/{user}/departments', [AdminAccessController::class, 'updateDepartments']);
+    Route::post('/manage-admins/{user}/resend-invitation', [AdminManagementController::class, 'resendInvitation']);
+    Route::get('/me/profile', [AdminAccessController::class, 'profile']);
+    Route::put('/me/profile', [AdminAccessController::class, 'updateProfile']);
+
     Route::get('/manage-admins', [AdminManagementController::class, 'index']);
     Route::post('/manage-admins', [AdminManagementController::class, 'store']);
     Route::patch('/manage-admins/{user}', [AdminManagementController::class, 'update']);
@@ -144,6 +162,8 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->prefix('admin')->gr
     Route::get('/students/{studentProfile}/placement-report', [AdminStudentRecordController::class, 'placementReport']);
     Route::get('/students/{studentProfile}/eligibility-report', [AdminStudentRecordController::class, 'eligibilityReport']);
     Route::post('/students/{studentProfile}/resumes/verify-all', [AdminStudentRecordController::class, 'verifyAllResumes']);
+    Route::patch('/students/{studentProfile}/verification/{field}', [AdminStudentRecordController::class, 'decideField']);
+    Route::post('/students/{studentProfile}/verification/verify-all', [AdminStudentRecordController::class, 'verifyAllFields']);
 
     Route::get('/resumes', [AdminResumeController::class, 'index']);
     Route::get('/resumes/{resume}/file', [AdminResumeController::class, 'file']);

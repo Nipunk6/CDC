@@ -10,6 +10,8 @@ import { useBranding } from "@/lib/branding";
 import AppShell from "@/components/shared/appshell";
 import ShellFooter from "@/components/shared/shellfooter";
 import StudentSearch from "@/components/admin/studentsearch";
+import AccessGate from "@/components/admin/access/accessgate";
+import { AccessProvider, useAccess } from "@/lib/access";
 
 const handleSignOut = async () => {
   try {
@@ -21,7 +23,21 @@ const handleSignOut = async () => {
 };
 
 // PU.3: a thin wrapper. Layout and navigation are the shared AppShell; the admin's pages are listed in lib/nav/admin.js.
+// Staff roles: AccessProvider loads the person's access; the sidebar shows only what they can open and AccessGate
+// guards every page (profile completion first, then the page's permission).
 export default function AdminShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AccessProvider>
+      <AdminShellInner>{children}</AdminShellInner>
+    </AccessProvider>
+  );
+}
+
+function AdminShellInner({
   children,
 }: {
   children: React.ReactNode;
@@ -30,8 +46,12 @@ export default function AdminShell({
   const { data: session } = useSession();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const branding = useBranding();
+  const { isSuper, can, access } = useAccess();
 
-  const navSections = useMemo(() => adminNav({ isSuperAdmin: Boolean(session?.user?.isSuperAdmin) }), [session?.user?.isSuperAdmin]);
+  const navSections = useMemo(
+    () => (access ? adminNav({ isSuperAdmin: isSuper, can }) : []),
+    [access, isSuper, can]
+  );
 
   useEffect(() => {
     const run = async () => {
@@ -74,10 +94,10 @@ export default function AdminShell({
       onSignOut={handleSignOut}
       notificationsCount={unreadNotifications}
       notificationsHref="/admin/notifications"
-      utilities={<StudentSearch />}
+      utilities={can("students", "read") ? <StudentSearch /> : null}
       footer={<ShellFooter />}
     >
-      {children}
+      <AccessGate>{children}</AccessGate>
     </AppShell>
   );
 }

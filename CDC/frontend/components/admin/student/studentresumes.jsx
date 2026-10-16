@@ -22,6 +22,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import { adminApi } from "@/lib/adminapi";
+import { useAccess } from "@/lib/access";
 import { formatDateTime, statusColor, titleCase } from "@/lib/format";
 
 // The signed preview URL goes through the session-gated Next.js PDF proxy (M0.3d), as on /admin/resumes.
@@ -39,6 +40,7 @@ export default function StudentResumes({ student, onChanged }) {
   const [rejecting, setRejecting] = useState(null);
   const [remark, setRemark] = useState("");
   const [dialogError, setDialogError] = useState(null);
+  const canVerify = useAccess().can("resumes", "verify");
 
   const decide = async (resume, status, adminRemark = null) => {
     setBusy(true);
@@ -87,7 +89,7 @@ export default function StudentResumes({ student, onChanged }) {
         <Typography variant="subtitle1" fontWeight={700}>
           Resume
         </Typography>
-        <Button variant="contained" color="success" size="small" startIcon={<DoneAllIcon />} disabled={busy || pending.length === 0} onClick={verifyAll}>
+        <Button variant="contained" color="success" size="small" startIcon={<DoneAllIcon />} disabled={busy || !canVerify || pending.length === 0} onClick={verifyAll}>
           Mark all as verified
         </Button>
       </Stack>
@@ -128,7 +130,7 @@ export default function StudentResumes({ student, onChanged }) {
                 variant="contained"
                 color="success"
                 startIcon={<CheckIcon />}
-                disabled={busy || resume.status === "approved"}
+                disabled={busy || !canVerify || resume.status === "approved"}
                 onClick={() => decide(resume, "approved")}
               >
                 Mark as verified
@@ -138,7 +140,7 @@ export default function StudentResumes({ student, onChanged }) {
                 variant="outlined"
                 color="error"
                 startIcon={<CloseIcon />}
-                disabled={busy}
+                disabled={busy || !canVerify}
                 onClick={() => {
                   setRemark("");
                   setDialogError(null);

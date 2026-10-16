@@ -30,9 +30,11 @@ import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import MailIcon from "@mui/icons-material/MailOutline";
 
 import { adminApi } from "@/lib/adminapi";
-import AddAdminModal from "@/app/admin/manage-admins/addadminmodal";
+import AddUserDialog from "@/components/admin/access/adduserdialog";
+import UserAccessPanel from "@/components/admin/access/useraccesspanel";
 
 const COUNTRY_CODES = ["+91", "+1", "+44", "+61", "+65", "+971", "+49", "+81"];
 
@@ -143,6 +145,7 @@ function EditUserDialog({ user, onClose, onSaved }) {
 }
 
 // Users directory (S8.2): search, master-detail card, Edit, + Add User and Delete this User. Super admins only.
+// Staff roles: Add User takes name + email + role (invitation mail); each card shows the person's role and access.
 export default function UsersDirectory() {
   const { data: session, status } = useSession();
   const isSuper = Boolean(session?.user?.isSuperAdmin);
@@ -154,20 +157,31 @@ export default function UsersDirectory() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
+  const [roleData, setRoleData] = useState({ roles: [], catalogue: [], departments: [] });
+
   const load = () =>
-    adminApi("/admin/manage-admins")
-      .then((response) => {
+    Promise.all([adminApi("/admin/manage-admins"), adminApi("/admin/roles")])
+      .then(([response, roles]) => {
         setUsers(response.admins ?? []);
+        setRoleData({ roles: roles.roles ?? [], catalogue: roles.catalogue ?? [], departments: roles.departments ?? [] });
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load users."));
 
   useEffect(() => {
     if (status !== "authenticated" || !isSuper) return;
-    adminApi("/admin/manage-admins")
-      .then((response) => setUsers(response.admins ?? []))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load users."));
+    void load();
   }, [status, isSuper]);
+
+  const resendInvite = async (user) => {
+    try {
+      const response = await adminApi(`/admin/manage-admins/${user.id}/resend-invitation`, { method: "POST" });
+      setSuccess(response.message);
+      void load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to resend the invitation.");
+    }
+  };
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -237,7 +251,7 @@ export default function UsersDirectory() {
                   </ListItemAvatar>
                   <ListItemText
                     primary={user.name}
-                    secondary={[user.designation, user.email].filter(Boolean).join(" · ")}
+                    secondary={[user.is_super_admin ? "Super Admin" : (user.staff_role?.name ?? "No role"), user.designation, user.email].filter(Boolean).join(" · ")}
                     primaryTypographyProps={{ fontWeight: 600, noWrap: true }}
                     secondaryTypographyProps={{ noWrap: true }}
                   />
@@ -263,7 +277,14 @@ export default function UsersDirectory() {
                 </Box>
               </Stack>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-                <Chip size="small" color={selected.is_super_admin ? "primary" : "default"} label={selected.is_super_admin ? "Super Admin" : "Admin"} />
+                {selected.is_super_admin ? (
+                  <Chip size="small" color="primary" label="Super Admin" />
+                ) : (
+                  <Chip size="small" color={selected.staff_role?.color ?? "default"} variant={selected.staff_role ? "filled" : "outlined"} label={selected.staff_role?.name ?? "No role"} />
+                )}
+                {!selected.is_super_admin && selected.staff_role && !selected.staff_role_enabled && <Chip size="small" color="warning" label="Role turned off" />}
+                {!selected.is_super_admin && selected.invitation_status === "sent" && <Chip size="small" color="info" variant="outlined" label="Invitation sent" />}
+                {!selected.is_super_admin && selected.invitation_status === "accepted" && !selected.profile_completed && <Chip size="small" color="info" variant="outlined" label="Profile pending" />}
                 {selected.is_active === false && <Chip size="small" color="warning" label="Inactive" />}
               </Stack>
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "140px 1fr" }, rowGap: 0.75, columnGap: 2, mb: 2 }}>
@@ -286,15 +307,34 @@ export default function UsersDirectory() {
                 <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditing(selected)}>
                   Edit
                 </Button>
+                {!selected.is_super_admin && selected.invitation_status === "sent" && (
+                  <Button variant="outlined" startIcon={<MailIcon />} onClick={() => resendInvite(selected)}>
+                    Resend invitation
+                  </Button>
+                )}
                 {!selected.is_super_admin && String(selected.id) !== String(session?.user?.id) && (
                   <Button color="error" variant="outlined" startIcon={<DeleteIcon />} onClick={() => handleDelete(selected)}>
                     Delete this User
                   </Button>
                 )}
               </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                Every admin has access to everything; only super admins manage users.
-              </Typography>
+              {selected.is_super_admin ? (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  Super admins have access to everything, including users and roles.
+                </Typography>
+              ) : (
+                <Box sx={{ mt: 2 }}>
+                  <UserAccessPanel
+                    key={selected.id}
+                    user={selected}
+                    roles={roleData.roles}
+                    catalogue={roleData.catalogue}
+                    departmentOptions={roleData.departments}
+                    admins={users ?? []}
+                    onChanged={load}
+                  />
+                </Box>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -319,12 +359,15 @@ export default function UsersDirectory() {
         />
       )}
 
-      <AddAdminModal
+      <AddUserDialog
         open={adding}
+        roles={roleData.roles}
+        catalogue={roleData.catalogue}
         onClose={() => setAdding(false)}
-        onSuccess={() => {
+        onCreated={(user, message) => {
           setAdding(false);
-          setSuccess("User created successfully. An invitation email has been sent.");
+          setSuccess(message);
+          setSelectedId(user.id);
           void load();
         }}
       />

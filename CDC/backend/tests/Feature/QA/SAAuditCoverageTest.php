@@ -357,6 +357,18 @@ class SAAuditCoverageTest extends TestCase
             'PATCH api/admin/branch-changes/{branchChangeRequest}' => fn () => ['PATCH', "/api/admin/branch-changes/{$w['branchChange']->id}", ['status' => 'approved']],
 
             // ---------------- Superset parity
+            // ---------------- staff roles and per-person access (super admin only; Admin Alpha is a super admin)
+            'POST api/admin/roles' => fn () => ['POST', '/api/admin/roles', ['name' => 'QA Role', 'levels' => ['students' => 'read']]],
+            'PATCH api/admin/roles/{staffRole}' => fn () => ['PATCH', '/api/admin/roles/'.\App\Models\StaffRole::create(['name' => 'QA Role P'])->id, ['levels' => ['notices' => 'read']]],
+            'DELETE api/admin/roles/{staffRole}' => fn () => ['DELETE', '/api/admin/roles/'.\App\Models\StaffRole::create(['name' => 'QA Role D'])->id, []],
+            'POST api/admin/roles/{staffRole}/duplicate' => fn () => ['POST', '/api/admin/roles/'.\App\Models\StaffRole::create(['name' => 'QA Role C'])->id.'/duplicate', []],
+            'PUT api/admin/manage-admins/{user}/access' => fn () => ['PUT', '/api/admin/manage-admins/'.User::factory()->create(['role' => 'admin'])->id.'/access', ['levels' => ['settings' => 'read']]],
+            'PATCH api/admin/manage-admins/{user}/role' => fn () => ['PATCH', '/api/admin/manage-admins/'.User::factory()->create(['role' => 'admin'])->id.'/role', ['staff_role_id' => null]],
+            'PATCH api/admin/manage-admins/{user}/role-status' => fn () => ['PATCH', '/api/admin/manage-admins/'.User::factory()->create(['role' => 'admin'])->id.'/role-status', ['enabled' => false]],
+            'POST api/admin/manage-admins/{user}/transfer-role' => fn () => ['POST', '/api/admin/manage-admins/'.User::factory()->create(['role' => 'admin'])->id.'/transfer-role', ['to_user_id' => User::factory()->create(['role' => 'admin'])->id]],
+            'PUT api/admin/manage-admins/{user}/departments' => fn () => ['PUT', '/api/admin/manage-admins/'.User::factory()->create(['role' => 'admin'])->id.'/departments', ['departments' => ['Mining Engineering']]],
+            'POST api/admin/manage-admins/{user}/resend-invitation' => fn () => ['POST', '/api/admin/manage-admins/'.User::factory()->create(['role' => 'admin'])->id.'/resend-invitation', []],
+            'PUT api/admin/me/profile' => fn () => ['PUT', '/api/admin/me/profile', ['first_name' => 'Admin', 'last_name' => 'Alpha', 'designation' => 'TPO', 'mobile' => '+91 9876543210']],
             'PATCH api/admin/manage-admins/{user}' => fn () => ['PATCH', "/api/admin/manage-admins/{$this->adminB->id}", ['first_name' => 'Admin', 'last_name' => 'Gamma', 'designation' => 'TPO']],
             'PATCH api/admin/placement-cycles/{placementCycle}/publish' => function () use ($w) {
                 $w['in']->update(['is_draft' => true]);
@@ -373,6 +385,8 @@ class SAAuditCoverageTest extends TestCase
             'POST api/admin/students/{studentProfile}/resumes/verify-all' => fn () => ['POST', "/api/admin/students/{$s[1]->id}/resumes/verify-all", ['resumes' => [
                 ['id' => $w['pendingResume']->id, 'expected_updated_at' => $w['pendingResume']->fresh()->updated_at->toIso8601String()],
             ]]],
+            'PATCH api/admin/students/{studentProfile}/verification/{field}' => fn () => ['PATCH', "/api/admin/students/{$s[1]->id}/verification/phone", ['status' => 'rejected', 'remark' => 'Number does not ring']],
+            'POST api/admin/students/{studentProfile}/verification/verify-all' => fn () => ['POST', "/api/admin/students/{$s[2]->id}/verification/verify-all", ['fields' => [['field' => 'phone'], ['field' => 'photo']]]],
             'POST api/admin/postings/{jobPosting}/open-now' => function () use ($w) {
                 JobPosting::whereKey($w['open']->id)->update(['scheduled_open_at' => now()->addDay()]);
 
@@ -444,7 +458,7 @@ class SAAuditCoverageTest extends TestCase
             'PUT api/admin/form-builder/{company}/infs/{inf}' => fn () => ['PUT', "/api/admin/form-builder/{$w['company']->id}/infs/{$w['iDraft']->id}", $infBody],
 
             // ---------------- Phase 1 routes
-            'POST api/admin/manage-admins' => fn () => ['POST', '/api/admin/manage-admins', ['name' => 'QA New Admin', 'email' => 'qa.cdc.newadmin@gmail.com']],
+            'POST api/admin/manage-admins' => fn () => ['POST', '/api/admin/manage-admins', ['name' => 'QA New Admin', 'email' => 'qa.cdc.newadmin@gmail.com', 'staff_role_id' => \App\Models\StaffRole::fullAccess()->id]],
             'DELETE api/admin/manage-admins/{user}' => fn () => ['DELETE', "/api/admin/manage-admins/{$this->adminB->id}", []],
             'POST api/admin/programme-branches' => fn () => ['POST', '/api/admin/programme-branches', ['programme_name' => self::BTECH, 'branch_name' => 'QA Another Branch']],
             'PATCH api/admin/programme-branches/status' => fn () => ['PATCH', '/api/admin/programme-branches/status', ['programme_name' => self::BTECH, 'branch_name' => 'Petroleum Engineering', 'is_active' => false]],

@@ -181,8 +181,8 @@ class AuthController extends Controller
                 'password' => $password,
                 'remember_token' => Str::random(60),
             ]);
-            // S5: the first password a student sets accepts the invitation (status Accepted for good).
-            if ($user->role === 'student' && $user->activated_at === null) {
+            // S5: the first password a student (or invited staff member) sets accepts the invitation for good.
+            if (in_array($user->role, ['student', 'admin'], true) && $user->activated_at === null) {
                 $user->forceFill(['activated_at' => now(), 'invite_revoked_at' => null]);
             }
             $user->save();

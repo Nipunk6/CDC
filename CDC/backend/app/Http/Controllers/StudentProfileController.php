@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\StudentProfile;
 use App\Services\LoginLogService;
+use App\Services\StudentVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -12,8 +13,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StudentProfileController extends Controller
 {
-    public function __construct(private readonly LoginLogService $loginLog)
-    {
+    public function __construct(
+        private readonly LoginLogService $loginLog,
+        private readonly StudentVerificationService $verification
+    ) {
     }
 
     public function show(Request $request): JsonResponse
@@ -42,7 +45,11 @@ class StudentProfileController extends Controller
             'phone.regex' => 'Phone may contain only digits, spaces, +, - and brackets.',
         ])->validate();
 
-        $student->update($validated);
+        $student->fill($validated);
+        $changed = array_keys($student->getDirty());
+        $student->save();
+        // Every change goes back to the CDC for verification; the new value applies at once.
+        $this->verification->markChanged($student, $changed);
 
         return response()->json([
             'message' => 'Profile updated.',
@@ -71,6 +78,7 @@ class StudentProfileController extends Controller
 
         $old = $student->photo_path;
         $student->update(['photo_path' => $path]);
+        $this->verification->markChanged($student, ['photo']);
 
         if ($old && $old !== $path) {
             Storage::disk('local')->delete($old);
@@ -113,6 +121,8 @@ class StudentProfileController extends Controller
         [$lastLogin, $previousLogin] = $student->user ? $this->loginLog->lastTwo($student->user) : [null, null];
 
         return $student->toArray() + [
+            'verification' => $this->verification->fieldsFor($student),
+            'is_verified' => $this->verification->isVerified($student),
             'last_login' => $lastLogin,
             'previous_login' => $previousLogin,
             'active_blocks' => $blocks->map(fn ($b) => [

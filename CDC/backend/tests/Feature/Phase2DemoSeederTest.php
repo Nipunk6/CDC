@@ -40,7 +40,9 @@ class Phase2DemoSeederTest extends TestCase
         $this->assertSame(2, ApplicationRoundResult::where('result', 'waitlisted')->count());
         $this->assertSame(1, ApplicationRoundResult::where('is_addendum', true)->count());
         $this->assertGreaterThan(0, Application::where('placed_elsewhere_flag', true)->count());
-        $this->assertTrue(StudentProfile::where('roll_no', 'like', '23JE%')->exists());
+        // Demo roll numbers use the made-up "XY" code, so none can be a real student's roll number.
+        $this->assertTrue(StudentProfile::where('roll_no', 'like', '23XY%')->exists());
+        $this->assertSame(0, StudentProfile::where('roll_no', 'not like', '23XY%')->count());
         // Demo students must never carry deliverable addresses (real roll-number mailboxes exist at iitism.ac.in).
         $this->assertSame(0, StudentProfile::where('institute_email', 'not like', '%@students.cdc-demo.test')->count());
         $this->assertSame(0, StudentProfile::where('personal_email', 'not like', '%.cdc-demo.test')->count());

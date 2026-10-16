@@ -33,6 +33,7 @@ import SyncIcon from "@mui/icons-material/Sync";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import PageHeader from "@/components/shared/pageheader";
+import VerifiedBadge from "@/components/shared/verifiedbadge";
 import StudentFormDialog from "@/components/admin/studentformdialog";
 import SpreadsheetImportDialog from "@/components/admin/spreadsheetimportdialog";
 import StudentFilterPanel from "@/components/admin/studentfilterpanel";
@@ -41,6 +42,7 @@ import TemplateDownloadButton from "@/components/admin/templatedownloadbutton";
 import PendingRequestsBanner from "@/components/admin/pendingrequestsbanner";
 import { initials } from "@/components/admin/studentsearch";
 import { adminApi } from "@/lib/adminapi";
+import { useAccess } from "@/lib/access";
 import useCatalogue, { shortProgramme } from "@/lib/usecatalogue";
 import { dash } from "@/lib/format";
 import { filtersFromParams, filtersToQuery, hasFilters } from "@/lib/studentfilters";
@@ -126,6 +128,11 @@ function StudentsDirectory() {
 
   const reload = () => setReloadTick((tick) => tick + 1);
 
+  // Staff roles: buttons the person's access would refuse are hidden (the server enforces it anyway).
+  const { can } = useAccess();
+  const canWrite = can("students", "write");
+  const canInvite = can("student_invitations", "read");
+
   const toggleActive = async (student) => {
     const action = student.is_active ? "suspend" : "reactivate";
     if (
@@ -160,20 +167,28 @@ function StudentsDirectory() {
         backLabel="Back to Dashboard"
         actions={
           <>
-            <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
-              Add Student
-            </Button>
-            <Button variant="contained" color="secondary" startIcon={<MailOutlineIcon />} component={Link} href="/admin/students/invitations">
-              Invitations
-            </Button>
-            <Tooltip title="Upload Student CSV for Student Invitations">
-              <Button variant="contained" color="secondary" startIcon={<UploadFileIcon />} onClick={() => setImportOpen(true)}>
-                Import
+            {canWrite && (
+              <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
+                Add Student
               </Button>
-            </Tooltip>
-            <Button variant="contained" color="secondary" startIcon={<SyncIcon />} onClick={() => setAcademicOpen(true)}>
-              Update Academics
-            </Button>
+            )}
+            {canInvite && (
+              <Button variant="contained" color="secondary" startIcon={<MailOutlineIcon />} component={Link} href="/admin/students/invitations">
+                Invitations
+              </Button>
+            )}
+            {canWrite && (
+              <Tooltip title="Upload Student CSV for Student Invitations">
+                <Button variant="contained" color="secondary" startIcon={<UploadFileIcon />} onClick={() => setImportOpen(true)}>
+                  Import
+                </Button>
+              </Tooltip>
+            )}
+            {canWrite && (
+              <Button variant="contained" color="secondary" startIcon={<SyncIcon />} onClick={() => setAcademicOpen(true)}>
+                Update Academics
+              </Button>
+            )}
           </>
         }
       />
@@ -266,6 +281,7 @@ function StudentsDirectory() {
                           {student.full_name}
                         </MuiLink>
                       </Tooltip>
+                      <VerifiedBadge verified={student.is_verified} />
                     </Stack>
                   </TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>{student.roll_no}</TableCell>
@@ -280,7 +296,7 @@ function StudentsDirectory() {
                   </TableCell>
                   <TableCell>
                     <Tooltip title={student.is_active ? "Suspend account" : "Reactivate account"}>
-                      <Switch size="small" checked={student.is_active} onChange={() => toggleActive(student)} />
+                      <Switch size="small" checked={student.is_active} disabled={!canWrite} onChange={() => toggleActive(student)} />
                     </Tooltip>
                     {!student.is_active && <Chip size="small" color="error" variant="outlined" label="Suspended" />}
                   </TableCell>

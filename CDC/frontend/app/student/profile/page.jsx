@@ -32,6 +32,7 @@ import { studentApi, studentBlobUrl, studentUpload } from "@/lib/studentapi";
 import useCatalogue from "@/lib/usecatalogue";
 import { dash, formatDate, formatDateTime, statusColor, titleCase } from "@/lib/format";
 import { academicExtraFields, formatAcademicExtra } from "@/lib/academicextras";
+import VerifiedBadge from "@/components/shared/verifiedbadge";
 
 const academicFields = [
   ["Roll number", "roll_no"],
@@ -49,6 +50,14 @@ const academicFields = [
   ["Social Category", "category"],
   ["PwD", "pwd"],
 ];
+
+// The CDC verifies every change to these fields and the photo; the new value applies at once meanwhile.
+const verificationText = (entry) => {
+  if (!entry) return undefined;
+  if (entry.status === "verified") return "Verified by the CDC";
+  if (entry.status === "rejected") return `Rejected by the CDC: ${entry.remark ?? "please correct this"}`;
+  return "Waiting for the CDC to verify";
+};
 
 const personalFields = [
   ["personal_email", "Personal email"],
@@ -170,6 +179,7 @@ export default function StudentProfilePage() {
     (b) => !(branchProgramme === student.programme && b === student.branch)
   );
   const activeBlocks = student.active_blocks ?? [];
+  const verificationByField = Object.fromEntries((student.verification ?? []).map((entry) => [entry.field, entry]));
 
   return (
     <Stack spacing={3}>
@@ -204,7 +214,13 @@ export default function StudentProfilePage() {
             </Box>
             <Box sx={{ textAlign: { xs: "center", sm: "left" } }}>
               <Typography variant="h5" fontWeight={700}>
-                {student.full_name}
+                {student.full_name}{" "}
+                <VerifiedBadge
+                  verified={student.is_verified}
+                  size={22}
+                  verifiedText="Your profile is verified by the CDC"
+                  unverifiedText="Some of your details or resumes are waiting for the CDC's check, or need a correction"
+                />
               </Typography>
               <Typography color="text.secondary">
                 {student.roll_no} · {student.branch}
@@ -212,6 +228,16 @@ export default function StudentProfilePage() {
               <Typography variant="body2" color="text.secondary">
                 {student.programme} · Batch {student.graduating_batch}
               </Typography>
+              {verificationByField.photo && (
+                <Typography
+                  variant="caption"
+                  component="div"
+                  color={verificationByField.photo.status === "rejected" ? "error" : "text.secondary"}
+                  sx={{ wordBreak: "break-word" }}
+                >
+                  Photo: {verificationText(verificationByField.photo)}
+                </Typography>
+              )}
               {student.last_login && (
                 <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 0.5 }}>
                   Last login: {formatDateTime(student.last_login.at)} from {student.last_login.ip}
@@ -290,6 +316,8 @@ export default function StudentProfilePage() {
                   label={label}
                   value={personal[key] ?? ""}
                   onChange={(event) => setPersonal((prev) => ({ ...prev, [key]: event.target.value }))}
+                  error={verificationByField[key]?.status === "rejected"}
+                  helperText={verificationText(verificationByField[key])}
                 />
               </Grid>
             ))}

@@ -19,7 +19,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Staff access answers are cached for one request only, so role changes apply on the next request.
+        $this->app->scoped(\App\Services\StaffAccessService::class);
     }
 
     /**

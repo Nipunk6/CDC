@@ -28,6 +28,9 @@ const STATUS_COLORS = {
   waitlisted: "info",
   rejected: "error",
   withdrawn: "default",
+  // Profile verification (per field)
+  verified: "success",
+  unverified: "warning",
 };
 
 /**

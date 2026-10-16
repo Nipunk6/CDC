@@ -10,8 +10,10 @@ use App\Services\MailDispatchService;
 use App\Services\PortalNotificationService;
 use App\Services\SpreadsheetImportService;
 use App\Services\StudentAcademicSyncService;
+use App\Services\StaffAccessService;
 use App\Services\StudentAccountService;
 use App\Services\StudentRecordService;
+use App\Services\StudentVerificationService;
 use App\Support\ProgrammeCatalogue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -72,7 +74,8 @@ class AdminStudentController extends Controller
         private readonly StudentAcademicSyncService $academics,
         private readonly SpreadsheetImportService $spreadsheets,
         private readonly MailDispatchService $mail,
-        private readonly PortalNotificationService $notifications
+        private readonly PortalNotificationService $notifications,
+        private readonly StudentVerificationService $verification
     ) {
     }
 
@@ -88,13 +91,12 @@ class AdminStudentController extends Controller
             ->orderBy('roll_no')
             ->paginate((int) ($validated['per_page'] ?? self::PER_PAGE));
 
+        $verified = $this->verification->verifiedMap(collect($page->items()));
+
         return response()->json([
-            'students' => collect($page->items())->map(fn (StudentProfile $s) => $this->listPayload($s)),
+            'students' => collect($page->items())->map(fn (StudentProfile $s) => $this->listPayload($s, $verified[$s->id])),
             // S5.5 header: "N students registered · total N students invited" (registered = Accepted).
-            'invitation_summary' => [
-                'registered' => \App\Models\User::query()->where('role', 'student')->whereNotNull('activated_at')->count(),
-                'invited' => \App\Models\User::query()->where('role', 'student')->whereNotNull('invited_at')->count(),
-            ],
+            'invitation_summary' => $this->invitationSummary(),
             'meta' => [
                 'current_page' => $page->currentPage(),
                 'last_page' => $page->lastPage(),
@@ -129,8 +131,9 @@ class AdminStudentController extends Controller
      */
     public function pendingRequests(): JsonResponse
     {
-        $branchChanges = \App\Models\BranchChangeRequest::query()->where('status', 'pending')->count();
-        $resumes = \App\Models\Resume::query()->where('status', 'pending')->count();
+        $access = app(StaffAccessService::class);
+        $branchChanges = $access->scopeStudents(\App\Models\BranchChangeRequest::query(), request()->user(), 'studentProfile')->where('status', 'pending')->count();
+        $resumes = $access->scopeStudents(\App\Models\Resume::query(), request()->user(), 'studentProfile')->where('status', 'pending')->count();
 
         return response()->json([
             'branch_changes' => $branchChanges,
@@ -269,6 +272,7 @@ class AdminStudentController extends Controller
 
         $tracked = array_keys(self::FIELD_LABELS);
         $before = $studentProfile->only($tracked);
+        $editableBefore = $studentProfile->only(StudentProfile::SELF_EDITABLE);
 
         DB::transaction(function () use ($studentProfile, $validated): void {
             $studentProfile->fill($validated);
@@ -283,6 +287,10 @@ class AdminStudentController extends Controller
 
         $after = $studentProfile->only($tracked);
         $changed = array_values(array_filter($tracked, fn (string $f) => ($before[$f] ?? null) != ($after[$f] ?? null)));
+
+        // A value the CDC typed in itself needs no second check.
+        $editableAfter = $studentProfile->only(StudentProfile::SELF_EDITABLE);
+        $this->verification->markVerifiedByAdmin($request, $studentProfile, array_keys(array_diff_assoc(array_map('strval', $editableAfter), array_map('strval', $editableBefore))));
 
         if ($changed !== []) {
             $this->audit->log(
@@ -681,9 +689,22 @@ class AdminStudentController extends Controller
     /**
      * @return Builder<StudentProfile>
      */
+    /** S5.5 header counts, limited to a department-limited person's departments (staff roles). */
+    private function invitationSummary(): array
+    {
+        $students = fn () => \App\Models\User::query()->where('role', 'student')
+            ->whereHas('studentProfile', fn ($q) => app(StaffAccessService::class)->scopeStudents($q, request()->user()));
+
+        return [
+            'registered' => $students()->whereNotNull('activated_at')->count(),
+            'invited' => $students()->whereNotNull('invited_at')->count(),
+        ];
+    }
+
     private function filteredQuery(array $validated): Builder
     {
-        $query = StudentProfile::query();
+        // Staff roles: a department-limited person (e.g. Dept FIC) sees only their departments.
+        $query = app(StaffAccessService::class)->scopeStudents(StudentProfile::query(), request()->user());
 
         foreach (['programme', 'branch', 'graduating_batch'] as $filter) {
             if (! empty($validated[$filter])) {
@@ -700,7 +721,7 @@ class AdminStudentController extends Controller
         return $query;
     }
 
-    private function listPayload(StudentProfile $student): array
+    private function listPayload(StudentProfile $student, ?bool $verified = null): array
     {
         return [
             'id' => $student->id,
@@ -718,6 +739,8 @@ class AdminStudentController extends Controller
             'total_backlogs' => $student->total_backlogs,
             'gender' => $student->gender,
             'is_active' => (bool) ($student->user?->is_active ?? true),
+            // Profile verification: every filled-in student-changeable field verified and no open resume.
+            'is_verified' => $verified ?? $this->verification->isVerified($student),
         ];
     }
 
@@ -727,6 +750,8 @@ class AdminStudentController extends Controller
 
         return $student->toArray() + [
             'is_active' => (bool) ($student->user?->is_active ?? true),
+            'verification' => $this->verification->fieldsFor($student),
+            'is_verified' => $this->verification->isVerified($student),
         ] + ($user ? AdminStudentInvitationController::invitationFields($user) : []);
     }
 }

@@ -30,6 +30,10 @@ class User extends Authenticatable
         'password',
         'role',
         'is_super_admin',
+        'staff_role_id',
+        'staff_role_enabled',
+        'profile_completed_at',
+        'staff_departments',
         'is_active',
         'company_id',
         'first_name',
@@ -61,6 +65,9 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
+            'staff_role_enabled' => 'boolean',
+            'profile_completed_at' => 'datetime',
+            'staff_departments' => 'array',
             'is_active' => 'boolean',
             'invited_at' => 'datetime',
             'last_invited_at' => 'datetime',
@@ -123,5 +130,16 @@ class User extends Authenticatable
             name: (string) $this->name,
             resetUrl: "{$frontendUrl}{$path}?{$query}",
         ));
+    }
+
+    /** Staff role (admins only); see StaffAccessService. */
+    public function staffRole(): BelongsTo
+    {
+        return $this->belongsTo(StaffRole::class);
+    }
+
+    public function permissionOverrides(): HasMany
+    {
+        return $this->hasMany(UserPermissionOverride::class);
     }
 }

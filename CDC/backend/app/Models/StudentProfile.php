@@ -155,4 +155,10 @@ class StudentProfile extends Model
     {
         return $this->hasMany(StudentNote::class);
     }
+
+    /** Profile verification rows (one per student-changeable field); see StudentVerificationService. */
+    public function fieldVerifications(): HasMany
+    {
+        return $this->hasMany(StudentFieldVerification::class);
+    }
 }

@@ -29,7 +29,8 @@ class AdminBranchChangeController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $query = BranchChangeRequest::query()
+        // Staff roles: a department-limited person sees only their departments' students.
+        $query = app(\App\Services\StaffAccessService::class)->scopeStudents(BranchChangeRequest::query(), $request->user(), 'studentProfile')
             ->with([
                 'studentProfile:id,roll_no,full_name,programme,branch,graduating_batch,current_cgpa',
                 'decidedBy:id,name',

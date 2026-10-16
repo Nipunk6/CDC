@@ -37,6 +37,31 @@ class UserFactory extends Factory
     }
 
     /**
+     * Staff roles: a non-super admin gets the built-in Full Access role and a completed profile unless the test
+     * says otherwise (pass `staff_role_id` / `profile_completed_at`, or use withoutStaffRole()).
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (User $user) {
+            if ($user->role !== 'admin' || $user->is_super_admin) {
+                return;
+            }
+            if (! array_key_exists('staff_role_id', $user->getAttributes())) {
+                $user->staff_role_id = \App\Models\StaffRole::fullAccess()->id;
+            }
+            if (! array_key_exists('profile_completed_at', $user->getAttributes())) {
+                $user->profile_completed_at = now();
+            }
+        });
+    }
+
+    /** An admin with no staff role (can sign in, cannot open any admin page). */
+    public function withoutStaffRole(): static
+    {
+        return $this->state(fn () => ['staff_role_id' => null]);
+    }
+
+    /**
      * Indicate that the model's email address should be unverified.
      */
     public function unverified(): static

@@ -29,7 +29,7 @@ use Illuminate\Support\Str;
  * Enable by uncommenting it in DatabaseSeeder, or run: php artisan db:seed --class=Phase2DemoSeeder
  *
  * Demo logins (local development only):
- *   students  roll number (e.g. 23JE0101) / Student@2026
+ *   students  roll number (e.g. 23XY0104) / Student@2026
  *   companies hr@nimbus.demo, hr@vertex.demo, hr@helix.demo / Company@2026
  *   admin     admin@cdc-demo.test / Admin@2026 (demo super admin for local browser checks, D107)
  */
@@ -243,28 +243,29 @@ class Phase2DemoSeeder extends Seeder
         $plan = [];
         foreach (self::BTECH_BRANCHES as $branch => $count) {
             for ($i = 0; $i < $count; $i++) {
-                $plan[] = [self::BTECH, $branch, 'JE', 23];
+                $plan[] = [self::BTECH, $branch];
             }
         }
         foreach (['Computer Science and Engineering', 'Data Analytics', 'VLSI Design (Electronics and Communication Engineering)'] as $branch) {
             for ($i = 0; $i < 4; $i++) {
-                $plan[] = [self::MTECH, $branch, 'MT', 25];
+                $plan[] = [self::MTECH, $branch];
             }
         }
         foreach (['MBA - Finance', 'MBA - Marketing'] as $branch) {
             for ($i = 0; $i < 4; $i++) {
-                $plan[] = [self::MBA, $branch, 'MB', 25];
+                $plan[] = [self::MBA, $branch];
             }
         }
 
         $students = [];
-        $counters = [];
-        foreach ($plan as [$programme, $branch, $code, $year]) {
+        $counter = 100;
+        foreach ($plan as [$programme, $branch]) {
             if (! \App\Support\ProgrammeCatalogue::has($programme, $branch)) {
                 continue; // catalogue changed: skip rather than seed an invalid student
             }
-            $counters[$code] = ($counters[$code] ?? 100) + $this->faker->numberBetween(1, 7);
-            $roll = sprintf('%d%s%04d', $year, $code, $counters[$code]);
+            $counter += $this->faker->numberBetween(1, 7);
+            // "XY" is not a real IIT (ISM) programme code, so a demo roll number can never be a real student's.
+            $roll = sprintf('23XY%04d', $counter);
             $gender = $this->faker->randomElement(['male', 'male', 'female']);
             $name = $this->faker->firstName($gender).' '.$this->faker->lastName();
             // Reserved .test domain: roll-number addresses at iitism.ac.in may belong to REAL students (D90).

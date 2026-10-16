@@ -36,8 +36,11 @@ import StudentFormDialog from "@/components/admin/studentformdialog";
 import StudentBlocksPanel from "@/components/admin/studentblockspanel";
 import StudentPlacements from "@/components/admin/student/studentplacements";
 import StudentResumes from "@/components/admin/student/studentresumes";
+import StudentVerification from "@/components/admin/student/studentverification";
+import VerifiedBadge from "@/components/shared/verifiedbadge";
 import StudentNotes from "@/components/admin/student/studentnotes";
 import { adminApi } from "@/lib/adminapi";
+import { useAccess } from "@/lib/access";
 import { adminBlobUrl } from "@/lib/adminupload";
 import { academicExtraFields, formatAcademicExtra } from "@/lib/academicextras";
 import { dash, formatDate, formatDateTime, formatMoney, statusColor, titleCase } from "@/lib/format";
@@ -102,6 +105,9 @@ export default function AdminStudentDetailPage({ params }) {
   const [tab, setTab] = useState("overview");
   const [editOpen, setEditOpen] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(null);
+  const { can } = useAccess();
+  const canWrite = can("students", "write");
+  const canInvite = can("student_invitations", "write");
 
   const load = useCallback(async () => {
     try {
@@ -179,33 +185,41 @@ export default function AdminStudentDetailPage({ params }) {
     <>
       <PageHeader
         icon={<PersonIcon />}
-        title={student.full_name}
+        title={
+          <>
+            {student.full_name} <VerifiedBadge verified={student.is_verified} size={22} />
+          </>
+        }
         subtitle={`${student.roll_no} · ${student.branch} · ${student.graduating_batch}`}
         backHref="/admin/students"
         backLabel="All Students"
         actions={
           <>
-            <Button variant="contained" color="secondary" startIcon={<EditIcon />} onClick={() => setEditOpen(true)}>
-              Edit
-            </Button>
-            {student.invitation_status !== "accepted" && (
+            {canWrite && (
+              <Button variant="contained" color="secondary" startIcon={<EditIcon />} onClick={() => setEditOpen(true)}>
+                Edit
+              </Button>
+            )}
+            {canInvite && student.invitation_status !== "accepted" && (
               <Button variant="contained" color="secondary" startIcon={<MailIcon />} onClick={resendInvite}>
                 Resend Invite
               </Button>
             )}
-            {student.invitation_status === "sent" && (
+            {canInvite && student.invitation_status === "sent" && (
               <Button variant="contained" color="secondary" startIcon={<BlockIcon />} onClick={revokeInvite}>
                 Revoke Invite
               </Button>
             )}
-            <Button
-              variant="contained"
-              color={student.is_active ? "error" : "success"}
-              startIcon={student.is_active ? <BlockIcon /> : <CheckCircleIcon />}
-              onClick={toggleActive}
-            >
-              {student.is_active ? "Suspend" : "Reactivate"}
-            </Button>
+            {canWrite && (
+              <Button
+                variant="contained"
+                color={student.is_active ? "error" : "success"}
+                startIcon={student.is_active ? <BlockIcon /> : <CheckCircleIcon />}
+                onClick={toggleActive}
+              >
+                {student.is_active ? "Suspend" : "Reactivate"}
+              </Button>
+            )}
           </>
         }
       />
@@ -246,7 +260,7 @@ export default function AdminStudentDetailPage({ params }) {
               </Avatar>
               <Box sx={{ minWidth: 0 }}>
                 <Typography variant="h6" fontWeight={700} sx={{ wordBreak: "break-word" }}>
-                  {student.full_name}
+                  {student.full_name} <VerifiedBadge verified={student.is_verified} />
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {student.graduating_batch} Passout Batch | {student.roll_no}
@@ -270,6 +284,7 @@ export default function AdminStudentDetailPage({ params }) {
       <Card>
         <Tabs value={tab} onChange={(_e, value) => setTab(value)} variant="scrollable" allowScrollButtonsMobile>
           <Tab value="overview" label="Overview" />
+          <Tab value="verification" label={`Verification (${(student.verification ?? []).filter((f) => f.status !== "verified").length} open)`} />
           <Tab value="placements" label={`Placements (${student.placements?.length ?? 0})`} />
           <Tab value="applications" label={`Applications (${applications.length})`} />
           <Tab value="offers" label="Offers & Blocks" />
@@ -288,6 +303,10 @@ export default function AdminStudentDetailPage({ params }) {
                 {fieldGrid(academicExtraFields, (key) => formatAcademicExtra(student, key))}
               </Box>
             </Stack>
+          )}
+
+          {tab === "verification" && (
+            <StudentVerification student={student} photoUrl={photoUrl} onChanged={load} onOpenResumes={() => setTab("resumes")} />
           )}
 
           {tab === "placements" && <StudentPlacements student={student} />}

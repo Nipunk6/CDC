@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\StaffRole;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\StaffAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class AdminManagementController extends Controller
 {
-    public function __construct(private readonly AuditService $audit)
-    {
+    public function __construct(
+        private readonly AuditService $audit,
+        private readonly StaffAccessService $access
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -22,13 +26,17 @@ class AdminManagementController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::where('role', 'admin')->orderByDesc('is_super_admin')->orderBy('name')->get();
 
         return response()->json([
-            'admins' => $admins,
+            'admins' => $admins->map(fn (User $u) => $this->access->userPayload($u))->values(),
         ]);
     }
 
+    /**
+     * Add User (staff roles): the super admin enters only the name, email and role. The person gets an invitation
+     * mail describing the role, sets a password from it and then fills in their own details (profile_completed_at).
+     */
     public function store(Request $request): JsonResponse
     {
         if (!$request->user()->is_super_admin) {
@@ -37,28 +45,54 @@ class AdminManagementController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email:rfc,dns', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'string', 'email:rfc', 'max:255', 'unique:users,email'],
+            'staff_role_id' => ['required', 'integer', Rule::exists('staff_roles', 'id')],
+        ], [
+            'staff_role_id.required' => 'Choose a role for this person.',
         ]);
 
-        $password = Str::random(16);
+        $name = trim($validated['name']);
+        $words = preg_split('/\s+/', $name) ?: [$name];
+        $role = StaffRole::query()->findOrFail($validated['staff_role_id']);
 
         $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $password,
+            'name' => $name,
+            'first_name' => $words[0],
+            'last_name' => count($words) > 1 ? implode(' ', array_slice($words, 1)) : null,
+            'email' => strtolower($validated['email']),
+            'password' => Str::random(40),
             'role' => 'admin',
             'is_super_admin' => false,
+            'staff_role_id' => $role->id,
+            'staff_role_enabled' => true,
         ]);
 
-        Password::sendResetLink([
-            'email' => $user->email,
-        ]);
-        $this->audit->log($request, 'admin.create', $user, null, $user->only(['name', 'email', 'role']));
+        $this->access->invite($user, $request->user());
+        $this->audit->log($request, 'admin.create', $user, null, $user->only(['name', 'email', 'role']) + ['staff_role' => $role->name]);
 
         return response()->json([
-            'message' => 'Admin created successfully. An invitation has been sent to their email.',
-            'user' => $user,
+            'message' => sprintf('%s added with the role %s. An invitation describing the role has been sent to %s.', $user->name, $role->name, $user->email),
+            'user' => $this->access->userPayload($user->fresh()),
         ], 201);
+    }
+
+    /** Resend the staff invitation (a new set-password link) while the person has not set a password yet. */
+    public function resendInvitation(Request $request, User $user): JsonResponse
+    {
+        if (!$request->user()->is_super_admin) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+        if ($user->role !== 'admin' || $user->is_super_admin) {
+            return response()->json(['message' => 'Only invited staff can be sent an invitation.'], 422);
+        }
+        if ($user->activated_at !== null) {
+            return response()->json(['message' => 'This person has already set a password.'], 422);
+        }
+
+        $this->access->invite($user, $request->user());
+        $this->audit->log($request, 'admin.invite_resend', $user, null, ['email' => $user->email, 'invite_count' => (int) $user->fresh()->invite_count]);
+
+        return response()->json(['message' => 'Invitation sent again.', 'user' => $this->access->userPayload($user->fresh())]);
     }
 
     /**
@@ -98,7 +132,7 @@ class AdminManagementController extends Controller
         $user->fill($fields);
 
         if (! $user->isDirty()) {
-            return response()->json(['message' => 'Nothing changed.', 'user' => $user]);
+            return response()->json(['message' => 'Nothing changed.', 'user' => $this->access->userPayload($user)]);
         }
 
         $changed = array_keys($user->getDirty());
@@ -107,7 +141,7 @@ class AdminManagementController extends Controller
 
         return response()->json([
             'message' => 'User updated.',
-            'user' => $user->fresh(),
+            'user' => $this->access->userPayload($user->fresh()),
         ]);
     }
 
