@@ -172,21 +172,25 @@ class AdminResultController extends Controller
             }
         }
 
+        // The offer type chosen for each selection decides whether a second offer in the cycle is allowed.
+        $offerTypes = array_column($validated['selections'], 'offer_type', 'application_id');
+
         // Offers only for the final round's pool or people already decided in it (no skipping earlier rejections, D84).
         $poolIds = $this->pipeline->pool($final)->pluck('id')->all();
         $finalRows = $final->results()->get()->keyBy('application_id');
         $finalIds = $finalRows->keys()->all();
         foreach ($applications as $application) {
             if (! in_array($application->id, $poolIds, true) && ! in_array($application->id, $finalIds, true)) {
-                return response()->json(['message' => "{$application->studentProfile->roll_no} did not reach the final stage. Use Re-add on the stage where they were not selected."], 422);
+                return response()->json(['message' => "{$application->studentProfile->roll_no} did not reach the final stage. Change their decision on the stage where they were not selected first."], 422);
             }
-            // QA F-027: a rejection already published in the final stage is undone only through Re-add (company told, audited).
+            // QA F-027: a rejection already published in the final stage is changed on that stage's page first (company told, audited).
             $finalRow = $finalRows->get($application->id);
             if ($finalRow && $finalRow->result === 'rejected' && $finalRow->isPublished()) {
-                return response()->json(['message' => "{$application->studentProfile->roll_no} was not selected in the final stage. Use Re-add on that stage first."], 422);
+                return response()->json(['message' => "{$application->studentProfile->roll_no} was not selected in the final stage. Change their decision on the final stage's shortlist page first."], 422);
             }
-            // QA F-035 (owner rule): never a second offer in the cycle, never an offer through an active block.
-            if ($refusal = $this->policy->offerRefusal($application->studentProfile, $jobPosting, $application->id)) {
+            // QA F-035 (owner rule): never a second offer in the cycle (except a Full-Time one after an Intern +
+            // performance-based PPO in a full-time cycle), never an offer through an active block.
+            if ($refusal = $this->policy->offerRefusal($application->studentProfile, $jobPosting, $application->id, $offerTypes[$application->id] ?? null)) {
                 return response()->json(['message' => $refusal], 422);
             }
         }
@@ -203,7 +207,7 @@ class AdminResultController extends Controller
         $rejectRemaining = (bool) ($validated['reject_remaining'] ?? true);
 
         try {
-            [$offers, $blocks, $flagged, $published, $blockScopes] = DB::transaction(function () use ($validated, $applications, $final, $jobPosting, $company, $now, $admin, $rejectRemaining) {
+            [$offers, $blocks, $flagged, $published, $blockScopes] = DB::transaction(function () use ($validated, $applications, $final, $jobPosting, $company, $now, $admin, $rejectRemaining, $offerTypes) {
                 $offers = collect();
                 $blocks = collect();
                 $flagged = 0;
@@ -212,7 +216,7 @@ class AdminResultController extends Controller
                 // Same check again under a row lock, so two announcements at the same moment cannot both offer one student.
                 StudentProfile::query()->whereIn('id', $applications->pluck('student_profile_id'))->lockForUpdate()->get();
                 foreach ($applications as $application) {
-                    if ($refusal = $this->policy->offerRefusal($application->studentProfile, $jobPosting, $application->id)) {
+                    if ($refusal = $this->policy->offerRefusal($application->studentProfile, $jobPosting, $application->id, $offerTypes[$application->id] ?? null)) {
                         throw new HttpResponseException(response()->json(['message' => $refusal], 422));
                     }
                 }

@@ -1,18 +1,19 @@
 /**
- * Offer categories and the CDC blocking rules (owner decision 2026-10-01, QA F-004). Mirrors
- * JobPosting::OFFER_CATEGORIES and BlockingPolicy on the backend.
+ * Offer categories and the CDC blocking rules (owner decisions 2026-10-01 and 2026-10-18). Mirrors
+ * JobPosting::OFFER_CATEGORIES and BlockingPolicy on the backend. Categories are per placement cycle type:
+ * an internship cycle is always "Internship"; a full-time cycle asks which kind of role it is.
  */
 
 export const OFFER_CATEGORIES = {
-  jnf: [
+  internship: [{ value: "intern", label: "Internship" }],
+  fulltime: [
     { value: "fulltime", label: "Full-Time" },
+    { value: "intern_performance_ppo", label: "Intern + performance-based PPO" },
     { value: "intern_fulltime", label: "Intern + Full-Time" },
   ],
-  inf: [
-    { value: "intern", label: "Internship" },
-    { value: "intern_performance_ppo", label: "Intern + performance-based PPO" },
-  ],
 };
+
+export const offerCategoriesFor = (cycleType) => OFFER_CATEGORIES[cycleType === "internship" ? "internship" : "fulltime"];
 
 const COMPLETE = ["fulltime", "intern_fulltime", "intern_ppo"];
 

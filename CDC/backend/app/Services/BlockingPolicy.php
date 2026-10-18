@@ -47,6 +47,16 @@ final class BlockingPolicy
         return $scope === null ? null : ['scope' => $scope];
     }
 
+    /**
+     * The default-block matrix, for showing the rules (offer type => `all`, `internships_only` or null).
+     *
+     * @return array<string, string|null>
+     */
+    public function matrix(): array
+    {
+        return self::MATRIX;
+    }
+
     /** Default offer type for a posting: its float-time category (JNF → fulltime, INF → intern when not set). */
     public function defaultOfferType(JobPosting|string $posting): string
     {
@@ -118,13 +128,20 @@ final class BlockingPolicy
         return $created;
     }
 
+    /** Most offers one student can hold in a full-time (placement) cycle (owner decision 2026-10-18). */
+    public const MAX_PLACEMENT_CYCLE_OFFERS = 2;
+
     /**
-     * Why this student must not be given an offer for this posting, or null when an offer is allowed (owner rule,
-     * QA F-027 / F-035): they already hold an offer in the posting's placement cycle, or an active block in that cycle
-     * applies to the posting — a debarment or an "all" block always, an internships-only block for an internship
-     * posting (the same rule EligibilityService uses for applying). Admins lift the block or revoke the offer first.
+     * Why this student must not be given an offer of `$offerType` (default: the posting's category) for this posting,
+     * or null when an offer is allowed (owner rule, QA F-027 / F-035): they already hold an offer in the posting's
+     * placement cycle, or an active block in that cycle applies to the posting — a debarment or an "all" block always,
+     * an internships-only block for an internship posting (the same rule EligibilityService uses for applying).
+     *
+     * One exception (owner decision 2026-10-18): in a full-time cycle, a student whose only offer there is an
+     * Intern + performance-based PPO can get one more offer, a plain Full-Time one — at most two offers in the cycle.
+     * Admins lift the block or revoke the offer first.
      */
-    public function offerRefusal(StudentProfile $student, JobPosting $posting, ?int $exceptApplicationId = null): ?string
+    public function offerRefusal(StudentProfile $student, JobPosting $posting, ?int $exceptApplicationId = null, ?string $offerType = null): ?string
     {
         $held = Offer::query()
             ->where('student_profile_id', $student->id)
@@ -132,13 +149,31 @@ final class BlockingPolicy
             ->when($exceptApplicationId, fn ($q) => $q->where('application_id', '!=', $exceptApplicationId))
             ->with('company')
             ->orderBy('id')
-            ->first();
+            ->get();
 
-        if ($held) {
+        if ($held->isNotEmpty() && ! $this->allowsSecondOffer($posting, $held, $offerType ?? $posting->offerType())) {
+            $first = $held->first();
+
+            if ($held->count() >= self::MAX_PLACEMENT_CYCLE_OFFERS) {
+                return sprintf(
+                    '%s already holds %d offers in this placement cycle, the most allowed. Revoke one first if this is intended.',
+                    $student->roll_no,
+                    $held->count()
+                );
+            }
+
+            if ($first->offer_type === 'intern_performance_ppo' && $posting->placementCycle?->type === 'fulltime') {
+                return sprintf(
+                    '%s holds an Intern + performance-based PPO offer in this placement cycle (%s), so the only further offer allowed is a Full-Time one.',
+                    $student->roll_no,
+                    $first->company?->name ?? 'another company'
+                );
+            }
+
             return sprintf(
                 '%s already holds an offer in this placement cycle (%s). Revoke that offer first if this is intended.',
                 $student->roll_no,
-                $held->company?->name ?? 'another company'
+                $first->company?->name ?? 'another company'
             );
         }
 
@@ -163,6 +198,45 @@ final class BlockingPolicy
         }
 
         return null;
+    }
+
+    /**
+     * Why an announced offer's type cannot change to `$newType`, or null: when the student holds another offer in the
+     * same cycle, the two must stay the one allowed pair (Intern + performance-based PPO and Full-Time, full-time cycle).
+     */
+    public function offerTypeChangeRefusal(Offer $offer, string $newType): ?string
+    {
+        $others = Offer::query()
+            ->where('student_profile_id', $offer->student_profile_id)
+            ->where('placement_cycle_id', $offer->placement_cycle_id)
+            ->whereKeyNot($offer->id)
+            ->get();
+
+        if ($others->isEmpty()) {
+            return null;
+        }
+
+        $types = [$others->first()->offer_type, $newType];
+        sort($types);
+        $allowed = $others->count() === 1
+            && $offer->placementCycle?->type === 'fulltime'
+            && $types === ['fulltime', 'intern_performance_ppo'];
+
+        return $allowed ? null : 'This student holds two offers in this placement cycle; they must stay an Intern + performance-based PPO and a Full-Time offer.';
+    }
+
+    /**
+     * The one second-offer case: a full-time cycle, the only offer held there is an Intern + performance-based PPO,
+     * and the new offer is a plain Full-Time one.
+     *
+     * @param  Collection<int, Offer>  $held
+     */
+    private function allowsSecondOffer(JobPosting $posting, Collection $held, string $offerType): bool
+    {
+        return $posting->placementCycle?->type === 'fulltime'
+            && $held->count() === 1
+            && $held->first()->offer_type === 'intern_performance_ppo'
+            && $offerType === 'fulltime';
     }
 
     /**

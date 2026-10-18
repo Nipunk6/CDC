@@ -148,7 +148,8 @@ class FixF004BlockingTest extends TestCase
 
     public function test_intern_performance_ppo_category_blocks_internships_not_full_time(): void
     {
-        $inf = $this->float('inf', $this->intern, 'intern_performance_ppo');
+        // A full-time cycle role since the owner decision of 2026-10-18 (an INF opened in a placement cycle).
+        $inf = $this->float('inf', $this->ft, 'intern_performance_ppo');
         $suggested = $this->announce($inf, $this->apply($inf));
 
         $this->assertSame('intern_performance_ppo', $suggested['offer_type'], 'the float-time category pre-selects the offer type');

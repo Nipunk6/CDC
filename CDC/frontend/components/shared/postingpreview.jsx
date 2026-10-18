@@ -16,7 +16,7 @@ const profile = (cp = {}, companyName = "") => ({
   website: cp.website || "",
   sector: cp.sector || "",
   employeeCount: cp.employeeCount || "",
-  postalAddress: "",
+  postalAddress: undefined, // hidden from students (D65)
   categoryOrgType: cp.categoryOrgType || "",
   dateOfEstablishment: cp.dateOfEstablishment || "",
   annualTurnover: cp.annualTurnover || "",

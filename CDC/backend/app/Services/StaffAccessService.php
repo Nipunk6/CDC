@@ -10,6 +10,7 @@ use App\Models\UserPermissionOverride;
 use App\Support\ProgrammeCatalogue;
 use App\Support\StaffPermissions;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 
@@ -58,6 +59,24 @@ class StaffAccessService
         }
 
         return false;
+    }
+
+    /**
+     * Active admins who hold `$permission` at `$level` or above (super admins always): the people a notice about work
+     * they can act on should go to. Nobody else is emailed (no notices to staff who cannot act on them).
+     *
+     * @param  string|list<string>  $permission  a list means "any one of these"
+     * @return Collection<int, User>
+     */
+    public function recipients(string|array $permission, string $level = 'read'): Collection
+    {
+        return User::query()
+            ->where('role', 'admin')
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (User $user) => $this->can($user, $permission, $level))
+            ->values();
     }
 
     /**

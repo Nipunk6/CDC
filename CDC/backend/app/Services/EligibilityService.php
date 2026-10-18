@@ -253,6 +253,17 @@ final class EligibilityService
     }
 
     /**
+     * Why an active block stops this student in this job profile (empty when none does): the same rule as applying,
+     * shown on the student's own applications as "Rejected" with this reason.
+     *
+     * @return list<string>
+     */
+    public function blockReasons(StudentProfile $student, JobPosting $posting): array
+    {
+        return $this->blockingBlocks($student, $posting);
+    }
+
+    /**
      * Student-facing sentences for the active blocks that stop this student applying to this posting.
      *
      * @return list<string>

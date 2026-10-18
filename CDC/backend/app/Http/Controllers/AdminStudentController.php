@@ -133,7 +133,7 @@ class AdminStudentController extends Controller
     {
         $access = app(StaffAccessService::class);
         $branchChanges = $access->scopeStudents(\App\Models\BranchChangeRequest::query(), request()->user(), 'studentProfile')->where('status', 'pending')->count();
-        $resumes = $access->scopeStudents(\App\Models\Resume::query(), request()->user(), 'studentProfile')->where('status', 'pending')->count();
+        $resumes = $access->scopeStudents(\App\Models\Resume::query()->whereNull('archived_at'), request()->user(), 'studentProfile')->where('status', 'pending')->count();
 
         return response()->json([
             'branch_changes' => $branchChanges,

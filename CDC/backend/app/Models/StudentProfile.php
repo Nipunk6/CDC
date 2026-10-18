@@ -119,9 +119,10 @@ class StudentProfile extends Model
         return $this->hasMany(CycleEnrollment::class);
     }
 
+    /** The student's current resumes (one per slot). Replaced versions kept for past applications are archived. */
     public function resumes(): HasMany
     {
-        return $this->hasMany(Resume::class);
+        return $this->hasMany(Resume::class)->whereNull('archived_at');
     }
 
     public function applications(): HasMany

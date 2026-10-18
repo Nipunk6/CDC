@@ -24,6 +24,7 @@ class Notice extends Model
         'attachment_name',
         'attachment_size',
         'job_posting_id',
+        'source',
         'published_at',
         'emailed_at',
         'created_by',

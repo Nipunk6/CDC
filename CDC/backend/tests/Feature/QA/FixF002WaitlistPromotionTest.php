@@ -21,9 +21,10 @@ use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
- * Regression for QA F-002 (CR-01): "Move to next round" must PROMOTE the waitlisted student within the round they
- * were waitlisted in (published "selected", mailed), so they enter the next round's pool like everyone else — it
- * must never pre-decide the next round for them.
+ * Regression for QA F-002 (CR-01): moving an On Hold student on PROMOTES them within the round they were waitlisted
+ * in (published "selected", mailed), so they enter the next round's pool like everyone else — it never pre-decides
+ * the next round for them. Since the owner decision of 2026-10-18 this is done by changing their decision on the
+ * stage itself and publishing (no row is locked; the On Hold tab's "Move" is gone).
  */
 #[Group('qa')]
 class FixF002WaitlistPromotionTest extends TestCase
@@ -80,7 +81,7 @@ class FixF002WaitlistPromotionTest extends TestCase
         return "/api/admin/postings/{$this->posting->id}/rounds/{$this->round($i)->id}";
     }
 
-    public function test_move_promotes_within_the_waitlisted_round_and_the_next_round_still_decides(): void
+    public function test_shortlisting_an_on_hold_student_promotes_within_that_round_and_the_next_round_still_decides(): void
     {
         $this->postJson($this->base(0).'/results', ['entries' => [
             ['roll_no' => '22JE0001', 'result' => 'selected'],
@@ -90,15 +91,16 @@ class FixF002WaitlistPromotionTest extends TestCase
         $this->postJson($this->base(0).'/publish', ['reject_remaining' => true])->assertOk();
         $this->postJson($this->base(1).'/publish', [])->assertStatus(422); // nothing decided in round 2 yet
 
-        // Move the LAST waitlisted student on.
-        $this->postJson($this->base(0).'/waitlist/'.$this->apps['22JE0004']->id.'/promote')->assertOk();
+        // Move the LAST waitlisted student on: shortlist them in round 1, then publish round 1 again.
+        $this->postJson($this->base(0).'/results', ['roll_nos' => ['22JE0004'], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
+        $this->postJson($this->base(0).'/publish', [])->assertOk()->assertJsonPath('counts.selected', 1);
 
         $row = ApplicationRoundResult::where('application_id', $this->apps['22JE0004']->id)->where('posting_round_id', $this->round(0)->id)->sole();
         $this->assertSame('selected', $row->result, 'promotion happens in the round the student was waitlisted in');
         $this->assertNotNull($row->published_at);
         $this->assertSame(0, ApplicationRoundResult::where('posting_round_id', $this->round(1)->id)->count(), 'nothing is pre-decided in the next round');
         Mail::assertQueued(RoundResultMail::class, fn ($m) => $m->outcome === 'selected' && $m->hasBcc($this->apps['22JE0004']->studentProfile->user->email) && $m->nextRound === $this->round(1)->name);
-        $this->assertSame(1, AuditLog::where('action', 'waitlist.promote')->count());
+        $this->assertSame(1, AuditLog::where('action', 'round.result_change')->count());
 
         // Round 2: only 22JE0001 is entered; "mark everyone else" must now reach the promoted student too.
         $this->postJson($this->base(1).'/results', ['roll_nos' => ['22JE0001'], 'result' => 'selected'])->assertOk()->assertJsonCount(0, 'warnings');
@@ -109,17 +111,21 @@ class FixF002WaitlistPromotionTest extends TestCase
         $this->postJson($this->base(2).'/results', ['roll_nos' => ['22JE0002'], 'result' => 'selected'])->assertOk()->assertJsonCount(1, 'warnings');
     }
 
-    public function test_promote_guards(): void
+    public function test_promotion_guards(): void
     {
         $this->postJson($this->base(0).'/results', ['entries' => [['roll_no' => '22JE0001', 'result' => 'selected'], ['roll_no' => '22JE0002', 'result' => 'waitlisted']]])->assertOk();
-        // Not published yet → refuse (the admin simply edits the draft instead).
-        $this->postJson($this->base(0).'/waitlist/'.$this->apps['22JE0002']->id.'/promote')->assertStatus(422);
+        // Not published yet: the draft is simply edited, which is not a change to a published decision.
+        $this->postJson($this->base(0).'/results', ['roll_nos' => ['22JE0002'], 'result' => 'selected'])->assertOk()
+            ->assertJsonPath('written', 1)->assertJsonPath('changed', 0);
+        $this->postJson($this->base(0).'/results', ['roll_nos' => ['22JE0002'], 'result' => 'waitlisted'])->assertOk();
         $this->postJson($this->base(0).'/publish', [])->assertOk();
-        // Not on the waitlist → refuse.
-        $this->postJson($this->base(0).'/waitlist/'.$this->apps['22JE0001']->id.'/promote')->assertStatus(422);
-        // Companies can never promote.
+        // Already shortlisted → nothing to change.
+        $this->postJson($this->base(0).'/results', ['roll_nos' => ['22JE0001'], 'result' => 'selected'])->assertOk()
+            ->assertJsonPath('written', 0)->assertJsonPath('errors.0.reason', 'Already shortlisted (published); nothing changed.');
+        // Companies can never decide a stage.
         Sanctum::actingAs($this->companyUser);
-        $this->postJson($this->base(0).'/waitlist/'.$this->apps['22JE0002']->id.'/promote')->assertForbidden();
+        $this->postJson($this->base(0).'/results', ['roll_nos' => ['22JE0002'], 'result' => 'selected'])->assertForbidden();
+        $this->assertSame('waitlisted', ApplicationRoundResult::where('application_id', $this->apps['22JE0002']->id)->where('posting_round_id', $this->round(0)->id)->value('result'));
     }
 
     public function test_publish_never_publishes_a_later_result_for_someone_rejected_earlier(): void
@@ -141,7 +147,8 @@ class FixF002WaitlistPromotionTest extends TestCase
         $this->postJson($this->base(0).'/publish', [])->assertOk();
         $this->postJson($this->base(1).'/results', ['entries' => [['roll_no' => '22JE0001', 'result' => 'selected'], ['roll_no' => '22JE0002', 'result' => 'waitlisted']]])->assertOk();
         $this->postJson($this->base(1).'/publish', [])->assertOk();
-        $this->postJson($this->base(1).'/waitlist/'.$this->apps['22JE0002']->id.'/promote')->assertOk();
+        $this->postJson($this->base(1).'/results', ['roll_nos' => ['22JE0002'], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
+        $this->postJson($this->base(1).'/publish', [])->assertOk();
 
         $prepare = $this->getJson("/api/admin/postings/{$this->posting->id}/results/prepare")->assertOk();
         $this->assertSame([], $prepare->json('selected'), 'nobody has a final-round decision yet, so nobody is offered');

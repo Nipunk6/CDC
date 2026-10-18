@@ -7,7 +7,6 @@ use App\Models\ApplicationRoundResult;
 use App\Models\JobPosting;
 use App\Models\PostingRound;
 use App\Services\AuditService;
-use App\Services\BlockingPolicy;
 use App\Services\PipelineService;
 use App\Services\SpreadsheetImportService;
 use App\Services\StakeholderNotifier;
@@ -24,8 +23,7 @@ class AdminPipelineController extends Controller
         private readonly AuditService $audit,
         private readonly PipelineService $pipeline,
         private readonly SpreadsheetImportService $spreadsheets,
-        private readonly StakeholderNotifier $stakeholders,
-        private readonly BlockingPolicy $blocking
+        private readonly StakeholderNotifier $stakeholders
     ) {
     }
 
@@ -152,7 +150,7 @@ class AdminPipelineController extends Controller
             $seen[$application->id] = $as;
             if (! in_array($application->id, $pool, true)) {
                 $reason = in_array($application->id, $waitlisted, true)
-                    ? 'Is On Hold at the previous stage — use "Move" on the On Hold tab first.'
+                    ? 'Is On Hold at the previous stage. Change their decision there to Shortlisted and publish it first.'
                     : 'Was not shortlisted in the previous stage.';
                 if ($strict) {
                     $unknown[] = ['roll_no' => $entry['roll_no'], 'reason' => $reason.' Not saved (strict check on current stage).'];
@@ -165,6 +163,15 @@ class AdminPipelineController extends Controller
         }
 
         $report = $this->pipeline->writeDrafts($postingRound, $drafts, $request->user());
+        $this->reportChangedDecisions($request, $jobPosting, $postingRound, $report['changed']);
+        foreach ($report['restored'] as $undo) {
+            $this->audit->log($request, 'round.result_change_undone', $postingRound, ['application_id' => $undo['application']->id, 'roll_no' => $undo['roll_no'], 'result' => $undo['from'], 'published' => false], [
+                'application_id' => $undo['application']->id,
+                'roll_no' => $undo['roll_no'],
+                'result' => $undo['to'],
+                'published' => true,
+            ]);
+        }
 
         if ($report['written'] > 0) {
             $this->audit->log($request, 'round.results_draft', $postingRound, null, [
@@ -175,9 +182,12 @@ class AdminPipelineController extends Controller
             ]);
         }
 
+        $changedCount = count($report['changed']);
+
         return response()->json([
-            'message' => sprintf('%d draft result(s) saved. %d not applied. Nothing is visible to students until you publish.', $report['written'], count($unknown) + count($report['skipped'])),
+            'message' => sprintf('%d draft result(s) saved%s. %d not applied. Nothing is visible to students until you publish.', $report['written'], $changedCount ? sprintf(', including %d change(s) to published decisions', $changedCount) : '', count($unknown) + count($report['skipped'])),
             'written' => $report['written'],
+            'changed' => $changedCount,
             'errors' => array_merge($unknown, $report['skipped']),
             'warnings' => $warnings,
         ]);
@@ -309,6 +319,15 @@ class AdminPipelineController extends Controller
         ]);
 
         [$found, $unknown] = $this->pipeline->resolveApplicants($jobPosting, $validated['roll_nos']);
+        // An addendum adds new candidates; someone with a published decision here is changed on the stage itself
+        // (audited, the company told when a rejection is undone), never through an addendum.
+        $decided = $postingRound->results()->whereNotNull('published_at')->whereIn('application_id', array_map(fn (Application $a) => $a->id, $found))->pluck('application_id')->all();
+        foreach ($found as $roll => $application) {
+            if (in_array($application->id, $decided, true)) {
+                $unknown[] = ['roll_no' => $roll, 'reason' => 'Already has a published decision in this stage. Change it on the stage instead.'];
+                unset($found[$roll]);
+            }
+        }
         $report = $this->pipeline->writeDrafts($postingRound, array_map(fn (Application $a) => [
             'application' => $a,
             'result' => 'selected',
@@ -331,113 +350,32 @@ class AdminPipelineController extends Controller
     }
 
     /**
-     * Admin-only protocol to bring back a candidate already rejected (published) in this round.
-     * The company is told automatically (spec Q4.5).
+     * Changes to PUBLISHED decisions (owner decision 2026-10-18, replacing Re-add and the On Hold tab's Move / Remove):
+     * each is audited, and bringing back someone who was not selected tells the company, as Re-add did (spec Q4.5).
+     *
+     * @param  list<array{application: Application, roll_no: string, from: string, to: string}>  $changed
      */
-    public function readd(Request $request, JobPosting $jobPosting, PostingRound $postingRound, Application $application): JsonResponse
+    private function reportChangedDecisions(Request $request, JobPosting $jobPosting, PostingRound $postingRound, array $changed): void
     {
-        $this->assertRoundOf($jobPosting, $postingRound);
-        abort_if($application->job_posting_id !== $jobPosting->id, 404, 'Application not found.');
+        foreach ($changed as $change) {
+            $this->audit->log($request, 'round.result_change', $postingRound, ['application_id' => $change['application']->id, 'roll_no' => $change['roll_no'], 'result' => $change['from'], 'published' => true], [
+                'application_id' => $change['application']->id,
+                'roll_no' => $change['roll_no'],
+                'result' => $change['to'],
+                'published' => false,
+            ]);
 
-        $validated = $request->validate([
-            'confirm' => ['required', 'accepted'],
-            'remark' => ['required', 'string', 'max:255'],
-        ], [
-            'confirm.accepted' => 'Confirm that the company will be notified.',
-            'remark.required' => 'Give a reason for re-adding this candidate.',
-        ]);
-
-        $row = $postingRound->results()->where('application_id', $application->id)->first();
-
-        if (! $row || $row->result !== 'rejected' || ! $row->isPublished()) {
-            return response()->json(['message' => 'Only a candidate whose rejection in this stage was published can be re-added.'], 422);
+            if ($change['from'] === 'rejected' && in_array($change['to'], ['selected', 'waitlisted'], true)) {
+                $student = $change['application']->studentProfile;
+                $this->stakeholders->notifyCompany(
+                    $jobPosting,
+                    'Candidate re-added to your process',
+                    sprintf('The CDC has re-added %s (%s) to %s for %s after they were earlier marked not selected.', $student->full_name, $student->roll_no, $postingRound->name, $jobPosting->title()),
+                    ['New decision: '.\App\Services\PipelineService::RESULT_LABELS[$change['to']].'. The student is told when the CDC publishes the stage.'],
+                    'warning'
+                );
+            }
         }
-
-        // QA F-035 (owner rule): a student who already holds an offer in this cycle, or is blocked, is not brought back.
-        if ($refusal = $this->blocking->offerRefusal($application->studentProfile, $jobPosting, $application->id)) {
-            return response()->json(['message' => $refusal], 422);
-        }
-
-        $before = $row->only(['result', 'is_addendum', 'published_at', 'remark']);
-        $row->update([
-            'result' => 'selected',
-            'is_addendum' => true,
-            'published_at' => null,
-            'decided_by' => $request->user()->id,
-            'remark' => $validated['remark'],
-        ]);
-
-        $student = $application->studentProfile;
-        $this->audit->log($request, 'round.readd', $row, $before, $row->only(['result', 'is_addendum', 'published_at', 'remark']) + [
-            'roll_no' => $student->roll_no,
-        ]);
-
-        $this->stakeholders->notifyCompany(
-            $jobPosting,
-            'Candidate re-added to your process',
-            sprintf('The CDC has re-added %s (%s) to %s for %s after they were earlier marked not selected.', $student->full_name, $student->roll_no, $postingRound->name, $jobPosting->title()),
-            ['Reason: '.$validated['remark']],
-            'warning'
-        );
-
-        return response()->json(['message' => 'Candidate re-added as a draft and the company has been notified. Publish the stage to inform the student.']);
-    }
-
-    /**
-     * Take someone off a round's waitlist (spec Q4.4). A published waitlist entry becomes a published "not selected"
-     * (with the regret mail); a draft entry is simply deleted.
-     */
-    public function removeFromWaitlist(Request $request, JobPosting $jobPosting, PostingRound $postingRound, Application $application): JsonResponse
-    {
-        $this->assertRoundOf($jobPosting, $postingRound);
-        abort_if($application->job_posting_id !== $jobPosting->id, 404, 'Application not found.');
-
-        $row = $this->pipeline->removeFromWaitlist($postingRound, $application, $request->user());
-        if (! $row) {
-            return response()->json(['message' => 'This candidate is not On Hold at this stage.'], 422);
-        }
-
-        $this->audit->log($request, 'waitlist.remove', $postingRound, ['application_id' => $application->id, 'result' => 'waitlisted'], [
-            'application_id' => $application->id,
-            'result' => $row->exists ? 'rejected' : 'removed draft',
-        ]);
-
-        if ($row->exists && $row->published_at) {
-            $this->pipeline->dispatchResultMails($postingRound, [$row->id], false);
-        }
-
-        return response()->json(['message' => 'Removed from On Hold.']);
-    }
-
-    /**
-     * "Move to next round" (D90, QA F-002): promote a PUBLISHED waitlisted candidate to "selected" in this round, mail
-     * them (with the next round's name) and let the next round decide them like everyone else.
-     */
-    public function promoteFromWaitlist(Request $request, JobPosting $jobPosting, PostingRound $postingRound, Application $application): JsonResponse
-    {
-        $this->assertRoundOf($jobPosting, $postingRound);
-        abort_if($application->job_posting_id !== $jobPosting->id, 404, 'Application not found.');
-        if ($blocked = $this->blocked($jobPosting)) {
-            return $blocked;
-        }
-
-        $row = $this->pipeline->promoteFromWaitlist($postingRound, $application, $request->user());
-        if (! $row) {
-            return response()->json(['message' => 'Only a candidate on this stage\'s PUBLISHED On Hold list can be moved on. (A draft On Hold entry can simply be changed to "shortlisted".)'], 422);
-        }
-
-        $this->audit->log($request, 'waitlist.promote', $postingRound, ['application_id' => $application->id, 'result' => 'waitlisted'], [
-            'application_id' => $application->id,
-            'result' => 'selected',
-            'remark' => 'Promoted from On Hold',
-        ]);
-        $this->pipeline->dispatchResultMails($postingRound, [$row->id]);
-
-        $next = $jobPosting->rounds()->where('sort_order', '>', $postingRound->sort_order)->first();
-
-        return response()->json([
-            'message' => $application->studentProfile->roll_no.' moved off On Hold'.($next ? " and into {$next->name}" : '').'. The student has been notified.',
-        ]);
     }
 
     /**

@@ -66,10 +66,11 @@ class FixF010ReplacementOnCompletedDriveTest extends TestCase
         $propose('shortlist')->assertStatus(422)->assertJsonPath('message', 'This job profile is completed. You can still send a replacement request or an addendum.');
         $propose('replacement_request')->assertCreated();
 
-        // CDC: approve (22JE0002 was published "not selected", so Re-add is the way back in), then offer.
+        // CDC: approve (22JE0002 was published "not selected": the approval reports them, and the CDC changes their
+        // decision on the final stage, which tells the company), then offer.
         Sanctum::actingAs($admin);
-        $this->patchJson('/api/admin/proposals/'.ShortlistProposal::sole()->id, ['status' => 'approved'])->assertOk();
-        $this->postJson("{$base}/rounds/{$final->id}/readd/{$apps['22JE0002']->id}", ['confirm' => true, 'remark' => 'Replacement request from the company'])->assertOk();
+        $this->patchJson('/api/admin/proposals/'.ShortlistProposal::sole()->id, ['status' => 'approved'])->assertOk()->assertJsonPath('errors.0.roll_no', '22JE0002');
+        $this->postJson("{$base}/rounds/{$final->id}/results", ['roll_nos' => ['22JE0002'], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
         $this->assertContains('22JE0002', collect($this->getJson("{$base}/results/prepare")->assertOk()->json('selected'))->pluck('student.roll_no')->all());
         $this->postJson("{$base}/results/publish", ['selections' => [['application_id' => $apps['22JE0002']->id, 'offer_type' => 'fulltime', 'block' => false]]])->assertOk();
         $this->assertSame(2, Offer::count());

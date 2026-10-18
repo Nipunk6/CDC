@@ -146,18 +146,15 @@ class AdminPostingController extends Controller
             'placement_cycle_id' => ['required', 'integer', 'exists:placement_cycles,id'],
             'application_deadline' => ['required', 'bail', 'date', $this->futureDeadline()],
             'share_contact_details' => ['nullable', 'boolean'],
-            'offer_type' => ['nullable', 'string', 'in:'.implode(',', JobPosting::OFFER_CATEGORIES[$request->input('form_type') === 'inf' ? 'inf' : 'jnf'])],
+            // Checked against the chosen cycle's type below, once the cycle is loaded.
+            'offer_type' => ['nullable', 'string', 'in:'.implode(',', array_merge(...array_values(JobPosting::OFFER_CATEGORIES)))],
             // "Schedule For Later" (S6.2): open applications at this IST time instead of now.
             'scheduled_open_at' => ['nullable', 'bail', 'date', $this->futureTime('The opening time must be in the future.')],
             'visit_date' => ['nullable', 'date_format:Y-m-d'],
             // Allowed Student Categories (S8.4): at least one is required to be eligible; empty = no restriction.
             'allowed_student_categories' => ['nullable', 'array', 'max:50'],
             'allowed_student_categories.*' => ['integer', 'exists:student_categories,id'],
-        ] + $this->questionRules(), [
-            'offer_type.in' => $request->input('form_type') === 'inf'
-                ? 'An INF is opened for applications as "Internship" or "Intern + performance-based PPO".'
-                : 'A JNF is opened for applications as "Full-Time" or "Intern + Full-Time".',
-        ]);
+        ] + $this->questionRules());
 
         $form = $this->findForm($validated['form_type'], (int) $validated['form_id']);
         if (! $form) {
@@ -188,17 +185,18 @@ class AdminPostingController extends Controller
             return response()->json(['message' => 'The selected placement is a draft. Publish the placement before opening job profiles for applications in it.'], 422);
         }
 
-        $expected = $validated['form_type'] === 'inf' ? 'internship' : 'fulltime';
-        if ($cycle->type !== $expected) {
-            return response()->json([
-                'message' => $expected === 'internship'
-                    ? 'An INF can only be opened for applications in an internship placement.'
-                    : 'A JNF can only be opened for applications in a full-time placement.',
-            ], 422);
+        // A JNF or an INF can go into either kind of cycle; the cycle decides the offer category (owner decision
+        // 2026-10-18): an internship cycle is always "Internship", a full-time one asks which kind of role it is.
+        $categories = JobPosting::offerCategoriesFor($cycle->type);
+        $offerType = $validated['offer_type'] ?? $categories[0];
+        if (! in_array($offerType, $categories, true)) {
+            $message = $this->offerCategoryMessage($cycle->type);
+
+            return response()->json(['message' => $message, 'errors' => ['offer_type' => [$message]]], 422);
         }
 
         try {
-            $posting = DB::transaction(function () use ($form, $cycle, $validated, $request, $scheduledAt): JobPosting {
+            $posting = DB::transaction(function () use ($form, $cycle, $validated, $request, $scheduledAt, $offerType): JobPosting {
                 $posting = JobPosting::create([
                     'postable_type' => $form::class,
                     'postable_id' => $form->id,
@@ -206,7 +204,7 @@ class AdminPostingController extends Controller
                     'application_deadline' => Ist::parse($validated['application_deadline']),
                     'status' => 'open',
                     'share_contact_details' => (bool) ($validated['share_contact_details'] ?? false),
-                    'offer_type' => $validated['offer_type'] ?? JobPosting::OFFER_CATEGORIES[$validated['form_type']][0],
+                    'offer_type' => $offerType,
                     'floated_by' => $request->user()->id,
                     'floated_at' => $scheduledAt ?? now(),
                     'eligibility_snapshot' => $this->snapshot($form) + array_filter([
@@ -249,6 +247,7 @@ class AdminPostingController extends Controller
         }
 
         $this->dispatchFloatMails($posting);
+        app(\App\Services\JobProfileNoticeService::class)->publish($posting);
 
         return response()->json([
             'message' => 'Job profile opened for applications. Eligible students are being notified.',
@@ -271,10 +270,12 @@ class AdminPostingController extends Controller
         $validated = $request->validate([
             'application_deadline' => ['sometimes', 'bail', 'date', $this->futureDeadline()],
             'share_contact_details' => ['sometimes', 'boolean'],
-            'offer_type' => ['sometimes', 'string', 'in:'.implode(',', JobPosting::OFFER_CATEGORIES[$jobPosting->formType()])],
+            'offer_type' => ['sometimes', 'string', 'in:'.implode(',', JobPosting::offerCategoriesFor($jobPosting->placementCycle?->type))],
             'visit_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'scheduled_open_at' => ['sometimes', 'bail', 'date', $this->futureTime('The opening time must be in the future.')],
-        ] + $this->questionRules());
+        ] + $this->questionRules(), [
+            'offer_type.in' => $this->offerCategoryMessage($jobPosting->placementCycle?->type),
+        ]);
 
         if (array_key_exists('scheduled_open_at', $validated)) {
             if (! $jobPosting->isScheduled()) {
@@ -322,6 +323,7 @@ class AdminPostingController extends Controller
 
         $jobPosting->refresh();
         $this->audit->log($request, 'posting.update', $jobPosting, $before, $this->auditState($jobPosting));
+        app(\App\Services\JobProfileNoticeService::class)->sync($jobPosting);
 
         return response()->json([
             'message' => 'Job profile updated.',
@@ -424,6 +426,7 @@ class AdminPostingController extends Controller
         $jobPosting->update(['scheduled_open_at' => null, 'floated_at' => now()]);
         $this->audit->log($request, 'posting.open_now', $jobPosting, $before, ['scheduled_open_at' => null]);
         $this->dispatchFloatMails($jobPosting);
+        app(\App\Services\JobProfileNoticeService::class)->publish($jobPosting);
 
         return response()->json([
             'message' => 'Job profile opened for applications. Eligible students are being notified.',
@@ -670,6 +673,7 @@ class AdminPostingController extends Controller
         $before = ['status' => $posting->status];
         $posting->update(['status' => $to]);
         $this->audit->log($request, $action, $posting, $before, ['status' => $to]);
+        app(\App\Services\JobProfileNoticeService::class)->sync($posting);
 
         return response()->json([
             'message' => $message,
@@ -922,5 +926,12 @@ class AdminPostingController extends Controller
                 'placed_elsewhere' => (clone $applications)->where('status', 'applied')->where('placed_elsewhere_flag', true)->count(),
             ],
         ];
+    }
+
+    private function offerCategoryMessage(?string $cycleType): string
+    {
+        return $cycleType === 'internship'
+            ? 'A job profile in an internship placement is an "Internship" offer.'
+            : 'A job profile in a full-time placement is "Full-Time", "Intern + performance-based PPO" or "Intern + Full-Time".';
     }
 }

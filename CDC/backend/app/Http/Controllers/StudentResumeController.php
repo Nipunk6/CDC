@@ -29,7 +29,9 @@ class StudentResumeController extends Controller
     }
 
     /**
-     * Upload into a slot. Re-uploading replaces the file and resets verification, unless locked.
+     * Upload into a slot. Re-uploading replaces the file and resets verification, unless an application still in
+     * progress uses it. If past applications used the old file, it is archived for them (they keep showing exactly what
+     * the student applied with) and the new file gets a new row in the slot; otherwise the old file is replaced.
      */
     public function store(Request $request): JsonResponse
     {
@@ -69,6 +71,13 @@ class StudentResumeController extends Controller
                     'reviewed_by' => null,
                     'reviewed_at' => null,
                 ];
+
+                if ($existing && $existing->applications()->exists()) {
+                    // Keep the version past applications were made with: archived, out of the slot.
+                    $existing->update(['slot' => null, 'archived_at' => now()]);
+
+                    return [$student->resumes()->create($attributes + ['slot' => $validated['slot']]), null, false];
+                }
 
                 if ($existing) {
                     $oldPath = $existing->file_path;

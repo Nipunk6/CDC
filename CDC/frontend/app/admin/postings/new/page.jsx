@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
@@ -13,7 +14,6 @@ import {
   FormControlLabel,
   Grid2,
   LinearProgress,
-  Link as MuiLink,
   Radio,
   RadioGroup,
   Stack,
@@ -21,12 +21,15 @@ import {
   Typography,
 } from "@mui/material";
 import WorkIcon from "@mui/icons-material/Work";
-import AddIcon from "@mui/icons-material/Add";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import BusinessIcon from "@mui/icons-material/Business";
+import AddBusinessIcon from "@mui/icons-material/AddBusiness";
 
 import PageHeader from "@/components/shared/pageheader";
 import JnfFormPro from "@/components/forms/jnfformpro";
 import InfFormPro from "@/components/forms/infformpro";
+import CompanyFormsPreview from "@/components/admin/companyformspreview";
+import AcceptedFormsGrid from "@/components/admin/acceptedformsgrid";
 import { adminApi } from "@/lib/adminapi";
 
 const emptyCompany = { name: "", hr_name: "", hr_email: "", website: "", sector: "" };
@@ -39,12 +42,15 @@ export default function AddNewJobPage() {
   );
 }
 
-// "Add New Job" (S6.1, B2-1): the CDC picks or creates the company, then fills the same JNF/INF
-// wizard the companies use. The form is accepted on submit and opened from its detail page.
+// "Add New Job" (S6.1, B2-1). Landing: recently accepted JNFs/INFs as company cards to publish or duplicate.
+// ?company=existing picks a company already on the portal; ?company=new enters a new company first. A new form
+// or a duplicate opens in the same JNF/INF wizard the companies use; it is accepted on submit.
 function AddNewJob() {
   const router = useRouter();
   const params = useSearchParams();
   const cycleParam = params.get("cycle") ?? "";
+  const newCompany = params.get("company") === "new";
+  const landing = !newCompany && params.get("company") !== "existing";
 
   const [cycle, setCycle] = useState(null);
   const [formType, setFormType] = useState("jnf");
@@ -52,11 +58,12 @@ function AddNewJob() {
   const [search, setSearch] = useState("");
   const [options, setOptions] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState(emptyCompany);
   const [savingCompany, setSavingCompany] = useState(false);
   const [error, setError] = useState(null);
   const [started, setStarted] = useState(false);
+  // A duplicated form (draft) opened in the wizard: its form data plus id.
+  const [initialData, setInitialData] = useState(null);
 
   useEffect(() => {
     if (!cycleParam) return;
@@ -78,7 +85,9 @@ function AddNewJob() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const createCompany = async () => {
+  // New company: create it, then go straight to the form. Backing out of the form keeps the created company
+  // selected (the picker is shown), so it is never created twice.
+  const createCompanyAndStart = async () => {
     setSavingCompany(true);
     setError(null);
     try {
@@ -89,7 +98,7 @@ function AddNewJob() {
       setCompany(response.company);
       setOptions((prev) => [response.company, ...prev]);
       setDraft(emptyCompany);
-      setAdding(false);
+      setStarted(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add the company.");
     } finally {
@@ -97,22 +106,56 @@ function AddNewJob() {
     }
   };
 
+  const openDuplicate = (response) => {
+    setError(null);
+    setCompany(response.company);
+    setFormType(response.form_type);
+    setInitialData({ ...(response.form?.form_data ?? {}), id: response.form?.id });
+    setStarted(true);
+    window.scrollTo({ top: 0 });
+  };
+
+  const closeWizard = () => {
+    setStarted(false);
+    setInitialData(null);
+  };
+
+  const modeHref = (mode) => `/admin/postings/new?company=${mode}${cycleParam ? `&cycle=${cycleParam}` : ""}`;
+
   const detailPath = (id) => `/admin/${formType}s/${id}${cycleParam ? `?cycle=${cycleParam}` : ""}`;
   const backHref = cycleParam ? `/admin/placement-cycles/${cycleParam}` : "/admin/postings";
   const canAddCompany = draft.name.trim() && draft.hr_name.trim() && draft.hr_email.trim();
+  // The new-company fields show until that company exists; then it is picked like any other.
+  const enteringCompany = newCompany && !company;
 
   return (
     <>
       <PageHeader
         icon={<WorkIcon />}
-        title={cycle ? `${cycle.name} / New Job Profile` : "New Job Profile"}
+        title={`${cycle ? `${cycle.name} / ` : ""}${landing ? "Add New Job" : newCompany ? "New Company & Job Profile" : "New Job Profile"}`}
         subtitle={
           started && company
-            ? `${company.name} · ${formType === "inf" ? "INF (internship)" : "JNF (full-time)"}. The form is accepted when you submit it; open it for applications next.`
-            : "Pick the company, choose JNF or INF, then fill the form on the company's behalf."
+            ? `${company.name} · ${formType === "inf" ? "INF (internship)" : "JNF (full-time)"}${initialData ? " · duplicated draft" : ""}. The form is accepted when you submit it; open it for applications next.`
+            : landing
+              ? "Publish a recently accepted JNF or INF, duplicate one, or fill a new form for a company."
+              : newCompany
+                ? "Enter the new company, choose JNF or INF, then fill the form on the company's behalf."
+                : "Pick a company already on the portal, choose JNF or INF, then fill the form on the company's behalf."
         }
-        backHref={backHref}
+        backHref={landing ? backHref : `/admin/postings/new${cycleParam ? `?cycle=${cycleParam}` : ""}`}
         backLabel="Back"
+        actions={
+          landing && !started ? (
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Button component={Link} href={modeHref("existing")} variant="contained" startIcon={<BusinessIcon />}>
+                New form for a company
+              </Button>
+              <Button component={Link} href={modeHref("new")} variant="outlined" startIcon={<AddBusinessIcon />}>
+                Add New Company
+              </Button>
+            </Stack>
+          ) : undefined
+        }
       />
 
       {error && (
@@ -121,15 +164,17 @@ function AddNewJob() {
         </Alert>
       )}
 
-      {!started && (
+      {landing && !started && <AcceptedFormsGrid onDuplicated={openDuplicate} />}
+
+      {!landing && !started && (
         <Card>
           <CardContent>
             <Stack spacing={3}>
               <Box>
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  Company*
+                  {enteringCompany ? "New company" : "Company*"}
                 </Typography>
-                {!adding && (
+                {!enteringCompany && (
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "flex-start" }}>
                     <Autocomplete
                       sx={{ flex: 1, minWidth: 0 }}
@@ -169,19 +214,13 @@ function AddNewJob() {
                         />
                       )}
                     />
-                    <Typography variant="body2" color="text.secondary" sx={{ pt: { sm: 2 } }}>
-                      Not listed?{" "}
-                      <MuiLink component="button" type="button" onClick={() => setAdding(true)} sx={{ verticalAlign: "baseline" }}>
-                        + Add a new company
-                      </MuiLink>
-                    </Typography>
                   </Stack>
                 )}
 
-                {adding && (
-                  <Box sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
+                {enteringCompany && (
+                  <Box>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Adds a company record without a portal login.
+                      Adds a company record without a portal login. The rest of the company profile is filled in the form.
                     </Typography>
                     <Grid2 container spacing={2}>
                       <Grid2 size={{ xs: 12, sm: 6 }}>
@@ -200,18 +239,10 @@ function AddNewJob() {
                         <TextField fullWidth label="Website" placeholder="https://" value={draft.website} onChange={(e) => setDraft({ ...draft, website: e.target.value })} />
                       </Grid2>
                     </Grid2>
-                    <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
-                      <Button onClick={() => setAdding(false)} disabled={savingCompany}>
-                        Cancel
-                      </Button>
-                      <Button variant="contained" startIcon={<AddIcon />} onClick={createCompany} disabled={savingCompany || !canAddCompany}>
-                        Add company
-                      </Button>
-                    </Stack>
                   </Box>
                 )}
 
-                {company && !adding && (
+                {company && (
                   <Chip sx={{ mt: 1.5, maxWidth: "100%" }} color="primary" variant="outlined" label={`${company.name} · ${company.hr_email}`} onDelete={() => setCompany(null)} />
                 )}
               </Box>
@@ -231,33 +262,42 @@ function AddNewJob() {
                 )}
               </Box>
 
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                <Button variant="contained" endIcon={<ArrowForwardIcon />} disabled={!company || adding} onClick={() => setStarted(true)}>
-                  Continue to the form
-                </Button>
-              </Box>
+              {enteringCompany && (
+                <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                  <Button variant="contained" endIcon={<ArrowForwardIcon />} disabled={savingCompany || !canAddCompany} onClick={createCompanyAndStart}>
+                    {savingCompany ? "Adding company..." : "Add company & fill job details"}
+                  </Button>
+                </Box>
+              )}
             </Stack>
           </CardContent>
         </Card>
+      )}
+
+      {/* Existing company: its forms as a read-only preview; the wizard opens only via "Create a new …". */}
+      {!landing && !started && company && !enteringCompany && (
+        <CompanyFormsPreview company={company} formType={formType} cycleId={cycleParam} onCreateNew={() => setStarted(true)} />
       )}
 
       {started && company && (
         <Box sx={{ maxWidth: 1200, mx: "auto" }}>
           {formType === "inf" ? (
             <InfFormPro
-              key={`inf-${company.id}`}
+              key={`inf-${company.id}-${initialData?.id ?? "new"}`}
               api={adminApi}
               apiPrefix={`/admin/form-builder/${company.id}`}
+              initialData={initialData ?? undefined}
               onSaved={(id) => router.push(detailPath(id))}
-              onCancel={() => setStarted(false)}
+              onCancel={closeWizard}
             />
           ) : (
             <JnfFormPro
-              key={`jnf-${company.id}`}
+              key={`jnf-${company.id}-${initialData?.id ?? "new"}`}
               api={adminApi}
               apiPrefix={`/admin/form-builder/${company.id}`}
+              initialData={initialData ?? undefined}
               onSaved={(id) => router.push(detailPath(id))}
-              onCancel={() => setStarted(false)}
+              onCancel={closeWizard}
             />
           )}
         </Box>

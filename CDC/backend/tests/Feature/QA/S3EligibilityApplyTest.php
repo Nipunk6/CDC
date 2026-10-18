@@ -404,9 +404,10 @@ class S3EligibilityApplyTest extends TestCase
         $closed = PlacementCycle::create(['name' => 'Closed FT', 'type' => 'fulltime', 'starts_on' => '2025-07-01', 'ends_on' => '2026-06-30', 'status' => 'closed', 'allowed_programmes' => [['programme' => self::BTECH, 'batches' => [2026]]]]);
         $this->float($jnf, $closed)->assertStatus(422);
 
-        // Type mismatch (spec M5.3: JNF→fulltime, INF→internship).
-        $this->float($jnf, $this->intern)->assertStatus(422);
-        $this->float($this->inf(), $this->ft)->assertStatus(422);
+        // Either form can go into either kind of cycle (owner decision 2026-10-18, replacing spec M5.3's JNF→fulltime,
+        // INF→internship); the role must fit the cycle.
+        $this->float($jnf, $this->intern, ['offer_type' => 'fulltime'])->assertStatus(422)->assertJsonValidationErrors('offer_type');
+        $this->float($this->inf(), $this->ft, ['offer_type' => 'intern'])->assertStatus(422)->assertJsonValidationErrors('offer_type');
 
         $this->assertSame(0, JobPosting::count(), 'no guard may leave a posting behind');
         $this->as($student);

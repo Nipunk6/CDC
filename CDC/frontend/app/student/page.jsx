@@ -19,6 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import DescriptionIcon from "@mui/icons-material/Description";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 
 import PostingCard from "@/components/student/postingcard";
 import RoundTrail from "@/components/student/roundtrail";
@@ -175,9 +176,13 @@ export default function StudentDashboardPage() {
               <Stack spacing={2}>
                 {data.applications.map((a) => (
                   <Box key={a.id}>
-                    <Typography variant="body2" fontWeight={600} component={Link} href={`/student/postings/${a.posting.id}`} sx={{ color: "text.primary" }}>
-                      {a.posting.company?.name} — {a.posting.title}
-                    </Typography>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      {a.offer && <EmojiEventsIcon fontSize="small" sx={{ color: "warning.main" }} titleAccess="Offer received" />}
+                      <Typography variant="body2" fontWeight={600} component={Link} href={`/student/postings/${a.posting.id}`} sx={{ color: "text.primary" }}>
+                        {a.posting.company?.name} — {a.posting.title}
+                      </Typography>
+                      {a.blocked_reason && <Chip size="small" color="error" label="Rejected" title={a.blocked_reason} />}
+                    </Stack>
                     <RoundTrail trail={a.trail} status={a.status} offer={a.offer} />
                   </Box>
                 ))}

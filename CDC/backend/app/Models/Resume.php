@@ -31,6 +31,7 @@ class Resume extends Model
         'admin_remark',
         'reviewed_by',
         'reviewed_at',
+        'archived_at',
     ];
 
     /**
@@ -72,14 +73,21 @@ class Resume extends Model
     }
 
     /**
-     * Locked = attached to a live application whose posting is still open or in process (spec B5).
+     * Locked = attached to an application still in progress (spec B5; owner decision 2026-10-18): applied, in a job
+     * profile that is open or in process, and neither accepted (an offer) nor rejected (a published "not selected",
+     * or shown as rejected because a block covers it). Once every such application is decided the slot can be
+     * replaced; the version those applications used is archived, not overwritten.
      */
     public function isLocked(): bool
     {
         return $this->applications()
             ->where('status', 'applied')
             ->whereHas('jobPosting', fn ($q) => $q->whereIn('status', ['open', 'in_process']))
-            ->exists();
+            ->whereDoesntHave('offer')
+            ->whereDoesntHave('roundResults', fn ($q) => $q->whereNotNull('published_at')->where('result', 'rejected'))
+            ->with(['jobPosting', 'studentProfile'])
+            ->get()
+            ->contains(fn (Application $application) => \App\Support\PostingPresenter::blockedReason($application) === null);
     }
 
     /**

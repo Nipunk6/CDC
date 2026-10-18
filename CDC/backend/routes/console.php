@@ -52,6 +52,8 @@ Artisan::command('placement:open-scheduled', function (AuditService $audit, \App
             $mail->mode() === 'sync'
                 ? \App\Jobs\SendPostingFloatedMails::dispatchSync($posting->id)
                 : \App\Jobs\SendPostingFloatedMails::dispatch($posting->id);
+            // The job profile is live now: announce it on every student's Notices page (owner decision 2026-10-18).
+            app(\App\Services\JobProfileNoticeService::class)->publish($posting->fresh());
             $opened++;
         });
     $this->info("{$opened} scheduled job profile(s) opened.");

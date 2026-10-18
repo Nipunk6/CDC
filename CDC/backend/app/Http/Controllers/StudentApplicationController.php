@@ -38,7 +38,7 @@ class StudentApplicationController extends Controller
             'applications' => $applications->map(function (Application $application) use ($student) {
                 $posting = $application->jobPosting;
 
-                return PostingPresenter::application($application) + [
+                return PostingPresenter::application($application, $student, $posting) + [
                     'posting' => PostingPresenter::card($posting, $student->programme),
                     'resume' => $application->resume?->only(['id', 'label', 'status', 'slot']),
                     'trail' => PostingPresenter::trail($posting, $application),

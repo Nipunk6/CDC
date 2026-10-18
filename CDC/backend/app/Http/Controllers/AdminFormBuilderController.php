@@ -80,6 +80,220 @@ class AdminFormBuilderController extends Controller
         ], 201);
     }
 
+    /** Form-data keys that differ between the INF and the JNF wizard (INF key => JNF key). */
+    private const TYPE_KEYS = [
+        'internshipTitle' => 'jobTitle',
+        'internshipDesignation' => 'jobDesignation',
+        'internshipLocation' => 'jobLocation',
+        'internshipDescription' => 'jobDescription',
+    ];
+
+    /** Pay and type-only fields that do not carry over when a form is duplicated as the other type. */
+    private const TYPE_ONLY = [
+        'inf' => ['duration', 'stipendSameForAll', 'programmeStipends', 'ppoProvision', 'ppoCtc'],
+        'jnf' => ['salarySameForAll', 'programmeSalaries', 'salaryComponents'],
+    ];
+
+    /**
+     * "Add New Job" landing page: recently accepted JNFs and INFs of every company, newest first, summarised for a
+     * card (company, batch, location, pay, programmes) with their job profile if already opened for applications.
+     */
+    public function acceptedForms(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['search' => ['nullable', 'string', 'max:255']]);
+        $term = trim((string) ($validated['search'] ?? ''));
+
+        $cards = collect();
+        foreach (self::TYPES as $type => $config) {
+            /** @var class-string<Jnf|Inf> $model */
+            $model = $config['model'];
+            $query = $model::query()
+                ->where('status', 'accepted')
+                ->with(['company:id,name,hr_email,logo_path', 'jobPosting:id,postable_type,postable_id,status,placement_cycle_id,offer_type', 'jobPosting.placementCycle:id,name,type'])
+                ->latest('updated_at')
+                ->orderByDesc('id');
+
+            if ($term !== '') {
+                $query->where(function ($q) use ($term, $config): void {
+                    \App\Support\Like::whereContains($q, [$config['title']], $term);
+                    $q->orWhereHas('company', fn ($c) => \App\Support\Like::whereContains($c, ['name', 'hr_email'], $term));
+                });
+            }
+
+            foreach ($query->limit(60)->get() as $form) {
+                $cards->push($this->card($type, $form));
+            }
+        }
+
+        return response()->json([
+            'forms' => $cards->sortByDesc('updated_at')->values()->take(60),
+        ]);
+    }
+
+    /**
+     * "Duplicate" on the Add New Job page: a copy of any JNF/INF as a new draft of the chosen type for the same
+     * company, opened in the wizard. Like the company's own duplicate, the batch, declarations and signatory are
+     * cleared so the wizard asks for them again; pay fields only carry over within the same type.
+     */
+    public function duplicate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'form_type' => ['required', 'in:jnf,inf'],
+            'form_id' => ['required', 'integer'],
+            'as' => ['required', 'in:jnf,inf'],
+        ]);
+
+        /** @var class-string<Jnf|Inf> $sourceModel */
+        $sourceModel = self::TYPES[$validated['form_type']]['model'];
+        $source = $sourceModel::query()->with('company:id,name')->find($validated['form_id']);
+        if (! $source || ! $source->company) {
+            return response()->json(['message' => 'Form not found.'], 404);
+        }
+
+        $from = $validated['form_type'];
+        $to = $validated['as'];
+        $data = $source->form_data;
+        $data = is_string($data) ? (json_decode($data, true) ?: []) : (is_array($data) ? $data : []);
+
+        if ($from !== $to) {
+            foreach (self::TYPE_KEYS as $infKey => $jnfKey) {
+                [$old, $new] = $from === 'inf' ? [$infKey, $jnfKey] : [$jnfKey, $infKey];
+                if (array_key_exists($old, $data)) {
+                    $data[$new] = $data[$old];
+                    unset($data[$old]);
+                }
+            }
+            foreach (self::TYPE_ONLY[$from] as $key) {
+                unset($data[$key]);
+            }
+        }
+
+        unset($data['id']);
+        $data['graduatingBatch'] = '';
+        foreach (is_array($data['eligibility'] ?? null) ? $data['eligibility'] : [] as $k => $programme) {
+            $data['eligibility'][$k]['graduatingBatch'] = '';
+            $data['eligibility'][$k]['graduatingBatches'] = [];
+        }
+        $data['declarations'] = array_fill_keys(['aipc', 'shortlistCriteria', 'infoVerified', 'consentLogo', 'confirmAccuracy', 'resultsViaCdc'], false);
+        $data['signatory'] = ['name' => '', 'designation' => '', 'date' => ''];
+
+        $titleKey = $to === 'inf' ? 'internshipTitle' : 'jobTitle';
+        $descriptionKey = $to === 'inf' ? 'internshipDescription' : 'jobDescription';
+        $title = trim((string) ($data[$titleKey] ?? '')) ?: (string) $source->{self::TYPES[$from]['title']};
+        $data[$titleKey] = $title;
+
+        $config = self::TYPES[$to];
+        /** @var class-string<Jnf|Inf> $targetModel */
+        $targetModel = $config['model'];
+        $description = trim(strip_tags((string) ($data[$descriptionKey] ?? ''))) !== '' ? (string) $data[$descriptionKey] : 'Draft in progress.';
+        $copy = $targetModel::create([
+            'company_id' => $source->company_id,
+            $config['title'] => mb_substr($title, 0, 255),
+            $to === 'inf' ? 'internship_description' : 'job_description' => mb_substr($description, 0, 5000),
+            $to === 'inf' ? 'internship_location' : 'job_location' => $data[$to === 'inf' ? 'internshipLocation' : 'jobLocation'] ?? null,
+            'status' => 'draft',
+            'form_data' => $data,
+        ]);
+
+        $this->audit->log($request, 'form.admin_duplicate', $copy, null, [
+            'source_type' => $from,
+            'source_id' => $source->id,
+            'form_type' => $to,
+            'form_id' => $copy->id,
+            'company_id' => $source->company_id,
+            'company' => $source->company->name,
+            'title' => $title,
+        ]);
+
+        return response()->json([
+            'message' => sprintf('%s duplicated as a new %s draft.', self::TYPES[$from]['label'], $config['label']),
+            'form_type' => $to,
+            'form' => ['id' => $copy->id, 'title' => $title, 'form_data' => $copy->form_data],
+            'company' => ['id' => $source->company->id, 'name' => $source->company->name, 'hr_email' => $source->company->hr_email],
+        ], 201);
+    }
+
+    /** @return array<string, mixed> */
+    private function card(string $type, Jnf|Inf $form): array
+    {
+        $data = $form->form_data;
+        $data = is_string($data) ? (json_decode($data, true) ?: []) : (is_array($data) ? $data : []);
+        $eligibility = is_array($data['eligibility'] ?? null) ? $data['eligibility'] : [];
+
+        $programmes = array_values(array_filter($eligibility, fn ($p) => is_array($p) && collect($p['branches'] ?? [])->contains(fn ($b) => ! empty($b['selected']))));
+        $batches = collect($programmes)->flatMap(fn ($p) => (array) ($p['graduatingBatches'] ?? [$p['graduatingBatch'] ?? null]))
+            ->push($data['graduatingBatch'] ?? null)->filter()->map(fn ($b) => (string) $b)->unique()->sort()->values()->all();
+
+        $pay = null;
+        if ($type === 'inf') {
+            $row = collect($data['programmeStipends'] ?? [])->first(fn ($r) => ! empty($r['enabled']) && ($r['total'] ?? $r['baseStipend'] ?? '') !== '');
+            $amount = $row['total'] ?? $row['baseStipend'] ?? $form->stipend;
+            $pay = $amount ? ['label' => 'Stipend', 'amount' => (float) $amount, 'interval' => 'month'] : null;
+        } else {
+            $row = collect($data['programmeSalaries'] ?? [])->first(fn ($r) => ! empty($r['enabled']) && ($r['ctcAnnual'] ?? '') !== '');
+            $amount = $row['ctcAnnual'] ?? $form->ctc_max ?? $form->ctc_min;
+            $pay = $amount ? ['label' => 'CTC', 'amount' => (float) $amount, 'interval' => 'year'] : null;
+        }
+
+        $posting = $form->jobPosting;
+
+        return [
+            'type' => $type,
+            'id' => $form->id,
+            'title' => $form->{self::TYPES[$type]['title']},
+            'designation' => $data[$type === 'inf' ? 'internshipDesignation' : 'jobDesignation'] ?? null,
+            'company' => $form->company ? ['id' => $form->company->id, 'name' => $form->company->name, 'hr_email' => $form->company->hr_email, 'logo_url' => $form->company->logo_url] : null,
+            'batches' => $batches,
+            'location' => $data[$type === 'inf' ? 'internshipLocation' : 'jobLocation'] ?? null,
+            'work_mode' => $data['workMode'] ?? null,
+            'duration_weeks' => $type === 'inf' ? ($data['duration'] ?? null) : null,
+            'expected_hires' => $data['expectedHires'] ?? null,
+            'pay' => $pay ? $pay + ['currency' => $data['currency'] ?? 'INR'] : null,
+            'ppo_ctc' => $type === 'inf' && ! empty($data['ppoProvision']) && ! empty($data['ppoCtc']) ? (float) $data['ppoCtc'] : null,
+            'programmes_count' => count($programmes),
+            'branches_count' => collect($programmes)->sum(fn ($p) => collect($p['branches'] ?? [])->filter(fn ($b) => ! empty($b['selected']))->count()),
+            'posting' => $posting ? [
+                'id' => $posting->id,
+                'status' => $posting->status,
+                'cycle' => $posting->placementCycle?->name,
+                'offer_label' => \App\Models\Offer::LABELS[$posting->offerType()] ?? null,
+            ] : null,
+            'updated_at' => $form->updated_at,
+        ];
+    }
+
+    /**
+     * "Add Job Profile" for an existing company: its JNFs or INFs, newest first, with the full form data for the
+     * read-only preview. Untouched autosave drafts (no title yet) are left out.
+     */
+    public function forms(Request $request, Company $company): JsonResponse
+    {
+        $validated = $request->validate(['type' => ['required', 'in:jnf,inf']]);
+        $config = self::TYPES[$validated['type']];
+        /** @var class-string<Jnf|Inf> $model */
+        $model = $config['model'];
+
+        $forms = $model::query()
+            ->where('company_id', $company->id)
+            ->where($config['title'], '!=', 'Untitled '.$config['label'].' Draft')
+            ->latest('updated_at')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get(['id', $config['title'], 'status', 'form_data', 'created_at', 'updated_at']);
+
+        return response()->json([
+            'company' => ['id' => $company->id, 'name' => $company->name, 'hr_email' => $company->hr_email, 'logo_url' => $company->logo_url],
+            'forms' => $forms->map(fn (Jnf|Inf $form) => [
+                'id' => $form->id,
+                'title' => $form->{$config['title']},
+                'status' => $form->status,
+                'form_data' => $form->form_data,
+                'created_at' => $form->created_at,
+                'updated_at' => $form->updated_at,
+            ]),
+        ]);
+    }
+
     /** Same shape as GET /company/profile, which the wizard reads to pre-fill the company step. */
     public function profile(Company $company): JsonResponse
     {

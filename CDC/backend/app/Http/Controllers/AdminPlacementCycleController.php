@@ -62,6 +62,7 @@ class AdminPlacementCycleController extends Controller
             'placement_cycle' => $this->cyclePayload($placementCycle) + [
                 'description' => $placementCycle->description,
                 'created_by' => $placementCycle->createdBy,
+                'rules' => $this->cycleRules($placementCycle),
             ],
         ]);
     }
@@ -89,8 +90,9 @@ class AdminPlacementCycleController extends Controller
 
     public function update(Request $request, PlacementCycle $placementCycle): JsonResponse
     {
-        // `status` is accepted here so an admin can reopen a cycle closed by mistake.
-        $validated = $request->validate($this->rules() + [
+        // `status` is accepted here so an admin can reopen a cycle closed by mistake. Every field is optional, so the
+        // Allowed Programmes editor can send just that list.
+        $validated = $request->validate($this->rules(partial: true) + [
             'status' => ['sometimes', 'in:open,closed'],
         ]);
 
@@ -366,20 +368,25 @@ class AdminPlacementCycleController extends Controller
     }
 
     /**
+     * `partial`: every top-level field may be left out (PATCH).
+     *
      * @return array<string, array<int, mixed>>
      */
-    private function rules(): array
+    private function rules(bool $partial = false): array
     {
+        $required = $partial ? 'sometimes' : 'required';
+
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:fulltime,internship'],
-            'starts_on' => ['required', 'date'],
-            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+            'name' => [$required, 'string', 'max:255'],
+            'type' => [$required, 'in:fulltime,internship'],
+            'starts_on' => [$required, 'date'],
+            'ends_on' => [$required, 'date', 'after_or_equal:starts_on'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'allowed_programmes' => ['required', 'array', 'min:1'],
+            'allowed_programmes' => [$required, 'array', 'min:1'],
             'allowed_programmes.*.programme' => [
                 'required',
                 'string',
+                'distinct',
                 function (string $attribute, mixed $value, callable $fail): void {
                     if (! ProgrammeCatalogue::hasProgramme((string) $value)) {
                         $fail(sprintf('"%s" is not a programme in the catalogue.', $value));
@@ -388,6 +395,70 @@ class AdminPlacementCycleController extends Controller
             ],
             'allowed_programmes.*.batches' => ['required', 'array', 'min:1'],
             'allowed_programmes.*.batches.*' => ['required', 'integer', 'min:2000', 'max:2100'],
+        ];
+    }
+
+    /**
+     * The rules that apply to this placement, for the Overview tab. Built from the code that enforces them
+     * (BlockingPolicy, JobPosting::OFFER_CATEGORIES, the float check in AdminPostingController, EligibilityService).
+     *
+     * @return array{job_profiles: string, offer_types: list<array<string, mixed>>, eligibility: list<string>, general: list<string>}
+     */
+    private function cycleRules(PlacementCycle $cycle): array
+    {
+        $internship = $cycle->type === 'internship';
+        // Only the offers this kind of placement deals in: its job-profile categories, plus the PPO outcomes for full
+        // time (a PPO decides a student's full-time eligibility).
+        $relevant = $internship
+            ? \App\Models\JobPosting::OFFER_CATEGORIES['internship']
+            : [...\App\Models\JobPosting::OFFER_CATEGORIES['fulltime'], 'intern_ppo', 'ppo_offered'];
+        $matrix = $this->blocking->matrix();
+
+        $offerTypes = [];
+        foreach ($relevant as $type) {
+            $scope = $matrix[$type] ?? null;
+            $offerTypes[] = [
+                'type' => $type,
+                'label' => \App\Models\Offer::LABELS[$type] ?? $type,
+                'block' => $scope,
+                'block_label' => match ($scope) {
+                    'all' => 'Blocked completely: every placement the student is enrolled in',
+                    'internships_only' => 'Blocked from internships only: full-time stays open',
+                    default => 'No block',
+                },
+            ];
+        }
+        return [
+            'job_profiles' => $internship
+                ? 'JNFs and INFs can be opened here. Every job profile in this placement is an Internship offer.'
+                : 'JNFs and INFs can be opened here. Each job profile is a Full-Time, Intern + performance-based PPO or Intern + Full-Time role.',
+            'offer_types' => $offerTypes,
+            'eligibility' => [
+                'Enrolled in this placement, and the enrolment is not suspended.',
+                'Student account is active.',
+                'Not debarred, and no active block covers the job profile.',
+                "Programme and branch are selected in the job profile's eligibility.",
+                'CGPA meets the branch cutoff.',
+                'Active and total backlogs are within what the job profile allows.',
+                "Gender matches the job profile's gender filter, if any.",
+                'Graduating batch matches the job profile (PhD exempt; blank means any batch).',
+                "10th and 12th marks meet the job profile's minimums, if set.",
+                'Belongs to one of the allowed student categories, if any are set.',
+            ],
+            'general' => array_values(array_filter([
+                $cycle->is_draft ? 'This placement is a draft: students cannot see it and no job profile can be opened in it until it is published.' : null,
+                $cycle->isOpen() ? null : 'This placement is closed: no job profile can be opened in it.',
+                $internship
+                    ? 'A student can hold only one offer in this placement.'
+                    : 'A student can hold one offer in this placement. A student with an Intern + performance-based PPO offer here can get one more, Full-Time, offer: at most two.',
+                'Ineligible students still see the job profile with the reason, but cannot apply.',
+                'Until the application deadline, students can change their resume or answers, or take their application back and apply again.',
+                $internship
+                    ? 'Blocks a student already has carry over when they are enrolled here later (both complete and internship-only blocks).'
+                    : 'Complete blocks a student already has carry over when they are enrolled here later. Internship-only blocks do not.',
+                'When an offer blocks a student, their other live applications are flagged for the admin.',
+                'Admins can change the suggested block when announcing results, and can unblock a student at any time.',
+            ])),
         ];
     }
 

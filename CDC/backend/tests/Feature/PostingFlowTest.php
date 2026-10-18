@@ -142,11 +142,31 @@ class PostingFlowTest extends TestCase
         $this->assertSame(1, AuditLog::where('action', 'posting.float')->count());
     }
 
+    public function test_the_cycle_decides_the_offer_category_for_either_form(): void
+    {
+        // INF in a placement cycle: Full-Time by default; any full-time role can be chosen.
+        $this->float($this->form('inf'), ['placement_cycle_id' => $this->ft->id])->assertCreated();
+        $infPosting = JobPosting::latest('id')->first();
+        $this->assertSame(['fulltime', 'fulltime'], [$infPosting->offerType(), $infPosting->postingType()]);
+        $this->float($this->form('inf'), ['placement_cycle_id' => $this->ft->id, 'offer_type' => 'intern_performance_ppo'])->assertCreated();
+        $this->assertSame('fulltime', JobPosting::latest('id')->first()->postingType());
+
+        // JNF in an internship cycle: always an Internship offer.
+        $this->float($this->form('jnf'), ['placement_cycle_id' => $this->intern->id])->assertCreated();
+        $this->assertSame(['intern', 'internship'], [JobPosting::latest('id')->first()->offerType(), JobPosting::latest('id')->first()->postingType()]);
+
+        // Editing keeps the role within the cycle's options.
+        $this->patchJson("/api/admin/postings/{$infPosting->id}", ['offer_type' => 'intern'])->assertStatus(422)->assertJsonValidationErrors('offer_type');
+        $this->patchJson("/api/admin/postings/{$infPosting->id}", ['offer_type' => 'intern_fulltime'])->assertOk();
+        $this->assertSame('intern_fulltime', $infPosting->fresh()->offer_type);
+    }
+
     public function test_float_guards(): void
     {
         $this->float($this->form('jnf', 'submitted'))->assertStatus(422);
-        $this->float($this->form('jnf'), ['placement_cycle_id' => $this->intern->id])->assertStatus(422);
-        $this->float($this->form('inf'), ['placement_cycle_id' => $this->ft->id])->assertStatus(422);
+        // Either form can go into either kind of cycle (owner decision 2026-10-18), but the role must fit the cycle.
+        $this->float($this->form('jnf'), ['placement_cycle_id' => $this->intern->id, 'offer_type' => 'fulltime'])->assertStatus(422)->assertJsonValidationErrors('offer_type');
+        $this->float($this->form('inf'), ['placement_cycle_id' => $this->ft->id, 'offer_type' => 'intern'])->assertStatus(422)->assertJsonValidationErrors('offer_type');
         $this->float($this->form(), ['application_deadline' => now()->subHour()->toIso8601String()])->assertStatus(422);
         $this->float($this->form(), ['questions' => [['question' => 'Pick', 'qtype' => 'mcq_single', 'options' => ['Only one']]]])->assertStatus(422);
 

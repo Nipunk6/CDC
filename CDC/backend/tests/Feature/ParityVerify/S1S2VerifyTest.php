@@ -174,7 +174,7 @@ class S1S2VerifyTest extends TestCase
 
     // ---------------------------------------------------------------- S1 probes
 
-    public function test_per_row_decision_on_a_published_row_is_refused_and_the_row_is_unchanged(): void
+    public function test_per_row_decision_on_a_published_row_is_accepted_as_a_draft_until_republished(): void
     {
         $p = $this->posting('Acme');
         $this->apply($p, $this->students);
@@ -185,19 +185,29 @@ class S1S2VerifyTest extends TestCase
         ]])->assertOk()->assertJsonPath('written', 2);
         $this->postJson($this->base($p, 0).'/publish', ['reject_remaining' => true])->assertOk();
 
+        // Owner decision 2026-10-18: no row is locked. A changed published decision is a draft again; an unchanged one
+        // is reported, not rewritten.
         $this->postJson($this->base($p, 0).'/results', ['entries' => [
             ['roll_no' => '22JE0001', 'result' => 'rejected'],
             ['roll_no' => '22JE0002', 'result' => 'selected'],
             ['roll_no' => '22JE0003', 'result' => 'pending'],
-        ]])->assertOk()->assertJsonPath('written', 0)->assertJsonCount(3, 'errors');
+            ['roll_no' => '22JE0004', 'result' => 'rejected'],
+        ]])->assertOk()->assertJsonPath('written', 3)->assertJsonPath('changed', 3)->assertJsonCount(1, 'errors')
+            ->assertJsonPath('errors.0.reason', 'Already not selected (published); nothing changed.');
 
-        $this->assertSame('selected', $this->row($p, 0, $this->students[0])->result);
-        $this->assertSame('rejected', $this->row($p, 0, $this->students[1])->result);
-        $this->assertSame('rejected', $this->row($p, 0, $this->students[2])->result);
+        foreach ([[0, 'rejected'], [1, 'selected'], [2, 'pending']] as [$i, $result]) {
+            $row = $this->row($p, 0, $this->students[$i]);
+            $this->assertSame($result, $row->result);
+            $this->assertNull($row->published_at, 'a changed published decision is a draft again');
+        }
+        $this->assertNotNull($this->row($p, 0, $this->students[3])->published_at);
+        $this->assertSame(3, AuditLog::where('action', 'round.result_change')->count());
 
-        // A published row cannot be "cleared" either.
-        $this->deleteJson($this->base($p, 0).'/results/'.$this->app($p, $this->students[0])->id)->assertStatus(422);
-        $this->assertNotNull($this->row($p, 0, $this->students[0])?->published_at);
+        // A still-published row cannot be "cleared"; publishing again makes the changes visible.
+        $this->deleteJson($this->base($p, 0).'/results/'.$this->app($p, $this->students[3])->id)->assertStatus(422);
+        $this->postJson($this->base($p, 0).'/publish', ['reject_remaining' => false])->assertOk();
+        $this->assertNotNull($this->row($p, 0, $this->students[1])->published_at);
+        Mail::assertQueued(RoundResultMail::class, fn ($m) => $m->outcome === 'selected' && $m->hasBcc($this->students[1]->user->email));
     }
 
     public function test_strict_toggle_is_off_by_default_warns_outside_pool_and_refuses_when_on(): void
@@ -333,7 +343,7 @@ class S1S2VerifyTest extends TestCase
             ->assertJsonFragment(['message' => 'The final stage is published from the Shortlist for Offer page, where offers are created.']);
     }
 
-    public function test_on_hold_semantics_unchanged_publish_then_promote_moves_into_next_stage_pool(): void
+    public function test_on_hold_semantics_unchanged_publish_then_shortlist_moves_into_next_stage_pool(): void
     {
         $p = $this->posting('Acme');
         $this->apply($p, $this->students);
@@ -347,12 +357,15 @@ class S1S2VerifyTest extends TestCase
         $this->postJson($this->base($p, 1).'/results', ['roll_nos' => ['22JE0001'], 'result' => 'selected', 'strict' => true])
             ->assertOk()->assertJsonPath('written', 0);
 
-        $this->postJson($this->base($p, 0).'/waitlist/'.$this->app($p, $this->students[0])->id.'/promote')->assertOk();
+        // On Hold → Shortlisted on the stage itself (the On Hold tab's "Move" is gone): a draft until published.
+        $this->postJson($this->base($p, 0).'/results', ['roll_nos' => ['22JE0001'], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
+        $this->getJson($this->base($p, 1).'/shortlist')->assertOk()->assertJsonPath('counts.candidates', 0);
+        $this->postJson($this->base($p, 0).'/publish', ['reject_remaining' => false])->assertOk();
         $row = $this->row($p, 0, $this->students[0]);
         $this->assertSame('selected', $row->result);
         $this->assertNotNull($row->published_at);
         $this->getJson($this->base($p, 1).'/shortlist')->assertOk()->assertJsonPath('counts.candidates', 1);
-        $this->assertTrue(AuditLog::where('action', 'waitlist.promote')->exists());
+        $this->assertTrue(AuditLog::where('action', 'round.result_change')->exists());
     }
 
     public function test_shortlist_counter_matches_the_progress_grid_pool_count(): void

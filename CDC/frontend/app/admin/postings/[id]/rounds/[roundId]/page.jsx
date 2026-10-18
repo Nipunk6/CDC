@@ -83,8 +83,8 @@ const rowSx = (row) => (theme) => {
 
 /**
  * "Shortlist for <Stage>" (Superset parity S1): one stage's candidates, decided one by one or in bulk. Every decision
- * is a draft until "Publish Shortlist to Students"; published rows are protected (D70e — Re-add / Addendum on the
- * Progress Grid are the only late paths).
+ * is a draft until "Publish Shortlist to Students". No row is ever locked (owner decision 2026-10-18): changing a
+ * published decision makes it a draft again, and bringing back someone not selected tells the company.
  */
 export default function StageShortlistPage({ params }) {
   const { id, roundId } = use(params);
@@ -135,9 +135,20 @@ function StageShortlist({ id, roundId }) {
   };
 
   const decide = async (rows, result) => {
-    const editable = rows.filter((r) => !r.published);
+    // Unchanged rows are left out; published ones that change become drafts again until the stage is published.
+    const editable = rows.filter((r) => r.result !== result);
     if (editable.length === 0) {
-      setError("Published decisions cannot be changed here. Use Re-add or Addendum on the Progress Grid.");
+      setSuccess("Nothing to change.");
+      return;
+    }
+    const comingBack = editable.filter((r) => r.published && r.result === "rejected" && result !== "rejected");
+    if (
+      comingBack.length > 0 &&
+      !window.confirm(
+        `${comingBack.map((r) => r.student.roll_no).join(", ")} ${comingBack.length === 1 ? "was" : "were"} published as not selected. ` +
+          "Bringing them back notifies the company. The students see the new decision when you publish this stage. Continue?"
+      )
+    ) {
       return;
     }
     setBusy(true);
@@ -195,7 +206,7 @@ function StageShortlist({ id, roundId }) {
   const locked = posting.accepts_applications || posting.status === "cancelled";
   const pageRows = candidates;
   const selectedRows = pageRows.filter((r) => selected.includes(r.application_id));
-  const selectableIds = pageRows.filter((r) => !r.published).map((r) => r.application_id);
+  const selectableIds = pageRows.map((r) => r.application_id);
   const allSelected = selectableIds.length > 0 && selectableIds.every((rid) => selected.includes(rid));
 
   const toggle = (rid) => setSelected((s) => (s.includes(rid) ? s.filter((x) => x !== rid) : [...s, rid]));
@@ -415,7 +426,7 @@ function StageShortlist({ id, roundId }) {
                     <TableCell padding="checkbox">
                       <Checkbox
                         checked={selected.includes(row.application_id)}
-                        disabled={row.published || locked}
+                        disabled={locked}
                         onChange={() => toggle(row.application_id)}
                         inputProps={{ "aria-label": `Select ${row.student.roll_no}` }}
                       />
@@ -451,11 +462,7 @@ function StageShortlist({ id, roundId }) {
                       <DecisionChip row={row} isFinal={isFinal} />
                     </TableCell>
                     <TableCell align="right">
-                      {row.published ? (
-                        <Typography variant="caption" color="text.secondary">
-                          Published
-                        </Typography>
-                      ) : (
+                      <Stack alignItems="flex-end" spacing={0.25}>
                         <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
                           <ButtonGroup size="small" disabled={busy || locked} sx={{ flexWrap: "nowrap" }}>
                             <Button color="success" variant={row.result === "selected" ? "contained" : "outlined"} onClick={() => decide([row], "selected")}>
@@ -468,7 +475,7 @@ function StageShortlist({ id, roundId }) {
                               Hold
                             </Button>
                           </ButtonGroup>
-                          {row.result && row.result !== "pending" && (
+                          {!row.published && row.result && row.result !== "pending" && (
                             <Tooltip title="Clear this draft decision">
                               <span>
                                 <IconButton size="small" disabled={busy || locked} onClick={() => clearDraft(row)} aria-label="Clear draft">
@@ -478,7 +485,12 @@ function StageShortlist({ id, roundId }) {
                             </Tooltip>
                           )}
                         </Stack>
-                      )}
+                        {row.published && (
+                          <Typography variant="caption" color="text.secondary">
+                            Published · change anytime
+                          </Typography>
+                        )}
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}

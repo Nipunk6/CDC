@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Avatar, Box, Card, CardActionArea, CardContent, Chip, Stack, Tooltip, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import CancelIcon from "@mui/icons-material/Cancel";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import PlaceIcon from "@mui/icons-material/PlaceOutlined";
 
@@ -48,10 +50,20 @@ export default function PostingCard({ posting }) {
                     {posting.company?.name}
                   </Typography>
                 </Box>
-                {applied && (
-                  <Tooltip title="You have applied">
-                    <CheckCircleIcon color="success" />
+                {posting.application?.offer ? (
+                  <Tooltip title={`You got an offer: ${posting.application.offer.label}`}>
+                    <EmojiEventsIcon sx={{ color: "warning.main" }} aria-label="Offer received" />
                   </Tooltip>
+                ) : posting.application?.blocked_reason ? (
+                  <Tooltip title={`Rejected: ${posting.application.blocked_reason}`}>
+                    <CancelIcon color="error" aria-label="Rejected" />
+                  </Tooltip>
+                ) : (
+                  applied && (
+                    <Tooltip title="You have applied">
+                      <CheckCircleIcon color="success" />
+                    </Tooltip>
+                  )
                 )}
               </Stack>
               <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>

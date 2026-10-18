@@ -87,6 +87,8 @@ class RecheckHighMediumTest extends TestCase
         foreach (array_slice($this->students, 0, 6) as $s) {
             $this->apply($s, $this->posting);
         }
+        // These tests measure admin-written notices; the automatic job-profile announcements are covered in JobProfileNoticeTest.
+        \App\Models\Notice::where('source', \App\Services\JobProfileNoticeService::SOURCE)->delete();
     }
 
     // ------------------------------------------------------------------ helpers

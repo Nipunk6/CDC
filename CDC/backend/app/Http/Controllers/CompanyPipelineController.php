@@ -67,7 +67,7 @@ class CompanyPipelineController extends Controller
         $share = $jobPosting->share_contact_details;
         $applications = $jobPosting->applications()
             ->where('status', 'applied')
-            ->with(['studentProfile', 'resume', 'roundResults' => fn ($q) => $q->whereNotNull('published_at')])
+            ->with(['studentProfile', 'resume', 'roundResults' => fn ($q) => $q->where(fn ($v) => $v->whereNotNull('published_at')->orWhereNotNull('published_result'))])
             ->orderBy('applied_at')
             ->get();
 
@@ -91,7 +91,7 @@ class CompanyPipelineController extends Controller
                     'answers' => $a->answers ?? [],
                     'resume_url' => $a->resume?->signedUrl(),
                     'rounds' => $a->roundResults->mapWithKeys(fn (ApplicationRoundResult $r) => [
-                        $r->posting_round_id => ['result' => $r->result, 'attendance' => $r->attendance],
+                        $r->posting_round_id => ['result' => $r->visibleResult(), 'attendance' => $r->attendance],
                     ]),
                 ] + ($share ? [
                     'phone' => $s->phone,
@@ -110,6 +110,35 @@ class CompanyPipelineController extends Controller
         $this->authorizePosting($request, $jobPosting);
 
         return $exports->applicantsWorkbook($jobPosting, 'company');
+    }
+
+    /**
+     * One stage's students as Excel: shortlisted, not selected, or everyone with a decision there. Only PUBLISHED
+     * decisions count, like everything else the company sees.
+     */
+    public function exportStage(Request $request, JobPosting $jobPosting, PostingRound $postingRound, \App\Services\ExportService $exports): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorizePosting($request, $jobPosting);
+        abort_if($postingRound->job_posting_id !== $jobPosting->id, 404, 'Stage not found.');
+        $decision = $request->validate(['decision' => ['nullable', 'in:shortlisted,rejected,all']])['decision'] ?? 'all';
+        $result = ['shortlisted' => 'selected', 'rejected' => 'rejected'][$decision] ?? null;
+
+        $narrow = fn ($applications) => $applications->filter(function (Application $a) use ($postingRound, $result) {
+            $visible = $a->roundResults->first(fn (ApplicationRoundResult $r) => $r->posting_round_id === $postingRound->id)?->visibleResult();
+
+            return $visible !== null && ($result === null || $visible === $result);
+        });
+        $label = ['shortlisted' => $postingRound->is_final ? 'selected' : 'shortlisted', 'rejected' => 'not selected', 'all' => 'all students'][$decision];
+
+        return $exports->applicantsWorkbook($jobPosting, 'company', $narrow, $postingRound->name.' '.$label);
+    }
+
+    /** "Download Final Offers": the job profile's offers (selected students) for the company. */
+    public function exportOffers(Request $request, JobPosting $jobPosting, \App\Services\ExportService $exports): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorizePosting($request, $jobPosting);
+
+        return $exports->companyOffersWorkbook($jobPosting);
     }
 
     /**
@@ -191,7 +220,10 @@ class CompanyPipelineController extends Controller
             sprintf('%s submitted a %s of %d candidate(s) for %s — %s.', $company, $this->kindLabel($validated['kind']), count($payload), $jobPosting->title(), $postingRound->name),
             [],
             "/admin/postings/{$jobPosting->id}",
-            ['job_posting_id' => $jobPosting->id, 'kind' => 'shortlist_proposal']
+            ['job_posting_id' => $jobPosting->id, 'kind' => 'shortlist_proposal'],
+            // Only the admins who approve or reject proposals, not every staff member (e.g. Dept FICs).
+            'proposals',
+            'verify'
         );
 
         return response()->json([

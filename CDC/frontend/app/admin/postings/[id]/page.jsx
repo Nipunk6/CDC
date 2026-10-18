@@ -17,7 +17,6 @@ import EligibleTab from "@/components/admin/posting/eligibletab";
 import RoundsTab from "@/components/admin/posting/roundstab";
 import QuestionsTab from "@/components/admin/posting/questionstab";
 import PipelineTab from "@/components/admin/posting/pipelinetab";
-import WaitlistTab from "@/components/admin/posting/waitlisttab";
 import ProposalsList from "@/components/admin/proposalslist";
 import DocumentsTab from "@/components/admin/posting/documentstab";
 import ActivityTab from "@/components/admin/posting/activitytab";
@@ -30,7 +29,6 @@ const TABS = [
   { key: "applicants", label: "Applicants" },
   { key: "eligible", label: "Eligible" },
   { key: "pipeline", label: "Progress Grid" },
-  { key: "waitlist", label: "On Hold" },
   { key: "proposals", label: "Proposals" },
   { key: "rounds", label: "Stages" },
   { key: "questions", label: "Additional Questions" },
@@ -138,7 +136,6 @@ export default function AdminPostingDetailPage({ params }) {
             )}
             {tab === "eligible" && <EligibleTab posting={posting} />}
             {tab === "pipeline" && <PipelineTab posting={posting} onMessage={setSuccess} onChanged={load} />}
-            {tab === "waitlist" && <WaitlistTab posting={posting} onMessage={setSuccess} onChanged={load} />}
             {tab === "proposals" && <ProposalsList postingId={posting.id} onDecided={load} />}
             {tab === "rounds" && <RoundsTab {...shared} />}
             {tab === "questions" && <QuestionsTab {...shared} />}

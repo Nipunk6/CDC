@@ -23,6 +23,7 @@ import {
 } from "@mui/material";
 import WorkIcon from "@mui/icons-material/Work";
 import AddIcon from "@mui/icons-material/Add";
+import AddBusinessIcon from "@mui/icons-material/AddBusiness";
 
 import PageHeader from "@/components/shared/pageheader";
 import { adminApi } from "@/lib/adminapi";
@@ -79,14 +80,24 @@ export default function AdminPostingsPage() {
         backHref="/admin"
         backLabel="Back to Dashboard"
         actions={
-          <Button
-            component={Link}
-            href={cycleId ? `/admin/postings/new?cycle=${cycleId}` : "/admin/postings/new"}
-            variant="contained"
-            startIcon={<AddIcon />}
-          >
-            Add New Job
-          </Button>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button
+              component={Link}
+              href={cycleId ? `/admin/postings/new?cycle=${cycleId}` : "/admin/postings/new"}
+              variant="contained"
+              startIcon={<AddIcon />}
+            >
+              Add Job Profile
+            </Button>
+            <Button
+              component={Link}
+              href={cycleId ? `/admin/postings/new?company=new&cycle=${cycleId}` : "/admin/postings/new?company=new"}
+              variant="outlined"
+              startIcon={<AddBusinessIcon />}
+            >
+              Add New Company
+            </Button>
+          </Stack>
         }
       />
 

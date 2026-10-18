@@ -60,6 +60,11 @@ class AdminOfferController extends Controller
             return response()->json(['message' => 'Nothing changed.'], 422);
         }
 
+        // Owner decision 2026-10-18: two offers in a cycle must stay Intern + performance-based PPO plus Full-Time.
+        if (isset($changes['offer_type']) && $refusal = app(\App\Services\BlockingPolicy::class)->offerTypeChangeRefusal($offer->load('placementCycle'), $changes['offer_type'])) {
+            return response()->json(['message' => $refusal, 'errors' => ['offer_type' => [$refusal]]], 422);
+        }
+
         $mode = $this->blockingMode($request);
         $result = $this->offers->update($offer->load(['studentProfile', 'placementCycle']), $changes, $mode, $request->user());
 

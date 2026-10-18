@@ -155,7 +155,8 @@ class CompanyAuthController extends Controller
             Storage::disk('public')->delete($logoPath);
         }
 
-        $admins = User::where('role', 'admin')->get();
+        // Only the admins who handle companies or their forms, not every staff member.
+        $admins = app(\App\Services\StaffAccessService::class)->recipients(['companies', 'form_reviews'], 'read');
         foreach ($admins as $admin) {
             $this->notificationService->createInAppNotification(
                 user: $admin,

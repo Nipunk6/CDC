@@ -27,7 +27,13 @@ class ExportService
     /**
      * @param  'admin'|'company'  $audience  company = restricted Q10.2 field set, published outcomes only
      */
-    public function applicantsWorkbook(JobPosting $posting, string $audience): StreamedResponse
+    /**
+     * `$narrow` keeps only some applications (e.g. one stage's shortlisted students); `$fileSuffix` replaces
+     * "applicants" in the file name.
+     *
+     * @param  (callable(\Illuminate\Support\Collection<int, Application>): \Illuminate\Support\Collection<int, Application>)|null  $narrow
+     */
+    public function applicantsWorkbook(JobPosting $posting, string $audience, ?callable $narrow = null, string $fileSuffix = 'applicants'): StreamedResponse
     {
         $admin = $audience === 'admin';
         $posting->loadMissing(['rounds', 'questions', 'postable.company']);
@@ -37,6 +43,9 @@ class ExportService
             ->with(['studentProfile', 'resume', 'roundResults', 'offer'])
             ->orderBy('applied_at')
             ->get();
+        if ($narrow) {
+            $applications = $narrow($applications)->values();
+        }
 
         $share = $admin || $posting->share_contact_details;
 
@@ -97,10 +106,12 @@ class ExportService
             $columns['R'.($ri + 1).': '.$round->name] = function (Application $a) use ($round, $admin) {
                 /** @var ApplicationRoundResult|null $row */
                 $row = $a->roundResults->firstWhere('posting_round_id', $round->id);
-                if (! $row || (! $admin && ! $row->isPublished())) {
+                // The company sees the published decision (kept while a change to it is still a draft).
+                $result = $admin ? $row?->result : $row?->visibleResult();
+                if (! $row || $result === null) {
                     return null;
                 }
-                $text = ucfirst($row->result);
+                $text = ucfirst($result);
                 if ($row->attendance) {
                     $text .= $row->attendance === 'yes' ? ' (appeared)' : ' (absent)';
                 }
@@ -148,7 +159,70 @@ class ExportService
 
         $company = $posting->company()?->name ?? 'company';
 
-        return $this->stream($spreadsheet, Str::slug($company.' '.$posting->title()).'-applicants.xlsx');
+        return $this->stream($spreadsheet, Str::slug($company.' '.$posting->title()).'-'.Str::slug($fileSuffix).'.xlsx');
+    }
+
+    /**
+     * Final offers of one job profile for its company: the selected students, their offer and (when the CDC shares
+     * contact details) how to reach them. Revoked offers are gone, so they are never listed.
+     */
+    public function companyOffersWorkbook(JobPosting $posting): StreamedResponse
+    {
+        $offers = Offer::query()
+            ->where('job_posting_id', $posting->id)
+            ->with(['studentProfile', 'application.resume'])
+            ->get()
+            ->sortBy(fn (Offer $o) => $o->studentProfile?->roll_no)
+            ->values();
+        $share = $posting->share_contact_details;
+
+        $columns = [
+            'Roll No' => fn (Offer $o) => $o->studentProfile?->roll_no,
+            'Name' => fn (Offer $o) => $o->studentProfile?->full_name,
+            'Programme' => fn (Offer $o) => $o->studentProfile?->programme,
+            'Branch' => fn (Offer $o) => $o->studentProfile?->branch,
+            'Batch' => fn (Offer $o) => $o->studentProfile?->graduating_batch,
+            'CGPA' => fn (Offer $o) => $this->num($o->studentProfile?->current_cgpa),
+            'Offer Type' => fn (Offer $o) => Offer::LABELS[$o->offer_type] ?? $o->offer_type,
+            'CTC (annual)' => fn (Offer $o) => $o->ctc_annual,
+            'Stipend (monthly)' => fn (Offer $o) => $o->stipend_monthly,
+            'Currency' => fn (Offer $o) => $o->currency,
+            'Announced On (IST)' => fn (Offer $o) => $o->announced_at?->timezone('Asia/Kolkata')->format('Y-m-d'),
+        ];
+        if ($share) {
+            $columns += [
+                'Institute Email' => fn (Offer $o) => $o->studentProfile?->institute_email,
+                'Personal Email' => fn (Offer $o) => $o->studentProfile?->personal_email,
+                'Phone' => fn (Offer $o) => $o->studentProfile?->phone,
+            ];
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Final Offers');
+        // Same resume link as the applicant list: the resume the student applied with, signed for 30 days.
+        $headers = array_merge(array_keys($columns), ['Resume Link']);
+        $this->writeHeader($sheet, $headers);
+        $linkColumn = count($headers);
+        $rowNumber = 2;
+        foreach ($offers as $offer) {
+            $col = 1;
+            foreach ($columns as $value) {
+                $this->put($sheet, $col++, $rowNumber, $value($offer));
+            }
+            if ($resume = $offer->application?->resume) {
+                $cell = Coordinate::stringFromColumnIndex($linkColumn).$rowNumber;
+                $sheet->setCellValue($cell, 'Open resume');
+                $sheet->getCell($cell)->getHyperlink()->setUrl($resume->signedUrl(30));
+                $sheet->getStyle($cell)->getFont()->setUnderline(true)->getColor()->setRGB('1D4ED8');
+            }
+            $rowNumber++;
+        }
+        $this->finish($sheet, count($headers));
+
+        $company = $posting->company()?->name ?? 'company';
+
+        return $this->stream($spreadsheet, Str::slug($company.' '.$posting->title()).'-final-offers.xlsx');
     }
 
     /**

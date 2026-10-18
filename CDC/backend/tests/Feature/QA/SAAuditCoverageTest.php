@@ -314,22 +314,7 @@ class SAAuditCoverageTest extends TestCase
 
                 return ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/publish", ['reject_remaining' => true]];
             },
-            'DELETE api/admin/postings/{jobPosting}/rounds/{postingRound}/waitlist/{application}' => function () use ($row, $p, $r1, $app) {
-                $row(2, 'waitlisted', true);
-
-                return ['DELETE', "/api/admin/postings/{$p}/rounds/{$r1}/waitlist/{$app(2)->id}", []];
-            },
-            'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/waitlist/{application}/promote' => function () use ($row, $p, $r1, $app) {
-                $row(2, 'waitlisted', true);
-
-                return ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/waitlist/{$app(2)->id}/promote", []];
-            },
             'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/addendum' => fn () => ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/addendum", ['roll_nos' => [$s[3]->roll_no], 'remark' => 'Late addition']],
-            'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/readd/{application}' => function () use ($row, $p, $r1, $app) {
-                $row(4, 'rejected', true);
-
-                return ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/readd/{$app(4)->id}", ['confirm' => true, 'remark' => 'Scored wrongly']];
-            },
             'DELETE api/admin/postings/{jobPosting}/rounds/{postingRound}/results/{application}' => function () use ($row, $p, $r1, $app) {
                 $row(5, 'selected', false);
 
@@ -450,6 +435,7 @@ class SAAuditCoverageTest extends TestCase
                 return ['DELETE', '/api/admin/settings/logo', []];
             },
             'POST api/admin/form-builder/companies' => fn () => ['POST', '/api/admin/form-builder/companies', ['name' => 'Offline Co', 'hr_name' => 'Asha Rao', 'hr_email' => 'asha@offline.qa.test']],
+            'POST api/admin/form-builder/duplicate' => fn () => ['POST', '/api/admin/form-builder/duplicate', ['form_type' => 'inf', 'form_id' => $w['iSub']->id, 'as' => 'jnf']],
             'POST api/admin/form-builder/{company}/jnfs/autosave' => fn () => ['POST', "/api/admin/form-builder/{$w['company']->id}/jnfs/autosave", ['job_title' => 'QA Wizard Role', 'job_description' => 'Build things.']],
             'POST api/admin/form-builder/{company}/jnfs' => fn () => ['POST', "/api/admin/form-builder/{$w['company']->id}/jnfs", $jnfBody],
             'PUT api/admin/form-builder/{company}/jnfs/{jnf}' => fn () => ['PUT', "/api/admin/form-builder/{$w['company']->id}/jnfs/{$w['jDraft']->id}", $jnfBody],
@@ -808,16 +794,17 @@ class SAAuditCoverageTest extends TestCase
         $this->postJson("{$base}/rounds/{$r1->id}/publish")->assertOk();
         $this->assertSame('waitlisted', ApplicationRoundResult::where('application_id', $apps[$s[2]->id]->id)->sole()->result);
 
-        // ---- move any waitlisted candidate on (no ranking, D90; promotion within the round, QA F-002)
-        $this->postJson("{$base}/rounds/{$r1->id}/waitlist/{$apps[$s[2]->id]->id}/promote")->assertOk();
+        // ---- move any waitlisted candidate on (no ranking, D90; promotion within the round, QA F-002): the published
+        // decision is changed on the stage (no row is locked since 2026-10-18) and published below
+        $this->postJson("{$base}/rounds/{$r1->id}/results", ['roll_nos' => [$s[2]->roll_no], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
         $this->assertSame('selected', ApplicationRoundResult::where('application_id', $apps[$s[2]->id]->id)->sole()->result);
 
         // ---- addendum (company kinds: addendum / replacement_request)
         $this->postJson("{$base}/rounds/{$r1->id}/addendum", ['roll_nos' => [$s[4]->roll_no], 'remark' => 'Replacement'])->assertOk();
         $this->assertTrue(ApplicationRoundResult::where('application_id', $apps[$s[4]->id]->id)->sole()->is_addendum);
-        // ---- re-add a published rejection (admin-only protocol)
-        $this->postJson("{$base}/rounds/{$r1->id}/readd/{$apps[$s[5]->id]->id}", ['confirm' => true, 'remark' => 'Recount'])->assertOk();
-        $this->postJson("{$base}/rounds/{$r1->id}/publish")->assertOk()->assertJsonPath('counts.selected', 2);
+        // ---- bring back a published rejection (admin only; the company is told)
+        $this->postJson("{$base}/rounds/{$r1->id}/results", ['roll_nos' => [$s[5]->roll_no], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
+        $this->postJson("{$base}/rounds/{$r1->id}/publish")->assertOk()->assertJsonPath('counts.selected', 3);
         $this->assertNotNull(ApplicationRoundResult::where('application_id', $apps[$s[5]->id]->id)->sole()->published_at);
 
         // ---- edit ANY student field, incl. admin-controlled academics

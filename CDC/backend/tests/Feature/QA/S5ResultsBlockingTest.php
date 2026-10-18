@@ -358,8 +358,10 @@ class S5ResultsBlockingTest extends TestCase
 
     public function test_T5_2a_intern_blocks_the_internship_cycle_full_time_stays_open(): void
     {
-        // The API itself refuses a JNF in an internship cycle, so an internship cycle only ever holds internships.
-        $this->floatRequest($this->makeForm('jnf', 'Refused JNF'), $this->intern)->assertStatus(422);
+        // A JNF can be opened in an internship cycle (owner decision 2026-10-18), but only as an Internship offer, so an
+        // internship cycle still only ever holds internships.
+        $this->floatRequest($this->makeForm('jnf', 'JNF as internship'), $this->intern)->assertCreated();
+        $this->assertSame('internship', JobPosting::latest('id')->first()->postingType());
 
         $inf1 = $this->floatPosting('inf', $this->intern, 'Intern One');
         $inf2 = $this->floatPosting('inf', $this->intern, 'Intern Two');

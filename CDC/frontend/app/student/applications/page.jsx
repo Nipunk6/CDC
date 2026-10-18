@@ -15,8 +15,11 @@ import {
   Stack,
   Tab,
   Tabs,
+  Tooltip,
   Typography,
+  alpha,
 } from "@mui/material";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 
 import RoundTrail from "@/components/student/roundtrail";
 import { studentApi } from "@/lib/studentapi";
@@ -74,7 +77,11 @@ export default function StudentApplicationsPage() {
 
       <Stack spacing={2}>
         {rows.map((application) => (
-          <Card key={application.id} variant="outlined">
+          <Card
+            key={application.id}
+            variant="outlined"
+            sx={application.offer ? { borderColor: "warning.main", borderWidth: 2, bgcolor: (t) => alpha(t.palette.warning.main, 0.04) } : undefined}
+          >
             <CardContent>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between">
                 <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
@@ -82,6 +89,12 @@ export default function StudentApplicationsPage() {
                     {application.posting.company?.name?.[0]}
                   </Avatar>
                   <Box sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                    {application.offer && (
+                      <Tooltip title={`Offer: ${application.offer.label ?? titleCase(application.offer.offer_type)}`}>
+                        <EmojiEventsIcon sx={{ color: "warning.main" }} aria-label="Offer received" />
+                      </Tooltip>
+                    )}
                     {application.posting.status === "cancelled" ? (
                       <Typography fontWeight={700} sx={{ wordBreak: "break-word" }}>
                         {application.posting.title}
@@ -91,12 +104,14 @@ export default function StudentApplicationsPage() {
                         {application.posting.title}
                       </Typography>
                     )}
+                    </Stack>
                     <Typography variant="body2" color="text.secondary">
                       {application.posting.company?.name} · applied {formatDateTime(application.applied_at)}
                     </Typography>
                   </Box>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="flex-start" flexWrap="wrap" useFlexGap>
+                  {application.blocked_reason && <Chip size="small" color="error" label="Rejected" />}
                   <Chip size="small" variant="outlined" color={statusColor(application.posting.status)} label={`Drive: ${titleCase(application.posting.status)}`} />
                   <Chip size="small" variant="outlined" label={`Resume: ${application.resume?.label ?? "—"}`} color={application.used_unverified_resume ? "warning" : "default"} />
                 </Stack>
@@ -106,6 +121,11 @@ export default function StudentApplicationsPage() {
                   🎉 Offer: {application.offer.label ?? titleCase(application.offer.offer_type)}
                   {application.offer.ctc_annual ? ` · ${formatMoney(application.offer.ctc_annual, application.offer.currency)} p.a.` : ""}
                   {application.offer.stipend_monthly ? ` · ${formatMoney(application.offer.stipend_monthly, application.offer.currency)}/month` : ""}
+                </Alert>
+              )}
+              {application.blocked_reason && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  Rejected: {application.blocked_reason}
                 </Alert>
               )}
               <Box sx={{ mt: 2 }}>

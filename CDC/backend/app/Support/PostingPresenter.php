@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationRoundResult;
 use App\Models\JobPosting;
 use App\Models\Offer;
+use App\Models\StudentProfile;
 
 /**
  * Hand-shaped, whitelisted arrays for student-facing posting payloads. Never serialise a Company
@@ -83,7 +84,7 @@ final class PostingPresenter
     }
 
     /** @return array<string, mixed> */
-    public static function application(?Application $application): ?array
+    public static function application(?Application $application, ?StudentProfile $student = null, ?JobPosting $posting = null): ?array
     {
         if (! $application) {
             return null;
@@ -97,7 +98,36 @@ final class PostingPresenter
             'used_unverified_resume' => $application->used_unverified_resume,
             'applied_at' => $application->applied_at,
             'withdrawn_at' => $application->withdrawn_at,
+            'blocked_reason' => self::blockedReason($application, $student, $posting),
+            // The student's offer from this job profile, for the trophy on the job board and job page.
+            'offer' => $application->offer ? [
+                'offer_type' => $application->offer->offer_type,
+                'label' => \App\Models\Offer::LABELS[$application->offer->offer_type] ?? $application->offer->offer_type,
+            ] : null,
         ];
+    }
+
+    /**
+     * Why a still-live application is shown to the student as "Rejected": an active block (another offer accepted,
+     * debarred, blocked by the CDC) covers this job profile. Null for the application that produced the offer and for
+     * one already decided as not selected in a published stage (that decision is shown instead).
+     */
+    public static function blockedReason(Application $application, ?StudentProfile $student = null, ?JobPosting $posting = null): ?string
+    {
+        if ($application->status !== 'applied' || $application->offer) {
+            return null;
+        }
+        if ($application->roundResults()->whereNotNull('published_at')->where('result', 'rejected')->exists()) {
+            return null;
+        }
+
+        $student ??= $application->studentProfile;
+        $posting ??= $application->jobPosting;
+        if (! $student || ! $posting) {
+            return null;
+        }
+
+        return app(\App\Services\EligibilityService::class)->blockReasons($student, $posting)[0] ?? null;
     }
 
     /**

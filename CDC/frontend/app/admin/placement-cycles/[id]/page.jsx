@@ -45,6 +45,7 @@ import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 import PublishIcon from "@mui/icons-material/Publish";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 
 import { adminApi } from "@/lib/adminapi";
 import { rememberPlacement } from "@/lib/recentplacements";
@@ -52,6 +53,8 @@ import CyclePostings from "@/components/admin/cyclepostings";
 import TemplateDownloadButton from "@/components/admin/templatedownloadbutton";
 import StudentBlocksPanel from "@/components/admin/studentblockspanel";
 import StudentFilterPanel from "@/components/admin/studentfilterpanel";
+import AllowedProgrammesDialog from "@/components/admin/allowedprogrammesdialog";
+import CycleRulesCard from "@/components/admin/cyclerulescard";
 import useCatalogue from "@/lib/usecatalogue";
 import { filtersFromParams, filtersToQuery, hasFilters } from "@/lib/studentfilters";
 
@@ -103,6 +106,7 @@ function PlacementCycleDetail({ id }) {
   const enrollmentsLoading = listing.key !== requestKey;
   const { enrollments, meta } = listing;
 
+  const [programmesOpen, setProgrammesOpen] = useState(false);
   const [rollInput, setRollInput] = useState("");
   const [file, setFile] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
@@ -417,9 +421,16 @@ function PlacementCycleDetail({ id }) {
 
           <Card>
             <CardContent>
-              <Typography variant="h6" fontWeight={700} gutterBottom sx={{ textAlign: "left" }}>
-                Allowed Programmes &amp; Batches
-              </Typography>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ textAlign: "left" }}>
+                  Allowed Programmes &amp; Batches
+                </Typography>
+                {(cycle.is_draft || cycle.status === "open") && (
+                  <Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => setProgrammesOpen(true)}>
+                    Edit
+                  </Button>
+                )}
+              </Stack>
               <Divider sx={{ mb: 2 }} />
               {(cycle.allowed_programmes ?? []).length === 0 ? (
                 <Typography color="text.secondary">No programmes recorded for this placement.</Typography>
@@ -447,6 +458,8 @@ function PlacementCycleDetail({ id }) {
               )}
             </CardContent>
           </Card>
+
+          <CycleRulesCard cycle={cycle} />
 
           <Card>
             <CardContent>
@@ -657,6 +670,16 @@ function PlacementCycleDetail({ id }) {
           </CardContent>
         </Card>
       )}
+      <AllowedProgrammesDialog
+        open={programmesOpen}
+        cycle={cycle}
+        onClose={() => setProgrammesOpen(false)}
+        onSaved={(updated, message) => {
+          setProgrammesOpen(false);
+          if (updated) setCycle((prev) => ({ ...prev, ...updated }));
+          setSuccess(message ?? "Allowed programmes updated.");
+        }}
+      />
     </Box>
   );
 }

@@ -165,7 +165,7 @@ export default function StudentResumesPage() {
                       Slot {slot}
                     </Typography>
                     {resume?.is_locked && (
-                      <Tooltip title="Attached to an application that is still in progress. It cannot be replaced or deleted until that process ends.">
+                      <Tooltip title="Used in an application that is still in progress (you are neither selected nor rejected yet). You can replace it once that is decided; companies keep the version you applied with.">
                         <LockIcon fontSize="small" color="action" />
                       </Tooltip>
                     )}

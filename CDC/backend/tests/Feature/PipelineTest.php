@@ -103,6 +103,38 @@ class PipelineTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_a_company_proposal_emails_only_admins_who_can_review_proposals(): void
+    {
+        $fic = \App\Models\StaffRole::create(['name' => 'Dept FIC (test)']);
+        \App\Models\StaffRolePermission::create(['staff_role_id' => $fic->id, 'permission' => 'students', 'level' => 'read']);
+        $reviewer = \App\Models\StaffRole::create(['name' => 'Proposal reviewer (test)']);
+        \App\Models\StaffRolePermission::create(['staff_role_id' => $reviewer->id, 'permission' => 'proposals', 'level' => 'verify']);
+        $ficUser = User::factory()->create(['role' => 'admin', 'staff_role_id' => $fic->id, 'email' => 'fic@cdc.test']);
+        $reviewerUser = User::factory()->create(['role' => 'admin', 'staff_role_id' => $reviewer->id, 'email' => 'reviewer@cdc.test']);
+        $super = User::factory()->create(['role' => 'admin', 'is_super_admin' => true, 'email' => 'super@cdc.test']);
+        $inactive = User::factory()->create(['role' => 'admin', 'is_super_admin' => true, 'is_active' => false, 'email' => 'gone@cdc.test']);
+
+        $this->closeApplications();
+        Sanctum::actingAs($this->companyUser);
+        $this->postJson("/api/company/postings/{$this->posting->id}/rounds/{$this->round(0)->id}/proposals", [
+            'kind' => 'shortlist', 'entries' => [['roll_no' => '22JE0001']],
+        ])->assertCreated();
+
+        foreach ([$reviewerUser, $super, $this->admin] as $told) {
+            Mail::assertQueued(PortalNoticeMail::class, fn ($m) => $m->hasTo($told->email));
+        }
+        foreach ([$ficUser, $inactive] as $notTold) {
+            Mail::assertNotQueued(PortalNoticeMail::class, fn ($m) => $m->hasTo($notTold->email));
+            $this->assertSame(0, \App\Models\PortalNotification::where('user_id', $notTold->id)->count());
+        }
+
+        // The same helper picks the form-review recipients for company INF/JNF submissions.
+        $formReviewers = app(\App\Services\StaffAccessService::class)->recipients('form_reviews', 'verify')->pluck('email')->all();
+        $this->assertContains($super->email, $formReviewers);
+        $this->assertNotContains($ficUser->email, $formReviewers);
+        $this->assertNotContains($reviewerUser->email, $formReviewers);
+    }
+
     public function test_company_proposal_to_publish_flow_with_mails_and_visibility(): void
     {
         $this->closeApplications();
@@ -179,7 +211,7 @@ class PipelineTest extends TestCase
         $this->assertEqualsCanonicalizing(['22JE0002', '22JE0003'], $waitlisted);
 
         // Waitlists have no order: there is no reorder endpoint and no rank anywhere in the payload.
-        $this->postJson("/api/admin/postings/{$this->posting->id}/rounds/{$r2->id}/waitlist/reorder", ['ordered_application_ids' => [1]])->assertStatus(405);
+        $this->postJson("/api/admin/postings/{$this->posting->id}/rounds/{$r2->id}/waitlist/reorder", ['ordered_application_ids' => [1]])->assertNotFound();
         $this->assertStringNotContainsString('rank', $this->getJson("/api/admin/postings/{$this->posting->id}/pipeline")->getContent());
     }
 
@@ -202,9 +234,11 @@ class PipelineTest extends TestCase
         $r2 = $this->round(1);
         $this->assertSame(0, ApplicationRoundResult::where('posting_round_id', $r2->id)->count());
 
-        // The admin moves the LAST waitlisted student on: promoted in round 1 (QA F-002), round 2 untouched.
+        // The admin moves the LAST waitlisted student on by shortlisting them in round 1 and publishing (QA F-002, the
+        // On Hold tab's "Move" is gone since 2026-10-18); round 2 is untouched.
         $a4 = Application::whereHas('studentProfile', fn ($q) => $q->where('roll_no', '22JE0004'))->sole();
-        $this->postJson("$url/waitlist/{$a4->id}/promote")->assertOk();
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0004'], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
+        $this->postJson("$url/publish")->assertOk()->assertJsonPath('counts.selected', 1);
         $this->assertSame('selected', ApplicationRoundResult::where('application_id', $a4->id)->where('posting_round_id', $r1->id)->value('result'));
         $this->assertSame(0, ApplicationRoundResult::where('posting_round_id', $r2->id)->count());
 
@@ -223,7 +257,7 @@ class PipelineTest extends TestCase
         $this->assertStringNotContainsString('rank', $this->getJson('/api/student/applications')->getContent());
     }
 
-    public function test_readd_protocol_requires_confirmation_and_notifies_company(): void
+    public function test_bringing_back_a_published_rejection_notifies_the_company(): void
     {
         $this->closeApplications();
         $r1 = $this->round(0);
@@ -233,22 +267,105 @@ class PipelineTest extends TestCase
 
         $rejected = Application::whereHas('studentProfile', fn ($q) => $q->where('roll_no', '22JE0005'))->sole();
 
-        // A normal upload cannot overwrite a published rejection.
-        $this->postJson("$url/results", ['roll_nos' => ['22JE0005'], 'result' => 'selected'])->assertOk()->assertJsonPath('written', 0);
+        // An addendum is for new candidates only; a published rejection is changed on the stage itself.
         $this->postJson("$url/addendum", ['roll_nos' => ['22JE0005']])->assertOk()->assertJsonPath('errors.0.roll_no', '22JE0005');
 
-        $this->postJson("$url/readd/{$rejected->id}", ['remark' => 'Mistake'])->assertStatus(422);
-        $this->postJson("$url/readd/{$rejected->id}", ['confirm' => true, 'remark' => 'Scored wrongly'])->assertOk();
+        // No row is locked (owner decision 2026-10-18, replacing Re-add): the change is a flagged draft and the company
+        // is told, as Re-add did (spec Q4.5).
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0005'], 'result' => 'selected'])->assertOk()
+            ->assertJsonPath('written', 1)->assertJsonPath('changed', 1);
 
         $row = ApplicationRoundResult::where('application_id', $rejected->id)->where('posting_round_id', $r1->id)->sole();
         $this->assertSame('selected', $row->result);
         $this->assertTrue($row->is_addendum);
         $this->assertNull($row->published_at);
-        Mail::assertQueued(PortalNoticeMail::class, fn ($m) => $m->hasTo('hr@acme.test') && str_contains($m->headline, '22JE0005'));
-        $this->assertSame(1, AuditLog::where('action', 'round.readd')->count());
+        Mail::assertQueued(PortalNoticeMail::class, fn ($m) => $m->hasTo('hr@acme.test') && $m->subjectLine === 'Candidate re-added to your process' && str_contains($m->headline, '22JE0005'));
+        $this->assertSame(1, AuditLog::where('action', 'round.result_change')->count());
 
-        // Addendum for a not-yet-decided student lands as a flagged draft; publishing informs them.
-        $this->postJson("$url/publish")->assertOk()->assertJsonPath('counts.selected', 1);
+        // Shortlisted → not selected is a change too, but the company is not told about it.
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0001'], 'result' => 'rejected'])->assertOk()->assertJsonPath('changed', 1);
+        Mail::assertQueued(PortalNoticeMail::class, 1);
+
+        // Publishing informs the students of the new decisions.
+        $this->postJson("$url/publish")->assertOk()->assertJsonPath('counts.selected', 1)->assertJsonPath('counts.rejected', 1);
+        Mail::assertQueued(RoundResultMail::class, fn ($m) => $m->outcome === 'selected' && $m->hasBcc($this->students[4]->user->email));
+    }
+
+    public function test_a_published_decision_change_is_refused_while_an_offer_exists(): void
+    {
+        $this->closeApplications();
+        $final = $this->round(2);
+        $url = "/api/admin/postings/{$this->posting->id}/rounds/{$final->id}";
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0002'], 'result' => 'selected'])->assertOk();
+        ApplicationRoundResult::where('posting_round_id', $final->id)->update(['published_at' => now()]);
+        $application = Application::whereHas('studentProfile', fn ($q) => $q->where('roll_no', '22JE0002'))->sole();
+        \App\Models\Offer::create([
+            'application_id' => $application->id, 'student_profile_id' => $application->student_profile_id, 'company_id' => $this->posting->company()->id,
+            'job_posting_id' => $this->posting->id, 'placement_cycle_id' => $this->posting->placement_cycle_id, 'offer_type' => 'fulltime',
+            'currency' => 'INR', 'announced_by' => $this->admin->id, 'announced_at' => now(),
+        ]);
+
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0002'], 'result' => 'rejected'])->assertOk()
+            ->assertJsonPath('written', 0)
+            ->assertJsonPath('errors.0.reason', 'Holds an offer from this job profile. Revoke the offer on the Shortlist for Offer page first.');
+        $this->assertSame('selected', ApplicationRoundResult::where('application_id', $application->id)->where('posting_round_id', $final->id)->value('result'));
+    }
+
+    public function test_a_shortlisted_decision_with_a_later_published_one_is_changed_there_first(): void
+    {
+        $this->closeApplications();
+        [$r1, $r2] = [$this->round(0), $this->round(1)];
+        $base = "/api/admin/postings/{$this->posting->id}/rounds";
+        $this->postJson("$base/{$r1->id}/results", ['roll_nos' => ['22JE0001', '22JE0002'], 'result' => 'selected'])->assertOk();
+        $this->postJson("$base/{$r1->id}/publish")->assertOk();
+        $this->postJson("$base/{$r2->id}/results", ['roll_nos' => ['22JE0001'], 'result' => 'selected'])->assertOk();
+        $this->postJson("$base/{$r2->id}/publish")->assertOk();
+
+        $this->postJson("$base/{$r1->id}/results", ['roll_nos' => ['22JE0001'], 'result' => 'rejected'])->assertOk()
+            ->assertJsonPath('written', 0)
+            ->assertJsonPath('errors.0.reason', "Already has a published decision in \"{$r2->name}\". Change it there first.");
+
+        // Changing it in the later stage first unlocks the earlier one.
+        $this->postJson("$base/{$r2->id}/results", ['roll_nos' => ['22JE0001'], 'result' => 'rejected'])->assertOk()->assertJsonPath('changed', 1);
+        $this->postJson("$base/{$r1->id}/results", ['roll_nos' => ['22JE0001'], 'result' => 'rejected'])->assertOk()->assertJsonPath('changed', 1);
+    }
+
+    public function test_taking_a_student_off_shortlisted_clears_their_later_stage_drafts(): void
+    {
+        $this->closeApplications();
+        [$r1, $r2] = [$this->round(0), $this->round(1)];
+        $base = "/api/admin/postings/{$this->posting->id}/rounds";
+        $this->postJson("$base/{$r1->id}/results", ['roll_nos' => ['22JE0001', '22JE0002'], 'result' => 'selected'])->assertOk();
+        $this->postJson("$base/{$r1->id}/publish")->assertOk();
+        $this->postJson("$base/{$r2->id}/results", ['roll_nos' => ['22JE0001', '22JE0002'], 'result' => 'selected'])->assertOk();
+        $this->assertSame(2, ApplicationRoundResult::where('posting_round_id', $r2->id)->whereNull('published_at')->count());
+
+        // 22JE0001 goes On Hold in round 1: their round-2 draft no longer applies; 22JE0002's stays.
+        $this->postJson("$base/{$r1->id}/results", ['roll_nos' => ['22JE0001'], 'result' => 'waitlisted'])->assertOk()->assertJsonPath('changed', 1);
+        $left = ApplicationRoundResult::where('posting_round_id', $r2->id)->get();
+        $this->assertSame(['22JE0002'], $left->map(fn ($r) => $r->application->studentProfile->roll_no)->all());
+    }
+
+    public function test_bringing_back_a_rejection_follows_the_offer_guard(): void
+    {
+        $this->closeApplications();
+        $r1 = $this->round(0);
+        $url = "/api/admin/postings/{$this->posting->id}/rounds/{$r1->id}";
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0001'], 'result' => 'selected'])->assertOk();
+        $this->postJson("$url/publish", ['reject_remaining' => true])->assertOk();
+        \App\Models\PlacementBlock::create([
+            'student_profile_id' => $this->students[4]->id, 'placement_cycle_id' => $this->posting->placement_cycle_id,
+            'scope' => 'all', 'reason' => 'debarred', 'remark' => 'Misconduct', 'active' => true, 'blocked_by' => $this->admin->id,
+        ]);
+
+        // QA F-035: a debarred (or already placed) student is not brought back; the company is not told anything.
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0005'], 'result' => 'selected'])->assertOk()
+            ->assertJsonPath('written', 0)
+            ->assertJsonPath('errors.0.reason', '22JE0005 is blocked in this placement cycle (debarred). Lift the block first if this is intended.');
+        Mail::assertNotQueued(PortalNoticeMail::class, fn ($m) => $m->hasTo('hr@acme.test'));
+
+        // Another not-selected student comes back fine.
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0006'], 'result' => 'waitlisted'])->assertOk()->assertJsonPath('changed', 1);
     }
 
     public function test_final_round_publish_goes_through_results_page(): void
@@ -342,9 +459,10 @@ class PipelineTest extends TestCase
         $this->deleteJson("/api/admin/postings/{$this->posting->id}/rounds/{$r2->id}/results/{$draft->application_id}")->assertOk();
         $this->assertSame(0, ApplicationRoundResult::where('posting_round_id', $r2->id)->count());
 
-        // Remove 22JE0003 from the published waitlist → published "not selected" + regret mail.
+        // Take 22JE0003 off the published waitlist on the stage itself, then publish → "not selected" + regret mail.
         $a3 = Application::whereHas('studentProfile', fn ($q) => $q->where('roll_no', '22JE0003'))->sole();
-        $this->deleteJson("$url/waitlist/{$a3->id}")->assertOk();
+        $this->postJson("$url/results", ['roll_nos' => ['22JE0003'], 'result' => 'rejected'])->assertOk()->assertJsonPath('changed', 1);
+        $this->postJson("$url/publish")->assertOk()->assertJsonPath('counts.rejected', 1);
         $row = ApplicationRoundResult::where('application_id', $a3->id)->where('posting_round_id', $r1->id)->sole();
         $this->assertSame('rejected', $row->result);
         $this->assertNotNull($row->published_at);

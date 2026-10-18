@@ -415,7 +415,8 @@ class CompanyInfController extends Controller
 
     private function sendEditAccessRequestEmailAndNotify(Inf $inf, string $companyName, string $reason): void
     {
-        $admins = User::where('role', 'admin')->get();
+        // Only the admins who review forms (super admins and staff with JNF & INF reviews: verify).
+        $admins = app(\App\Services\StaffAccessService::class)->recipients('form_reviews', 'verify');
         $reviewUrl = rtrim((string) config('app.frontend_url'), '/') . '/admin/infs/' . $inf->id;
 
         foreach ($admins as $admin) {
@@ -464,7 +465,8 @@ class CompanyInfController extends Controller
             return;
         }
 
-        $admins = User::where('role', 'admin')->get();
+        // Only the admins who review forms (super admins and staff with JNF & INF reviews: verify).
+        $admins = app(\App\Services\StaffAccessService::class)->recipients('form_reviews', 'verify');
         $summary = $this->buildSubmissionSummary($inf);
         $reviewUrl = rtrim((string) config('app.frontend_url'), '/') . '/admin/infs/' . $inf->id;
 

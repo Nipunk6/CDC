@@ -28,7 +28,7 @@ import { adminApi } from "@/lib/adminapi";
 import { formatDate, formatDateTime, formatMoney, fromLocalInput, postingStatusLabel, toLocalInput } from "@/lib/format";
 import LinkIcon from "@mui/icons-material/Link";
 import ForwardToInboxIcon from "@mui/icons-material/ForwardToInbox";
-import { OFFER_CATEGORIES, selectionConsequence } from "@/lib/offerpolicy";
+import { offerCategoriesFor, selectionConsequence } from "@/lib/offerpolicy";
 import ProcessStatusCard from "@/components/admin/posting/processstatuscard";
 
 const Stat = ({ label, value, color }) => (
@@ -189,7 +189,7 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
                 <FormControl fullWidth disabled={!editable || busy}>
                   <InputLabel id="overview-offer-type">Offer category</InputLabel>
                   <Select labelId="overview-offer-type" label="Offer category" value={offerType ?? ""} onChange={(e) => setOfferType(e.target.value)}>
-                    {(OFFER_CATEGORIES[posting.form_type] ?? []).map((category) => (
+                    {offerCategoriesFor(posting.placement_cycle?.type).map((category) => (
                       <MenuItem key={category.value} value={category.value}>
                         {category.label}
                       </MenuItem>

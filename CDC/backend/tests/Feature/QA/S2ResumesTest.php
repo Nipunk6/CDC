@@ -308,7 +308,11 @@ class S2ResumesTest extends TestCase
         $posting->update(['status' => 'completed']);
         $oldPath = $two->fresh()->file_path;
         $this->upload(2, null, 'Replaced after completion')->assertOk()->assertJsonPath('resume.status', 'pending');
-        Storage::disk('local')->assertMissing($oldPath);
+        // Owner decision 2026-10-18: the version the application was made with is kept (archived) for the CDC and
+        // the company; the new file goes into the slot as a new resume.
+        Storage::disk('local')->assertExists($oldPath);
+        $this->assertNotNull($two->fresh()->archived_at);
+        $this->assertSame($two->id, Application::sole()->resume_id);
         $this->assertFalse($two->fresh()->isLocked());
     }
 

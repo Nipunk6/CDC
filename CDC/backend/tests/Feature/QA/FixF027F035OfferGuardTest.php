@@ -112,7 +112,7 @@ class FixF027F035OfferGuardTest extends TestCase
         $final = $this->posting->rounds()->get()[1];
         ApplicationRoundResult::create(['application_id' => $this->apps['22JE0002']->id, 'posting_round_id' => $final->id, 'result' => 'rejected', 'published_at' => now(), 'decided_by' => $this->admin->id]);
 
-        $this->publishFinal([$this->offerFor('22JE0002')])->assertStatus(422)->assertJsonFragment(['message' => '22JE0002 was not selected in the final stage. Use Re-add on that stage first.']);
+        $this->publishFinal([$this->offerFor('22JE0002')])->assertStatus(422)->assertJsonFragment(['message' => '22JE0002 was not selected in the final stage. Change their decision on the final stage\'s shortlist page first.']);
         $this->assertSame(0, Offer::count());
 
         $this->publishFinal([$this->offerFor('22JE0001')])->assertOk();
@@ -142,6 +142,58 @@ class FixF027F035OfferGuardTest extends TestCase
         $this->assertNull($rows[$this->apps['22JE0002']->id]['offer_refusal']);
     }
 
+    public function test_full_time_cycle_allows_one_more_full_time_offer_after_an_intern_performance_ppo(): void
+    {
+        // Owner decision 2026-10-18: Intern + performance-based PPO, then at most one more offer, and only Full-Time.
+        $other = $this->floatPosting('Globex', 'globex');
+        $student = $this->apps['22JE0001']->studentProfile;
+        $otherApp = $this->apply($other, $student);
+        Offer::create([
+            'application_id' => $otherApp->id, 'student_profile_id' => $student->id, 'company_id' => $other->company()->id,
+            'job_posting_id' => $other->id, 'placement_cycle_id' => $this->cycle->id, 'offer_type' => 'intern_performance_ppo',
+            'currency' => 'INR', 'announced_by' => $this->admin->id, 'announced_at' => now(),
+        ]);
+        $this->clearFirstRound(['22JE0001', '22JE0002']);
+
+        // Not as Intern + Full-Time…
+        $this->publishFinal([['offer_type' => 'intern_fulltime'] + $this->offerFor('22JE0001')])->assertStatus(422)
+            ->assertJsonFragment(['message' => '22JE0001 holds an Intern + performance-based PPO offer in this placement cycle (Globex), so the only further offer allowed is a Full-Time one.']);
+        $this->assertSame(1, Offer::count());
+
+        // …but as Full-Time, yes: two offers now.
+        $this->publishFinal([$this->offerFor('22JE0001')])->assertOk();
+        $this->assertSame(['fulltime', 'intern_performance_ppo'], Offer::where('student_profile_id', $student->id)->orderBy('offer_type')->pluck('offer_type')->all());
+
+        // A third offer in the cycle is refused, whatever its type.
+        $third = $this->floatPosting('Initech', 'initech');
+        $this->assertSame(
+            '22JE0001 already holds 2 offers in this placement cycle, the most allowed. Revoke one first if this is intended.',
+            app(\App\Services\BlockingPolicy::class)->offerRefusal($student->fresh(), $third, null, 'fulltime')
+        );
+
+        // The pair must stay Intern + performance-based PPO and Full-Time when an offer is edited.
+        $fullTime = Offer::where('student_profile_id', $student->id)->where('offer_type', 'fulltime')->sole();
+        $this->patchJson("/api/admin/offers/{$fullTime->id}", ['offer_type' => 'intern_fulltime'])->assertStatus(422)->assertJsonValidationErrors('offer_type');
+        $this->assertSame('fulltime', $fullTime->fresh()->offer_type);
+    }
+
+    public function test_internship_cycle_still_allows_one_offer_only(): void
+    {
+        $intern = PlacementCycle::create([
+            'name' => 'Intern', 'type' => 'internship', 'starts_on' => '2026-07-01', 'ends_on' => '2027-06-30', 'status' => 'open',
+            'allowed_programmes' => [['programme' => StudentProfileFactory::BTECH, 'batches' => [2027]]],
+        ]);
+        $this->posting->update(['placement_cycle_id' => $intern->id, 'offer_type' => 'intern']);
+        $student = $this->apps['22JE0001']->studentProfile;
+        Offer::create([
+            'application_id' => $this->apps['22JE0002']->id, 'student_profile_id' => $student->id, 'company_id' => $this->posting->company()->id,
+            'job_posting_id' => $this->posting->id, 'placement_cycle_id' => $intern->id, 'offer_type' => 'intern_performance_ppo',
+            'currency' => 'INR', 'announced_by' => $this->admin->id, 'announced_at' => now(),
+        ]);
+
+        $this->assertStringContainsString('already holds an offer', (string) app(\App\Services\BlockingPolicy::class)->offerRefusal($student, $this->posting->fresh(), null, 'fulltime'));
+    }
+
     public function test_F035_no_offer_while_an_applicable_block_is_active(): void
     {
         $this->clearFirstRound(['22JE0002', '22JE0003', '22JE0004']);
@@ -162,19 +214,20 @@ class FixF027F035OfferGuardTest extends TestCase
         $this->assertSame(2, Offer::count());
     }
 
-    public function test_F035_readd_refuses_a_student_who_holds_an_offer_or_is_blocked(): void
+    public function test_F035_bringing_back_refuses_a_student_who_holds_an_offer_or_is_blocked(): void
     {
         $this->clearFirstRound(['22JE0001']); // 22JE0002–4 published as not selected in round 1
-        $readd = fn (string $roll) => $this->postJson($this->base(0).'/readd/'.$this->apps[$roll]->id, ['confirm' => true, 'remark' => 'Company asked']);
+        // Bringing back = changing the published "not selected" on the stage (Re-add is gone since 2026-10-18).
+        $readd = fn (string $roll) => $this->postJson($this->base(0).'/results', ['roll_nos' => [$roll], 'result' => 'selected']);
 
         $blocked = PlacementBlock::create([
             'student_profile_id' => $this->apps['22JE0002']->student_profile_id, 'placement_cycle_id' => $this->cycle->id,
             'scope' => 'all', 'reason' => 'manual', 'active' => true, 'blocked_by' => $this->admin->id,
         ]);
-        $readd('22JE0002')->assertStatus(422)->assertJsonPath('message', fn (string $m) => str_starts_with($m, '22JE0002 is blocked in this placement cycle'));
+        $readd('22JE0002')->assertOk()->assertJsonPath('written', 0)->assertJsonPath('errors.0.reason', fn (string $m) => str_starts_with($m, '22JE0002 is blocked in this placement cycle'));
         $this->assertSame('rejected', ApplicationRoundResult::where('application_id', $this->apps['22JE0002']->id)->value('result'));
 
         $blocked->update(['active' => false]);
-        $readd('22JE0002')->assertOk();
+        $readd('22JE0002')->assertOk()->assertJsonPath('changed', 1);
     }
 }

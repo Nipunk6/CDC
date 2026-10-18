@@ -14,8 +14,10 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   LinearProgress,
+  Menu,
   MenuItem,
   Select,
   Stack,
@@ -28,11 +30,13 @@ import {
   TableRow,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import WorkIcon from "@mui/icons-material/Work";
 import SendIcon from "@mui/icons-material/Send";
 import DownloadIcon from "@mui/icons-material/Download";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 
 import PageHeader from "@/components/shared/pageheader";
 import { companyApi } from "@/lib/companyapi";
@@ -58,6 +62,7 @@ export default function CompanyPostingDetailPage({ params }) {
   const [dialog, setDialog] = useState(null);
   const [dialogError, setDialogError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [stageMenu, setStageMenu] = useState(null); // { anchor, round } of a stage's download menu
 
   const load = useCallback(async () => {
     try {
@@ -110,6 +115,19 @@ export default function CompanyPostingDetailPage({ params }) {
   const exportApplicants = () =>
     companyDownload(`/company/postings/${id}/export`, `applicants-${id}.xlsx`).catch((e) => setError(e.message));
 
+  // One stage's students (published decisions only): shortlisted, not selected, or everyone decided there.
+  const exportStage = (round, decision) => {
+    setStageMenu(null);
+    companyDownload(`/company/postings/${id}/rounds/${round.id}/export?decision=${decision}`, `stage-${round.id}-${decision}.xlsx`).catch((e) => setError(e.message));
+  };
+
+  const exportOffers = () =>
+    companyDownload(`/company/postings/${id}/offers/export`, `final-offers-${id}.xlsx`).catch((e) => setError(e.message));
+
+  // "Download Final Offers" shows once at least one student is selected (published) in the final stage.
+  const finalRound = (posting.rounds ?? []).find((r) => r.is_final);
+  const hasOffers = Boolean(finalRound) && applicants.some((a) => a.rounds?.[finalRound.id]?.result === "selected");
+
   return (
     <>
       <PageHeader
@@ -123,6 +141,11 @@ export default function CompanyPostingDetailPage({ params }) {
             <Button variant="contained" color="secondary" startIcon={<DownloadIcon />} onClick={exportApplicants}>
               Download Applicants
             </Button>
+            {hasOffers && (
+              <Button variant="contained" color="secondary" startIcon={<EmojiEventsIcon />} onClick={exportOffers}>
+                Download Final Offers
+              </Button>
+            )}
             <Button
               variant="contained"
               color="secondary"
@@ -193,7 +216,23 @@ export default function CompanyPostingDetailPage({ params }) {
                     {share && <TableCell>Contact</TableCell>}
                     <TableCell>Resume</TableCell>
                     {(posting.rounds ?? []).map((r) => (
-                      <TableCell key={r.id}>{r.name}</TableCell>
+                      <TableCell key={r.id}>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <span>{r.name}</span>
+                          <Tooltip title={r.status === "completed" ? `Download ${r.name} students` : "Nothing published for this stage yet"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={r.status !== "completed"}
+                                aria-label={`Download ${r.name} students`}
+                                onClick={(e) => setStageMenu({ anchor: e.currentTarget, round: r })}
+                              >
+                                <DownloadIcon fontSize="inherit" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                      </TableCell>
                     ))}
                     {(posting.questions ?? []).length > 0 && <TableCell>Answers</TableCell>}
                   </TableRow>
@@ -338,6 +377,11 @@ export default function CompanyPostingDetailPage({ params }) {
           </Button>
         </DialogActions>
       </Dialog>
+      <Menu anchorEl={stageMenu?.anchor} open={Boolean(stageMenu)} onClose={() => setStageMenu(null)}>
+        <MenuItem onClick={() => exportStage(stageMenu.round, "shortlisted")}>{stageMenu?.round?.is_final ? "Selected" : "Shortlisted"}</MenuItem>
+        <MenuItem onClick={() => exportStage(stageMenu.round, "rejected")}>Not selected</MenuItem>
+        <MenuItem onClick={() => exportStage(stageMenu.round, "all")}>All students</MenuItem>
+      </Menu>
     </>
   );
 }

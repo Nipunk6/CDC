@@ -139,17 +139,31 @@ class JobPosting extends Model
         return $this->postable_type === Inf::class ? 'inf' : 'jnf';
     }
 
-    /** fulltime for JNFs, internship for INFs. */
+    /**
+     * `internship` or `fulltime`, from the offer category: only a plain Internship offer is an internship
+     * opportunity; every category of a full-time placement is a full-time one. Legacy postings without a category
+     * fall back to the form (INF → internship, JNF → full time), as before.
+     */
     public function postingType(): string
     {
-        return $this->formType() === 'inf' ? 'internship' : 'fulltime';
+        return $this->offerType() === 'intern' ? 'internship' : 'fulltime';
     }
 
-    /** Offer categories the admin can pick at float time, per form type (owner decision, QA F-004). */
+    /**
+     * Offer categories the admin can pick at float time, per placement cycle type (owner decision 2026-10-18,
+     * replacing the per-form-type list of QA F-004). Either form can be opened in either kind of cycle; the first
+     * entry is the default.
+     */
     public const OFFER_CATEGORIES = [
-        'jnf' => ['fulltime', 'intern_fulltime'],
-        'inf' => ['intern', 'intern_performance_ppo'],
+        'internship' => ['intern'],
+        'fulltime' => ['fulltime', 'intern_performance_ppo', 'intern_fulltime'],
     ];
+
+    /** @return list<string> */
+    public static function offerCategoriesFor(?string $cycleType): array
+    {
+        return self::OFFER_CATEGORIES[$cycleType === 'internship' ? 'internship' : 'fulltime'];
+    }
 
     /** The posting's offer category (float-time choice; legacy postings fall back to JNF → fulltime, INF → intern). */
     public function offerType(): string

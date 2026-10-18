@@ -157,6 +157,57 @@ class AdminPlacementCycleTest extends TestCase
         $this->assertSame('Full Time 2026-27 (revised)', $log->after['name']);
     }
 
+    public function test_allowed_programmes_can_be_edited_alone_on_a_draft_or_published_cycle(): void
+    {
+        $this->actingAsAdmin();
+        $published = $this->createCycle();
+        $draft = $this->createCycle();
+        $draft->update(['is_draft' => true]);
+
+        foreach ([$published, $draft] as $cycle) {
+            $response = $this->patchJson("/api/admin/placement-cycles/{$cycle->id}", [
+                'allowed_programmes' => [['programme' => self::BTECH, 'batches' => [2027, 2028]]],
+            ]);
+
+            $response->assertOk();
+            $response->assertJsonPath('placement_cycle.allowed_programmes.0.batches', [2027, 2028]);
+            $response->assertJsonPath('placement_cycle.name', 'Full Time 2026-27');
+            $this->assertSame((bool) $cycle->is_draft, $cycle->fresh()->is_draft);
+        }
+
+        $this->assertSame(2, AuditLog::query()->where('action', 'cycle.update')->count());
+    }
+
+    public function test_show_lists_the_rules_for_the_placement_type(): void
+    {
+        $this->actingAsAdmin();
+        $fulltime = $this->createCycle();
+        $internship = $this->createCycle(['type' => 'internship']);
+
+        $rules = $this->getJson("/api/admin/placement-cycles/{$fulltime->id}")->assertOk()->json('placement_cycle.rules');
+        $this->assertStringContainsString('JNFs and INFs', $rules['job_profiles']);
+        $this->assertSame(['fulltime', 'intern_performance_ppo', 'intern_fulltime', 'intern_ppo', 'ppo_offered'], collect($rules['offer_types'])->pluck('type')->all());
+        $this->assertSame('all', collect($rules['offer_types'])->firstWhere('type', 'fulltime')['block']);
+
+        $rules = $this->getJson("/api/admin/placement-cycles/{$internship->id}")->assertOk()->json('placement_cycle.rules');
+        $this->assertStringContainsString('Internship offer', $rules['job_profiles']);
+        $this->assertSame(['intern'], collect($rules['offer_types'])->pluck('type')->all());
+        $this->assertSame('internships_only', collect($rules['offer_types'])->firstWhere('type', 'intern')['block']);
+    }
+
+    public function test_allowed_programmes_cannot_list_a_programme_twice(): void
+    {
+        $this->actingAsAdmin();
+        $cycle = $this->createCycle();
+
+        $this->patchJson("/api/admin/placement-cycles/{$cycle->id}", [
+            'allowed_programmes' => [
+                ['programme' => self::BTECH, 'batches' => [2027]],
+                ['programme' => self::BTECH, 'batches' => [2028]],
+            ],
+        ])->assertStatus(422)->assertJsonValidationErrors(['allowed_programmes.0.programme']);
+    }
+
     public function test_close_sets_status_and_rejects_a_second_close(): void
     {
         $this->actingAsAdmin();

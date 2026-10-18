@@ -214,6 +214,8 @@ export default function AdminInfDetailPage() {
   const [editMode, setEditMode] = useState(false);
   const [editFormData, setEditFormData] = useState<FormData>({});
   const [savingEdit, setSavingEdit] = useState(false);
+  // "Edit" on New Job Profile's preview links here with ?edit=1: open in edit mode once the form has loaded.
+  const [editOnLoad, setEditOnLoad] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -227,6 +229,7 @@ export default function AdminInfDetailPage() {
           latest_editable_remark_id?: number | null;
         }>(`/admin/infs/${params.id}`);
         setInf(response.inf);
+        setEditOnLoad(new URLSearchParams(window.location.search).get("edit") === "1");
         setRemarks("");
         setStatusHistory(response.status_history ?? []);
         setReviewMarked(response.review_marked === true);
@@ -421,6 +424,11 @@ export default function AdminInfDetailPage() {
     setEditFormData(data);
     setEditMode(true);
   };
+
+  if (editOnLoad && inf) {
+    setEditOnLoad(false);
+    startEditing();
+  }
 
   const cancelEditing = () => {
     setEditMode(false);

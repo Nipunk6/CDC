@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, Card, CardActionArea, CardContent, Collapse, LinearProgress, Pagination, Stack, Typography } from "@mui/material";
+import { Alert, Avatar, Box, Button, Card, CardActionArea, CardContent, Collapse, LinearProgress, Pagination, Stack, Typography } from "@mui/material";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 
 import { plainText } from "@/lib/plaintext";
+import JobProfileNotice from "@/components/student/jobprofilenotice";
 import { studentApi, studentBlobUrl } from "@/lib/studentapi";
 import { formatDateTime } from "@/lib/format";
 
@@ -81,6 +82,17 @@ export default function StudentNoticesPage() {
                       aria-label={notice.is_read ? undefined : "Unread"}
                       sx={{ width: 10, height: 10, mt: 0.75, borderRadius: "50%", flexShrink: 0, bgcolor: notice.is_read ? "transparent" : "error.main" }}
                     />
+                    {notice.job_profile && (
+                      // The company's logo on its "Open for applications" notice.
+                      <Avatar
+                        src={notice.job_profile.logo_url ?? undefined}
+                        alt={notice.job_profile.company}
+                        variant="rounded"
+                        sx={{ width: 40, height: 40, bgcolor: "common.white", color: "primary.main", border: 1, borderColor: "divider", "& img": { objectFit: "contain", p: 0.5 } }}
+                      >
+                        {notice.job_profile.company?.[0]}
+                      </Avatar>
+                    )}
                     <Box sx={{ minWidth: 0, flex: 1 }}>
                       <Typography fontWeight={notice.is_read ? 600 : 800} sx={{ wordBreak: "break-word" }}>
                         {notice.title}
@@ -104,10 +116,14 @@ export default function StudentNoticesPage() {
               </CardActionArea>
               <Collapse in={expanded} unmountOnExit>
                 <CardContent sx={{ pt: 0, pl: { xs: 4.5, sm: 5 } }}>
-                  {text && (
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-line", wordBreak: "break-word" }}>
-                      {text}
-                    </Typography>
+                  {notice.job_profile ? (
+                    <JobProfileNotice details={notice.job_profile} />
+                  ) : (
+                    text && (
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-line", wordBreak: "break-word" }}>
+                        {text}
+                      </Typography>
+                    )
                   )}
                   {notice.attachment && (
                     <Button size="small" variant="outlined" startIcon={<AttachFileIcon />} onClick={() => openAttachment(notice)} sx={{ mt: 1.5, textTransform: "none", maxWidth: "100%" }}>

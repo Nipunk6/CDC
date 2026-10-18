@@ -8,6 +8,7 @@ import {
   Chip,
   Divider,
   Grid2,
+  Link,
   List,
   ListItem,
   ListItemText,
@@ -65,7 +66,7 @@ function PreviewSection({ title, children, onEdit, complete = true }: PreviewSec
           </Button>
         )}
       </Box>
-      <CardContent sx={{ py: 2 }}>{children}</CardContent>
+      <CardContent sx={{ py: 2, "& .MuiTypography-body2": { overflowWrap: "anywhere" } }}>{children}</CardContent>
     </Card>
   );
 }
@@ -138,7 +139,11 @@ interface JnfPreviewProps {
 
 export const stripHtml = (html: string | undefined | null): string => {
   if (!html) return "";
-  let cleaned = html.replace(/<[^>]*>/g, "");
+  let cleaned = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n• ")
+    .replace(/<\/(p|div|h[1-6]|ul|ol|blockquote)>/gi, "\n")
+    .replace(/<[^>]*>/g, "");
   cleaned = cleaned
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
@@ -147,8 +152,30 @@ export const stripHtml = (html: string | undefined | null): string => {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'");
-  return cleaned.trim();
+  return cleaned
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 };
+
+// "1500000" → "15,00,000"; anything that is not a plain number is shown as typed.
+const formatCount = (value?: string) => (value && /^\d+$/.test(value.trim()) ? Number(value).toLocaleString("en-IN") : value);
+
+const externalUrl = (value: string) => (/^https?:\/\//i.test(value) ? value : `https://${value}`);
+
+// A website / LinkedIn value as a link that opens in a new tab.
+function UrlValue({ value }: { value?: string }) {
+  if (!value) return <Typography variant="body2">-</Typography>;
+  return (
+    <Typography variant="body2">
+      <Link href={externalUrl(value)} target="_blank" rel="noopener noreferrer" underline="hover">
+        {value}
+      </Link>
+    </Typography>
+  );
+}
 
 // Phase 2 numeric backlog caps, shown on the branch chip when set (M4).
 const backlogCapLabel = (b: { backlogsAllowed: boolean; maxOngoingBacklogs?: string; maxTotalBacklogs?: string }) => {
@@ -230,7 +257,12 @@ export function JnfPreview({
       >
         <Stack direction="row" spacing={2} alignItems="center" mb={2} flexWrap="wrap">
           {companyLogoUrl && (
-            <Avatar src={companyLogoUrl} alt={companyProfile.name} sx={{ width: 56, height: 56 }} />
+            <Avatar
+              src={companyLogoUrl}
+              alt={companyProfile.name}
+              variant="rounded"
+              sx={{ width: 64, height: 64, bgcolor: "common.white", border: 1, borderColor: "divider", "& img": { objectFit: "contain", p: 0.75 } }}
+            />
           )}
           <Box>
             <Typography variant="caption" color="text.secondary">Company Name</Typography>
@@ -240,7 +272,7 @@ export function JnfPreview({
         <Grid2 container spacing={2}>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">Website</Typography>
-            <Typography variant="body2">{companyProfile.website || "-"}</Typography>
+            <UrlValue value={companyProfile.website} />
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">Sector</Typography>
@@ -256,7 +288,7 @@ export function JnfPreview({
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">Employee Count</Typography>
-            <Typography variant="body2">{companyProfile.employeeCount || "-"}</Typography>
+            <Typography variant="body2">{formatCount(companyProfile.employeeCount) || "-"}</Typography>
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">Annual Turnover</Typography>
@@ -264,7 +296,7 @@ export function JnfPreview({
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">LinkedIn URL</Typography>
-            <Typography variant="body2">{companyProfile.linkedinUrl || "-"}</Typography>
+            <UrlValue value={companyProfile.linkedinUrl} />
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">MNC HQ (Country/City)</Typography>
@@ -274,10 +306,12 @@ export function JnfPreview({
             <Typography variant="caption" color="text.secondary">Industry Sector Tags</Typography>
             <Typography variant="body2">{companyProfile.industrySectorTags || "-"}</Typography>
           </Grid2>
-          <Grid2 size={{ xs: 12, md: 6 }}>
-            <Typography variant="caption" color="text.secondary">Postal Address</Typography>
-            <Typography variant="body2">{companyProfile.postalAddress || "-"}</Typography>
-          </Grid2>
+          {companyProfile.postalAddress !== undefined && (
+            <Grid2 size={{ xs: 12, md: 6 }}>
+              <Typography variant="caption" color="text.secondary">Postal Address</Typography>
+              <Typography variant="body2">{companyProfile.postalAddress || "-"}</Typography>
+            </Grid2>
+          )}
           <Grid2 size={{ xs: 12 }}>
             <Typography variant="caption" color="text.secondary">Nature of Business</Typography>
             <Typography variant="body2">{companyProfile.natureOfBusiness || "-"}</Typography>
@@ -780,7 +814,12 @@ export function InfPreview({
       >
         <Stack direction="row" spacing={2} alignItems="center" mb={2} flexWrap="wrap">
           {companyLogoUrl && (
-            <Avatar src={companyLogoUrl} alt={companyProfile.name} sx={{ width: 56, height: 56 }} />
+            <Avatar
+              src={companyLogoUrl}
+              alt={companyProfile.name}
+              variant="rounded"
+              sx={{ width: 64, height: 64, bgcolor: "common.white", border: 1, borderColor: "divider", "& img": { objectFit: "contain", p: 0.75 } }}
+            />
           )}
           <Box>
             <Typography variant="caption" color="text.secondary">Company Name</Typography>
@@ -790,7 +829,7 @@ export function InfPreview({
         <Grid2 container spacing={2}>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">Website</Typography>
-            <Typography variant="body2">{companyProfile.website || "-"}</Typography>
+            <UrlValue value={companyProfile.website} />
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">Sector</Typography>
@@ -806,7 +845,7 @@ export function InfPreview({
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">Employee Count</Typography>
-            <Typography variant="body2">{companyProfile.employeeCount || "-"}</Typography>
+            <Typography variant="body2">{formatCount(companyProfile.employeeCount) || "-"}</Typography>
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">Annual Turnover</Typography>
@@ -814,7 +853,7 @@ export function InfPreview({
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">LinkedIn URL</Typography>
-            <Typography variant="body2">{companyProfile.linkedinUrl || "-"}</Typography>
+            <UrlValue value={companyProfile.linkedinUrl} />
           </Grid2>
           <Grid2 size={{ xs: 6, md: 3 }}>
             <Typography variant="caption" color="text.secondary">MNC HQ (Country/City)</Typography>
@@ -824,10 +863,12 @@ export function InfPreview({
             <Typography variant="caption" color="text.secondary">Industry Sector Tags</Typography>
             <Typography variant="body2">{companyProfile.industrySectorTags || "-"}</Typography>
           </Grid2>
-          <Grid2 size={{ xs: 12, md: 6 }}>
-            <Typography variant="caption" color="text.secondary">Postal Address</Typography>
-            <Typography variant="body2">{companyProfile.postalAddress || "-"}</Typography>
-          </Grid2>
+          {companyProfile.postalAddress !== undefined && (
+            <Grid2 size={{ xs: 12, md: 6 }}>
+              <Typography variant="caption" color="text.secondary">Postal Address</Typography>
+              <Typography variant="body2">{companyProfile.postalAddress || "-"}</Typography>
+            </Grid2>
+          )}
           <Grid2 size={{ xs: 12 }}>
             <Typography variant="caption" color="text.secondary">Nature of Business</Typography>
             <Typography variant="body2">{companyProfile.natureOfBusiness || "-"}</Typography>

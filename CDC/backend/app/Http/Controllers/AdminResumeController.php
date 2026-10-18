@@ -34,7 +34,7 @@ class AdminResumeController extends Controller
         ]);
 
         // Staff roles: a department-limited person sees only their departments' students.
-        $query = app(\App\Services\StaffAccessService::class)->scopeStudents(Resume::query(), $request->user(), 'studentProfile')
+        $query = app(\App\Services\StaffAccessService::class)->scopeStudents(Resume::query()->whereNull('archived_at'), $request->user(), 'studentProfile')
             ->with([
                 'studentProfile:id,roll_no,full_name,programme,branch,graduating_batch',
                 'reviewedBy:id,name',
@@ -65,7 +65,7 @@ class AdminResumeController extends Controller
                 'per_page' => $page->perPage(),
                 'total' => $page->total(),
             ],
-            'counts' => app(\App\Services\StaffAccessService::class)->scopeStudents(Resume::query(), $request->user(), 'studentProfile')->select('status', DB::raw('count(*) as total'))->groupBy('status')->pluck('total', 'status'),
+            'counts' => app(\App\Services\StaffAccessService::class)->scopeStudents(Resume::query()->whereNull('archived_at'), $request->user(), 'studentProfile')->select('status', DB::raw('count(*) as total'))->groupBy('status')->pluck('total', 'status'),
         ]);
     }
 

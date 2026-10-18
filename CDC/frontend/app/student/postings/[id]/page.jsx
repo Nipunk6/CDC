@@ -16,6 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 
 import ApplyPanel from "@/components/student/applypanel";
 import RoundTrail from "@/components/student/roundtrail";
@@ -70,11 +71,17 @@ export default function StudentPostingDetailPage({ params }) {
                 {posting.company?.name?.[0]}
               </Avatar>
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h5" fontWeight={700} sx={{ wordBreak: "break-word" }}>
-                  {posting.title}
-                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {posting.application?.offer && <EmojiEventsIcon sx={{ color: "warning.main", fontSize: 32 }} titleAccess="Offer received" />}
+                  <Typography variant="h5" fontWeight={700} sx={{ wordBreak: "break-word" }}>
+                    {posting.title}
+                  </Typography>
+                </Stack>
                 <Typography color="text.secondary">{posting.company?.name}</Typography>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                  {posting.application?.offer && (
+                    <Chip size="small" color="warning" icon={<EmojiEventsIcon />} label={`Your offer: ${posting.application.offer.label}`} />
+                  )}
                   <Chip size="small" variant="outlined" label={posting.offer_label ?? (posting.type === "fulltime" ? "Full Time" : "Internship")} />
                   {compensationText(posting.compensation) && <Chip size="small" variant="outlined" label={compensationText(posting.compensation)} />}
                   {posting.location && <Chip size="small" variant="outlined" label={posting.location} />}
@@ -102,6 +109,11 @@ export default function StudentPostingDetailPage({ params }) {
                   <Typography variant="subtitle1" fontWeight={700} gutterBottom>
                     Your progress
                   </Typography>
+                  {posting.application.blocked_reason && (
+                    <Alert severity="error" sx={{ mb: 1.5 }}>
+                      Rejected: {posting.application.blocked_reason}
+                    </Alert>
+                  )}
                   <RoundTrail trail={posting.trail} status={posting.application.status} />
                 </CardContent>
               </Card>

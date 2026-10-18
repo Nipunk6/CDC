@@ -31,6 +31,7 @@ class StudentNoticeController extends Controller
         $unread = (clone $visible)->whereDoesntHave('reads', $readBy)->count();
         $page = $visible
             ->withExists(['reads as is_read' => $readBy])
+            ->with(['jobPosting.postable.company', 'jobPosting.rounds'])
             ->orderByDesc('published_at')
             ->orderByDesc('id')
             ->paginate(self::PER_PAGE);
@@ -79,6 +80,11 @@ class StudentNoticeController extends Controller
             'body' => $notice->body,
             'published_at' => $notice->published_at,
             'attachment' => $notice->attachment_path ? ['name' => $notice->attachment_name, 'size' => $notice->attachment_size] : null,
+            // An automatic "Open for applications" notice also carries its content as data, laid out on the page
+            // with headings and numbered lists (the body stays plain text, D76).
+            'job_profile' => $notice->source === \App\Services\JobProfileNoticeService::SOURCE && $notice->jobPosting
+                ? app(\App\Services\JobProfileNoticeService::class)->details($notice->jobPosting)
+                : null,
         ];
     }
 }

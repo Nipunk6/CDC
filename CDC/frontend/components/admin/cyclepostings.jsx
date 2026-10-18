@@ -10,6 +10,7 @@ import {
   CardContent,
   Chip,
   LinearProgress,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -20,6 +21,7 @@ import {
 } from "@mui/material";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import AddIcon from "@mui/icons-material/Add";
+import AddBusinessIcon from "@mui/icons-material/AddBusiness";
 
 import { adminApi } from "@/lib/adminapi";
 import { formatDate, formatDateTime, postingStatusLabel, statusColor } from "@/lib/format";
@@ -38,11 +40,17 @@ export default function CyclePostings({ cycleId }) {
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!postings) return <LinearProgress />;
 
-  // "+ Add New Job" (S6.1): the CDC fills a JNF/INF for a company and returns here to open it.
+  // "+ Add New Job" (S6.1): the CDC fills a JNF/INF for a company already on the portal, or adds a new company
+  // with its first JNF/INF, and returns here to open it.
   const addNewJob = (
-    <Button component={Link} href={`/admin/postings/new?cycle=${cycleId}`} variant="contained" size="small" startIcon={<AddIcon />}>
-      Add New Job
-    </Button>
+    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+      <Button component={Link} href={`/admin/postings/new?cycle=${cycleId}`} variant="contained" size="small" startIcon={<AddIcon />}>
+        Add Job Profile
+      </Button>
+      <Button component={Link} href={`/admin/postings/new?company=new&cycle=${cycleId}`} variant="outlined" size="small" startIcon={<AddBusinessIcon />}>
+        Add New Company
+      </Button>
+    </Stack>
   );
 
   if (postings.length === 0) {

@@ -32,7 +32,6 @@ import {
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
-import UndoIcon from "@mui/icons-material/Undo";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import DownloadIcon from "@mui/icons-material/Download";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -77,7 +76,7 @@ export function overallStatus(application, rounds) {
   return latest === "waitlisted" ? "on_hold" : "in_process";
 }
 
-function ResultCell({ cell, onReadd, onRemoveDraft }) {
+function ResultCell({ cell, onRemoveDraft }) {
   if (!cell) return <Typography variant="caption" color="text.disabled">—</Typography>;
 
   const label = resultLabels[cell.result] ?? titleCase(cell.result);
@@ -98,13 +97,6 @@ function ResultCell({ cell, onReadd, onRemoveDraft }) {
             sx={cell.published ? undefined : { borderStyle: "dashed" }}
             label={`${label}${cell.is_addendum ? " +" : ""}${cell.published ? "" : " (draft)"}`}
           />
-        </Tooltip>
-      )}
-      {cell.published && cell.result === "rejected" && (
-        <Tooltip title="Re-add previously rejected candidate">
-          <IconButton size="small" onClick={onReadd}>
-            <UndoIcon fontSize="inherit" />
-          </IconButton>
         </Tooltip>
       )}
       {!cell.published && cell.result !== "pending" && (
@@ -180,14 +172,6 @@ export default function PipelineTab({ posting, onMessage, onChanged }) {
     }
     if (kind === "publish") {
       return run(() => adminApi(`${base}/${round.id}/publish`, { method: "POST", body: JSON.stringify({ reject_remaining: dialog.rejectRemaining }) }));
-    }
-    if (kind === "readd") {
-      return run(() =>
-        adminApi(`${base}/${round.id}/readd/${dialog.application.id}`, {
-          method: "POST",
-          body: JSON.stringify({ confirm: dialog.confirm, remark: dialog.remark }),
-        })
-      );
     }
     return undefined;
   };
@@ -345,7 +329,6 @@ export default function PipelineTab({ posting, onMessage, onChanged }) {
                   <TableCell key={round.id}>
                     <ResultCell
                       cell={a.results?.[round.id]}
-                      onReadd={() => setDialog({ kind: "readd", round, application: a, remark: "", confirm: false })}
                       onRemoveDraft={() =>
                         window.confirm(`Remove the draft result for ${a.student?.roll_no}?`) &&
                         run(() => adminApi(`${base}/${round.id}/results/${a.id}`, { method: "DELETE" }))
@@ -422,7 +405,6 @@ export default function PipelineTab({ posting, onMessage, onChanged }) {
           {dialog?.kind === "attendance" && `Attendance — ${dialog.round.name}`}
           {dialog?.kind === "addendum" && `Addendum — ${dialog.round.name}`}
           {dialog?.kind === "publish" && `Publish ${dialog.round.name} shortlist to students?`}
-          {dialog?.kind === "readd" && "Re-add previously rejected candidate"}
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
@@ -452,18 +434,6 @@ export default function PipelineTab({ posting, onMessage, onChanged }) {
                 />
               </>
             )}
-            {dialog?.kind === "readd" && (
-              <>
-                <Alert severity="warning">
-                  Re-add {dialog.application.student?.roll_no} {dialog.application.student?.full_name} to {dialog.round.name}. The company will be notified.
-                </Alert>
-                <TextField label="Reason (sent to the company)" value={dialog.remark} onChange={(e) => setDialog((d) => ({ ...d, remark: e.target.value }))} />
-                <FormControlLabel
-                  control={<Checkbox checked={dialog.confirm} onChange={(e) => setDialog((d) => ({ ...d, confirm: e.target.checked }))} />}
-                  label="Re-add previously rejected candidate — the company will be notified"
-                />
-              </>
-            )}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -473,7 +443,7 @@ export default function PipelineTab({ posting, onMessage, onChanged }) {
           <Button
             variant="contained"
             onClick={submitDialog}
-            disabled={busy || (dialog?.kind === "readd" && (!dialog.confirm || !dialog.remark.trim()))}
+            disabled={busy}
           >
             {dialog?.kind === "publish" ? "Continue" : "Save"}
           </Button>

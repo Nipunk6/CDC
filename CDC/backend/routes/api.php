@@ -223,10 +223,7 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin', 'staff'])->prefix('ad
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/results', [AdminPipelineController::class, 'results']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/attendance', [AdminPipelineController::class, 'attendance']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/publish', [AdminPipelineController::class, 'publish']);
-    Route::delete('/postings/{jobPosting}/rounds/{postingRound}/waitlist/{application}', [AdminPipelineController::class, 'removeFromWaitlist']);
-    Route::post('/postings/{jobPosting}/rounds/{postingRound}/waitlist/{application}/promote', [AdminPipelineController::class, 'promoteFromWaitlist']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/addendum', [AdminPipelineController::class, 'addendum']);
-    Route::post('/postings/{jobPosting}/rounds/{postingRound}/readd/{application}', [AdminPipelineController::class, 'readd']);
     Route::delete('/postings/{jobPosting}/rounds/{postingRound}/results/{application}', [AdminPipelineController::class, 'destroyDraft']);
 
     Route::post('/postings/{jobPosting}/applications/{application}/remove-from-process', [AdminPipelineController::class, 'removeFromProcess']);
@@ -315,8 +312,11 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin', 'staff'])->prefix('ad
     // "Add New Job" (S6.1): the CDC fills the JNF/INF wizard for a company, picking or creating it.
     Route::get('/form-builder/companies', [AdminFormBuilderController::class, 'companies']);
     Route::post('/form-builder/companies', [AdminFormBuilderController::class, 'storeCompany']);
+    Route::get('/form-builder/accepted-forms', [AdminFormBuilderController::class, 'acceptedForms']);
+    Route::post('/form-builder/duplicate', [AdminFormBuilderController::class, 'duplicate']);
     Route::prefix('/form-builder/{company}')->whereNumber('company')->group(function () {
         Route::get('/profile', [AdminFormBuilderController::class, 'profile']);
+        Route::get('/forms', [AdminFormBuilderController::class, 'forms']);
         Route::get('/policy-documents', [AdminFormBuilderController::class, 'policyDocuments']);
         Route::post('/jnfs/autosave', [AdminFormBuilderController::class, 'autosaveJnf']);
         Route::post('/jnfs', [AdminFormBuilderController::class, 'storeJnf']);
@@ -357,6 +357,8 @@ Route::middleware(['auth:sanctum', 'active', 'role:company'])->prefix('company')
     Route::get('/postings/{jobPosting}', [CompanyPipelineController::class, 'show']);
     Route::get('/postings/{jobPosting}/applicants', [CompanyPipelineController::class, 'applicants']);
     Route::get('/postings/{jobPosting}/export', [CompanyPipelineController::class, 'export']);
+    Route::get('/postings/{jobPosting}/rounds/{postingRound}/export', [CompanyPipelineController::class, 'exportStage']);
+    Route::get('/postings/{jobPosting}/offers/export', [CompanyPipelineController::class, 'exportOffers']);
     Route::get('/postings/{jobPosting}/proposals', [CompanyPipelineController::class, 'proposals']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/proposals', [CompanyPipelineController::class, 'storeProposal']);
 

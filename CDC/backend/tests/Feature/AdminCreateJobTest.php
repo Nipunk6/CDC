@@ -229,6 +229,88 @@ class AdminCreateJobTest extends TestCase
         $this->assertSame(0, AuditLog::where('action', 'form.admin_create')->count());
     }
 
+    public function test_forms_lists_only_this_companys_forms_of_the_type_for_the_preview(): void
+    {
+        $mine = $this->company();
+        $other = $this->company('hr@other.test');
+        $inf = Inf::create(['company_id' => $mine->id, 'internship_title' => 'SDE Intern', 'internship_description' => 'D', 'status' => 'accepted', 'form_data' => ['internshipTitle' => 'SDE Intern']]);
+        Inf::create(['company_id' => $mine->id, 'internship_title' => 'Untitled INF Draft', 'internship_description' => 'Draft in progress.', 'status' => 'draft']);
+        Inf::create(['company_id' => $other->id, 'internship_title' => 'Other', 'internship_description' => 'D', 'status' => 'accepted']);
+        Jnf::create(['company_id' => $mine->id, 'job_title' => 'SDE', 'job_description' => 'D', 'status' => 'accepted']);
+        Sanctum::actingAs($this->admin);
+
+        $response = $this->getJson("/api/admin/form-builder/{$mine->id}/forms?type=inf")->assertOk();
+        $this->assertSame([$inf->id], $response->json('forms.*.id'));
+        $response->assertJsonPath('forms.0.title', 'SDE Intern');
+        $response->assertJsonPath('forms.0.form_data.internshipTitle', 'SDE Intern');
+        $response->assertJsonPath('company.name', 'Offline Co');
+
+        $this->assertSame(['SDE'], $this->getJson("/api/admin/form-builder/{$mine->id}/forms?type=jnf")->json('forms.*.title'));
+        $this->getJson("/api/admin/form-builder/{$mine->id}/forms")->assertStatus(422)->assertJsonValidationErrors('type');
+    }
+
+    public function test_accepted_forms_lists_recent_accepted_forms_as_cards_and_searches(): void
+    {
+        $acme = $this->company();
+        $other = Company::create(['name' => 'Zenith Labs', 'hr_name' => 'HR', 'hr_email' => 'hr@zenith.test']);
+        $inf = Inf::create(['company_id' => $acme->id, 'internship_title' => 'SDE Intern', 'internship_description' => 'D', 'status' => 'accepted', 'form_data' => [
+            'internshipLocation' => 'Bengaluru', 'graduatingBatch' => '2028', 'currency' => 'INR', 'ppoProvision' => true, 'ppoCtc' => '4500000',
+            'programmeStipends' => [['programme' => 'B.Tech', 'baseStipend' => '110000', 'total' => '110000', 'enabled' => true]],
+            'eligibility' => [['programme' => 'B.Tech', 'graduatingBatches' => ['2028'], 'branches' => [['branch' => 'CSE', 'selected' => true], ['branch' => 'EE', 'selected' => true], ['branch' => 'ME', 'selected' => false]]]],
+        ]]);
+        Jnf::create(['company_id' => $other->id, 'job_title' => 'Analyst', 'job_description' => 'D', 'status' => 'accepted', 'form_data' => ['programmeSalaries' => [['programme' => 'B.Tech', 'ctcAnnual' => '1800000', 'enabled' => true]]]]);
+        Inf::create(['company_id' => $acme->id, 'internship_title' => 'Still submitted', 'internship_description' => 'D', 'status' => 'submitted']);
+        Sanctum::actingAs($this->admin);
+
+        $forms = collect($this->getJson('/api/admin/form-builder/accepted-forms')->assertOk()->json('forms'));
+        $this->assertEqualsCanonicalizing(['SDE Intern', 'Analyst'], $forms->pluck('title')->all());
+        $card = $forms->firstWhere('title', 'SDE Intern');
+        $this->assertSame(['inf', $inf->id, 'Offline Co', ['2028'], 'Bengaluru', 1, 2], [$card['type'], $card['id'], $card['company']['name'], $card['batches'], $card['location'], $card['programmes_count'], $card['branches_count']]);
+        $this->assertEquals(['label' => 'Stipend', 'amount' => 110000, 'interval' => 'month', 'currency' => 'INR'], $card['pay']);
+        $this->assertEquals(4500000, $card['ppo_ctc']);
+        $this->assertNull($card['posting']);
+        $this->assertEquals(1800000, $forms->firstWhere('title', 'Analyst')['pay']['amount']);
+
+        $this->assertSame(['Analyst'], collect($this->getJson('/api/admin/form-builder/accepted-forms?search=zenith')->json('forms'))->pluck('title')->all());
+        $this->assertSame(['SDE Intern'], collect($this->getJson('/api/admin/form-builder/accepted-forms?search=SDE')->json('forms'))->pluck('title')->all());
+    }
+
+    public function test_duplicate_copies_a_form_as_a_draft_of_either_type_and_is_audited(): void
+    {
+        $company = $this->company();
+        $inf = Inf::create(['company_id' => $company->id, 'internship_title' => 'SDE Intern', 'internship_description' => '<p>Build</p>', 'status' => 'accepted', 'form_data' => [
+            'internshipTitle' => 'SDE Intern', 'internshipDescription' => '<p>Build</p>', 'internshipLocation' => 'Pune', 'skills' => ['DSA'],
+            'graduatingBatch' => '2028', 'duration' => '8', 'programmeStipends' => [['programme' => 'B.Tech', 'total' => '1']],
+            'eligibility' => [['programme' => 'B.Tech', 'graduatingBatch' => '2028', 'graduatingBatches' => ['2028'], 'branches' => [['branch' => 'CSE', 'selected' => true]]]],
+            'declarations' => ['aipc' => true], 'signatory' => ['name' => 'Asha', 'designation' => 'HR', 'date' => '2026-10-01'],
+        ]]);
+        Sanctum::actingAs($this->admin);
+
+        // Same type: a draft INF with the batch, declarations and signatory cleared.
+        $same = $this->postJson('/api/admin/form-builder/duplicate', ['form_type' => 'inf', 'form_id' => $inf->id, 'as' => 'inf'])->assertCreated();
+        $copy = Inf::findOrFail($same->json('form.id'));
+        $this->assertSame(['draft', $company->id, 'SDE Intern'], [$copy->status, $copy->company_id, $copy->internship_title]);
+        $this->assertSame('', $copy->form_data['graduatingBatch']);
+        $this->assertSame([], $copy->form_data['eligibility'][0]['graduatingBatches']);
+        $this->assertFalse($copy->form_data['declarations']['aipc']);
+        $this->assertSame('', $copy->form_data['signatory']['name']);
+        $this->assertSame('8', $copy->form_data['duration']);
+        $this->assertSame('accepted', $inf->fresh()->status);
+
+        // As the other type: the title, description and location move to the JNF keys; stipend fields are dropped.
+        $other = $this->postJson('/api/admin/form-builder/duplicate', ['form_type' => 'inf', 'form_id' => $inf->id, 'as' => 'jnf'])->assertCreated()->assertJsonPath('form_type', 'jnf');
+        $jnf = Jnf::findOrFail($other->json('form.id'));
+        $this->assertSame(['draft', 'SDE Intern', 'Pune'], [$jnf->status, $jnf->job_title, $jnf->job_location]);
+        $this->assertSame(['SDE Intern', '<p>Build</p>', ['DSA']], [$jnf->form_data['jobTitle'], $jnf->form_data['jobDescription'], $jnf->form_data['skills']]);
+        $this->assertArrayNotHasKey('internshipTitle', $jnf->form_data);
+        $this->assertArrayNotHasKey('programmeStipends', $jnf->form_data);
+        $this->assertArrayNotHasKey('duration', $jnf->form_data);
+
+        $this->assertSame(2, AuditLog::where('action', 'form.admin_duplicate')->count());
+        $this->postJson('/api/admin/form-builder/duplicate', ['form_type' => 'jnf', 'form_id' => 999999, 'as' => 'inf'])->assertNotFound();
+        $this->postJson('/api/admin/form-builder/duplicate', ['form_type' => 'inf', 'form_id' => $inf->id])->assertStatus(422)->assertJsonValidationErrors('as');
+    }
+
     public function test_validation_errors(): void
     {
         $company = $this->company();

@@ -116,6 +116,8 @@ class VerifyFixS7Test extends TestCase
                 'application_id' => $application->id, 'posting_round_id' => $this->round->id, 'result' => $result, 'published_at' => $i === 2 ? null : now(),
             ]);
         }
+        // These tests measure admin-written notices; the automatic job-profile announcements are covered in JobProfileNoticeTest.
+        \App\Models\Notice::where('source', \App\Services\JobProfileNoticeService::SOURCE)->delete();
     }
 
     // ---------------------------------------------------------------- helpers

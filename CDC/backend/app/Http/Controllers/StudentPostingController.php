@@ -36,7 +36,7 @@ class StudentPostingController extends Controller
 
         $student = $this->student($request);
 
-        $applications = $student->applications()->get()->keyBy('job_posting_id');
+        $applications = $student->applications()->with('offer')->get()->keyBy('job_posting_id');
 
         $postings = $this->visibleQuery($student)
             ->with(['postable.company:id,name,logo_path,sector', 'placementCycle:id,name,type,status'])
@@ -49,7 +49,7 @@ class StudentPostingController extends Controller
         $items = $postings->map(function (JobPosting $posting) use ($student, $applications) {
             return PostingPresenter::card($posting, $student->programme) + [
                 'eligibility' => $this->eligibility->check($student, $posting),
-                'application' => PostingPresenter::application($applications->get($posting->id)),
+                'application' => PostingPresenter::application($applications->get($posting->id), $student, $posting),
             ];
         })->filter(function (array $item) use ($validated) {
             if (! empty($validated['type']) && $item['type'] !== $validated['type']) {
@@ -91,7 +91,7 @@ class StudentPostingController extends Controller
     {
         $student = $this->student($request);
 
-        $application = $student->applications()->where('job_posting_id', $jobPosting->id)->first();
+        $application = $student->applications()->with('offer')->where('job_posting_id', $jobPosting->id)->first();
 
         if (! $this->visibleQuery($student)->whereKey($jobPosting->id)->exists() || ! $this->shownTo($student, $jobPosting, $application !== null)) {
             return response()->json(['message' => 'Job profile not found.'], 404);
@@ -108,7 +108,7 @@ class StudentPostingController extends Controller
                 'questions' => $jobPosting->questions->map->only(['id', 'question', 'help_text', 'qtype', 'options', 'required'])->values(),
                 'documents' => $jobPosting->documents()->get(['id', 'title', 'file_size'])->map->only(['id', 'title', 'file_size'])->values(),
                 'eligibility' => $this->eligibility->check($student, $jobPosting),
-                'application' => PostingPresenter::application($application),
+                'application' => PostingPresenter::application($application, $student, $jobPosting),
                 'trail' => PostingPresenter::trail($jobPosting, $application),
             ],
         ]);

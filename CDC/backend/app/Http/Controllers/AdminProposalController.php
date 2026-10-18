@@ -108,9 +108,19 @@ class AdminProposalController extends Controller
                 [$found, $unknown] = $this->pipeline->resolveApplicants($posting, array_column($payload, 'roll_no'));
                 $kind = $shortlistProposal->kind;
 
+                // A company proposal never changes a decision already published in this stage: the CDC does that on the
+                // stage itself (audited, the company told when a rejection is undone). Those students are reported.
+                $published = $round->results()->whereNotNull('published_at')
+                    ->whereIn('application_id', array_map(fn ($a) => $a->id, array_values($found)))->pluck('application_id')->all();
+
                 $entries = [];
                 foreach ($payload as $item) {
                     $application = $found[$item['roll_no']] ?? null;
+                    if ($application && in_array($application->id, $published, true)) {
+                        $unknown[] = ['roll_no' => $item['roll_no'], 'reason' => 'Already has a published decision in this stage. Change it on the stage itself if needed.'];
+
+                        continue;
+                    }
                     if ($application) {
                         $entries[] = [
                             'application' => $application,
@@ -125,7 +135,7 @@ class AdminProposalController extends Controller
 
                 // A company waitlist proposal is the complete desired waitlist (D75, unordered since D90): anyone left off is removed.
                 if ($kind === 'waitlist') {
-                    $keep = array_map(fn ($e) => $e['application']->id, $entries);
+                    $keep = array_map(fn ($a) => $a->id, array_values($found));
                     $current = $round->results()->where('result', 'waitlisted')->pluck('application_id')->all();
                     foreach (array_diff($current, $keep) as $applicationId) {
                         $row = $this->pipeline->removeFromWaitlist($round, \App\Models\Application::findOrFail($applicationId), $request->user());

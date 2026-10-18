@@ -301,16 +301,14 @@ class S4PipelineTest extends TestCase
             $this->assertSame(1, PortalNotification::where('user_id', $admin->id)->count(), "in-app E10 for {$admin->email}");
         }
 
-        // The company token is refused on every admin pipeline / result / attendance / readd / addendum / waitlist endpoint.
+        // The company token is refused on every admin pipeline / result / attendance / addendum endpoint.
         $a1 = $this->application('23QA0001');
         $p = $this->base();
         $endpoints = [
             ['POST', "$p/rounds/{$r1->id}/publish", ['reject_remaining' => true]],
             ['POST', "$p/rounds/{$r1->id}/results", ['roll_nos' => ['23QA0001'], 'result' => 'selected']],
             ['POST', "$p/rounds/{$r1->id}/attendance", ['roll_nos_present' => ['23QA0001']]],
-            ['POST', "$p/rounds/{$r1->id}/readd/{$a1->id}", ['confirm' => true, 'remark' => 'x']],
             ['POST', "$p/rounds/{$r1->id}/addendum", ['roll_nos' => ['23QA0001']]],
-            ['DELETE', "$p/rounds/{$r1->id}/waitlist/{$a1->id}", []],
             ['DELETE', "$p/rounds/{$r1->id}/results/{$a1->id}", []],
             ['POST', "$p/applications/{$a1->id}/remove-from-process", []],
             ['GET', "$p/pipeline", []],
@@ -579,20 +577,20 @@ class S4PipelineTest extends TestCase
         $this->patchJson('/api/admin/proposals/'.ShortlistProposal::latest('id')->first()->id, ['status' => 'approved'])->assertOk();
         $this->assertSame(['23QA0007', '23QA0008'], $waitlist());
 
-        // Admin: add 0009 via results entries, remove draft 0008 via DELETE …/waitlist/{application}.
+        // Admin: add 0009 via results entries, remove draft 0008 via DELETE …/results/{application}.
         $this->postJson($this->base()."/rounds/{$r1->id}/results", ['entries' => [
             ['roll_no' => '23QA0009', 'result' => 'waitlisted'],
             ['roll_no' => '23QA0010', 'result' => 'waitlisted'],
             ['roll_no' => '23QA0001', 'result' => 'selected'],
         ]])->assertOk();
-        $this->deleteJson($this->base()."/rounds/{$r1->id}/waitlist/".$this->application('23QA0008')->id)->assertOk();
+        $this->deleteJson($this->base()."/rounds/{$r1->id}/results/".$this->application('23QA0008')->id)->assertOk();
         $this->assertSame(['23QA0007', '23QA0009', '23QA0010'], $waitlist());
         $this->assertNull($this->resultRow('23QA0008', $r1), 'draft waitlist entry deleted');
 
         // Only the admin publishes.
         Sanctum::actingAs($this->companyUser);
         $this->postJson($this->base()."/rounds/{$r1->id}/publish")->assertForbidden();
-        $this->deleteJson($this->base()."/rounds/{$r1->id}/waitlist/".$this->application('23QA0007')->id)->assertForbidden();
+        $this->deleteJson($this->base()."/rounds/{$r1->id}/results/".$this->application('23QA0007')->id)->assertForbidden();
         $this->assertSame(0, ApplicationRoundResult::whereNotNull('published_at')->count());
         $this->assertNull($this->studentTrail('23QA0007')->json('applications.0.trail.0.result'));
 
@@ -600,16 +598,21 @@ class S4PipelineTest extends TestCase
         $this->postJson($this->base()."/rounds/{$r1->id}/publish")->assertOk()->assertJsonPath('counts.waitlisted', 3);
         $this->assertSame('waitlisted', $this->studentTrail('23QA0009')->json('applications.0.trail.0.result'));
 
-        // Removing a PUBLISHED waitlist entry → published "not selected" + regret mail.
+        // Taking a PUBLISHED waitlist entry off: changed on the stage (no row is locked since 2026-10-18), then
+        // published → "not selected" + regret mail.
         Sanctum::actingAs($this->admin);
-        $this->deleteJson($this->base()."/rounds/{$r1->id}/waitlist/".$this->application('23QA0009')->id)->assertOk();
+        $this->postJson($this->base()."/rounds/{$r1->id}/results", ['roll_nos' => ['23QA0009'], 'result' => 'rejected'])->assertOk()->assertJsonPath('changed', 1);
+        $this->postJson($this->base()."/rounds/{$r1->id}/publish")->assertOk()->assertJsonPath('counts.rejected', 1);
         $row = $this->resultRow('23QA0009', $r1);
         $this->assertSame('rejected', $row->result);
         $this->assertNotNull($row->published_at);
         $this->assertSame(1, $this->roundResultMailsTo('23QA0009', 'rejected'));
         $this->assertSame(['23QA0007', '23QA0010'], $waitlist());
-        // 0006 (removed via the approved company proposal — audited since the F-003 fix) + 0008 + 0009 (admin).
-        $this->assertSame(3, AuditLog::where('action', 'waitlist.remove')->count());
+        // 0006 removed via the approved company proposal (audited since the F-003 fix); the admin's draft removal of
+        // 0008 and change of 0009 have their own audit actions.
+        $this->assertSame(1, AuditLog::where('action', 'waitlist.remove')->count());
+        $this->assertSame(1, AuditLog::where('action', 'round.draft_remove')->count());
+        $this->assertSame(1, AuditLog::where('action', 'round.result_change')->count());
 
         // Company removes a PUBLISHED waitlist entry through its waitlist proposal (complete list = only 0007):
         // the same outcome as the admin path is required — published "not selected" AND the regret mail + in-app.
@@ -674,12 +677,17 @@ class S4PipelineTest extends TestCase
             $this->assertStringNotContainsString('waitlist_rank', $response->getContent());
         }
 
-        // The admin moves ANY waitlisted candidate (here the 4th and the 2nd added): promoted to "selected" in the
-        // round they were waitlisted in, notified, and NOTHING is written into the next round (QA F-002).
+        // The admin moves ANY waitlisted candidate on (here the 4th and the 2nd added) by shortlisting them on the stage
+        // and publishing: promoted to "selected" in the round they were waitlisted in, notified, and NOTHING is
+        // written into the next round (QA F-002).
         Sanctum::actingAs($this->admin);
         foreach (['23QA0005', '23QA0003'] as $roll) {
-            $this->postJson($this->base()."/rounds/{$r1->id}/waitlist/".$this->application($roll)->id.'/promote')->assertOk();
+            $this->postJson($this->base()."/rounds/{$r1->id}/results", ['roll_nos' => [$roll], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
+        }
+        $this->postJson($this->base()."/rounds/{$r1->id}/publish")->assertOk()->assertJsonPath('counts.selected', 2);
+        foreach (['23QA0005', '23QA0003'] as $roll) {
             $this->assertSame('selected', $this->resultRow($roll, $r1)->result);
+            $this->assertNotNull($this->resultRow($roll, $r1)->published_at);
             $this->assertNull($this->resultRow($roll, $r2), 'the next round is not pre-decided');
         }
         $trail = $this->studentTrail('23QA0005')->json('applications.0.trail');
@@ -688,7 +696,7 @@ class S4PipelineTest extends TestCase
         // Writing a next-round result for someone still on the waitlist is flagged with a precise hint.
         Sanctum::actingAs($this->admin);
         $this->postJson($this->base()."/rounds/{$r2->id}/results", ['entries' => [['roll_no' => '23QA0004', 'result' => 'selected']]])
-            ->assertOk()->assertJsonPath('warnings.0.reason', 'Is On Hold at the previous stage — use "Move" on the On Hold tab first.');
+            ->assertOk()->assertJsonPath('warnings.0.reason', 'Is On Hold at the previous stage. Change their decision there to Shortlisted and publish it first.');
 
         // Someone who was neither selected nor waitlisted is still flagged.
         Sanctum::actingAs($this->admin);
@@ -697,10 +705,10 @@ class S4PipelineTest extends TestCase
     }
 
     // ------------------------------------------------------------------------------------------------------------
-    // T4.5 Re-add and addendum
+    // T4.5 Bringing back a rejected candidate (formerly Re-add) and addendum
     // ------------------------------------------------------------------------------------------------------------
 
-    public function test_T4_5_readd_rejected_requires_confirm_and_remark_notifies_company_company_can_only_propose(): void
+    public function test_T4_5_bringing_back_a_rejected_candidate_notifies_company_company_can_only_propose(): void
     {
         $this->closeApplications();
         $r1 = $this->round(0);
@@ -711,33 +719,33 @@ class S4PipelineTest extends TestCase
         $a5 = $this->application('23QA0005');
         $this->assertSame('rejected', $this->resultRow('23QA0005', $r1)->result);
 
-        // The company has no re-add: the admin route is 403 and no company route mentions re-add.
+        // The company cannot decide a stage (the admin results route is 403) and no company route re-adds anyone.
         Sanctum::actingAs($this->companyUser);
-        $this->postJson("$url/readd/{$a5->id}", ['confirm' => true, 'remark' => 'please'])->assertForbidden();
+        $this->postJson("$url/results", ['roll_nos' => ['23QA0005'], 'result' => 'selected'])->assertForbidden();
         $companyReadd = collect(Route::getRoutes()->getRoutes())->map->uri()->filter(fn ($u) => str_starts_with($u, 'api/company') && str_contains($u, 'readd'));
         $this->assertCount(0, $companyReadd);
+        $this->assertSame('rejected', $this->resultRow('23QA0005', $r1)->result, 'unchanged after the refused attempt');
 
+        // Re-stating the published decision changes nothing and tells nobody.
         Sanctum::actingAs($this->admin);
-        $this->postJson("$url/readd/{$a5->id}", ['remark' => 'Mis-scored'])->assertStatus(422);
-        $this->postJson("$url/readd/{$a5->id}", ['confirm' => false, 'remark' => 'Mis-scored'])->assertStatus(422);
-        $this->postJson("$url/readd/{$a5->id}", ['confirm' => true])->assertStatus(422);
-        $this->assertSame('rejected', $this->resultRow('23QA0005', $r1)->result, 'unchanged after refused attempts');
+        $this->postJson("$url/results", ['roll_nos' => ['23QA0005'], 'result' => 'rejected'])->assertOk()->assertJsonPath('written', 0);
         Mail::assertNotQueued(PortalNoticeMail::class, fn ($m) => $m->hasTo($this->companyUser->email));
 
-        $this->postJson("$url/readd/{$a5->id}", ['confirm' => true, 'remark' => 'Mis-scored test'])->assertOk();
+        // No row is locked (owner decision 2026-10-18): the admin changes the decision on the stage; the company is told.
+        $this->postJson("$url/results", ['roll_nos' => ['23QA0005'], 'result' => 'selected'])->assertOk()->assertJsonPath('changed', 1);
         $row = $this->resultRow('23QA0005', $r1);
         $this->assertSame('selected', $row->result);
         $this->assertTrue($row->is_addendum);
-        $this->assertNull($row->published_at, 're-add is a draft');
+        $this->assertNull($row->published_at, 'the change is a draft until published');
         Mail::assertQueued(PortalNoticeMail::class, fn (PortalNoticeMail $m) => $m->hasTo($this->companyUser->email) && str_contains($m->headline, '23QA0005'));
         $this->assertSame(1, PortalNotification::where('user_id', $this->companyUser->id)->count());
-        $audit = AuditLog::where('action', 'round.readd')->sole();
+        $audit = AuditLog::where('action', 'round.result_change')->sole();
         $this->assertSame('rejected', $audit->before['result']);
         $this->assertSame('selected', $audit->after['result']);
         $this->assertSame($this->admin->id, $audit->user_id);
 
         // The company can only PROPOSE: an addendum proposal for another rejected student is accepted as pending,
-        // and approving it does not re-add (reported, needs the admin protocol).
+        // and approving it does not bring them back (reported; the CDC changes it on the stage).
         Sanctum::actingAs($this->companyUser);
         $this->postJson("/api/company/postings/{$this->posting->id}/rounds/{$r1->id}/proposals", ['kind' => 'addendum', 'entries' => [['roll_no' => '23QA0006']]])->assertCreated();
         Sanctum::actingAs($this->admin);

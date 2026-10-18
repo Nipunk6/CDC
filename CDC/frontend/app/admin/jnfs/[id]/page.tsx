@@ -233,6 +233,8 @@ export default function AdminJnfDetailPage() {
   const [editMode, setEditMode] = useState(false);
   const [editFormData, setEditFormData] = useState<FormData>({});
   const [savingEdit, setSavingEdit] = useState(false);
+  // "Edit" on New Job Profile's preview links here with ?edit=1: open in edit mode once the form has loaded.
+  const [editOnLoad, setEditOnLoad] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -246,6 +248,7 @@ export default function AdminJnfDetailPage() {
           latest_editable_remark_id?: number | null;
         }>(`/admin/jnfs/${params.id}`);
         setJnf(response.jnf);
+        setEditOnLoad(new URLSearchParams(window.location.search).get("edit") === "1");
         setRemarks("");
         setStatusHistory(response.status_history ?? []);
         setReviewMarked(response.review_marked === true);
@@ -443,6 +446,11 @@ export default function AdminJnfDetailPage() {
     setEditFormData(data);
     setEditMode(true);
   };
+
+  if (editOnLoad && jnf) {
+    setEditOnLoad(false);
+    startEditing();
+  }
 
   const cancelEditing = () => {
     setEditMode(false);

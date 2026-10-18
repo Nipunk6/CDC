@@ -145,8 +145,10 @@ class PipelineService
     {
         $written = 0;
         $skipped = [];
+        $changed = [];
+        $restored = [];
 
-        DB::transaction(function () use ($round, $entries, $admin, &$written, &$skipped): void {
+        DB::transaction(function () use ($round, $entries, $admin, &$written, &$skipped, &$changed, &$restored): void {
             foreach ($entries as $entry) {
                 /** @var Application $application */
                 $application = $entry['application'];
@@ -158,22 +160,35 @@ class PipelineService
 
                 $roll = $application->studentProfile?->roll_no ?? (string) $application->id;
 
-                if ($row && $row->isPublished()) {
-                    $skipped[] = [
-                        'roll_no' => $roll,
-                        'reason' => $row->result === 'rejected'
-                            ? 'Already rejected in this stage (published). Use "Re-add" to bring them back.'
-                            : 'Result already published for this stage.',
-                    ];
+                // Owner decision 2026-10-18: a published decision is never locked. Changing it makes the row a draft
+                // again; the student sees (and is mailed) the new decision when the stage is published.
+                $wasPublished = $row && $row->isPublished();
+                if ($wasPublished) {
+                    if ($row->result === $entry['result']) {
+                        $skipped[] = ['roll_no' => $roll, 'reason' => 'Already '.self::RESULT_LABELS[$row->result].' (published); nothing changed.'];
+
+                        continue;
+                    }
+                    if ($refusal = $this->publishedChangeRefusal($round, $application, $row, $entry['result'])) {
+                        $skipped[] = ['roll_no' => $roll, 'reason' => $refusal];
+
+                        continue;
+                    }
+                }
+
+                // Someone published as not selected in an EARLIER stage is changed there first (D75).
+                if ($entry['result'] !== 'rejected' && $this->rejectedEarlier($application, $round)) {
+                    $skipped[] = ['roll_no' => $roll, 'reason' => 'Not shortlisted in an earlier stage. Change their decision on that stage first.'];
 
                     continue;
                 }
 
-                // Someone published as not selected in an EARLIER round comes back only through Re-add (D75).
-                if ($entry['result'] !== 'rejected' && $this->rejectedEarlier($application, $round)) {
-                    $skipped[] = ['roll_no' => $roll, 'reason' => 'Not shortlisted in an earlier stage. Use "Re-add" on that stage first.'];
-
-                    continue;
+                if ($wasPublished) {
+                    $changed[] = ['application' => $application, 'roll_no' => $roll, 'from' => $row->result, 'to' => $entry['result']];
+                    // Taken off "shortlisted": their undecided drafts in later stages no longer apply.
+                    if ($row->result === 'selected') {
+                        $this->laterResults($application, $round)->whereNull('published_at')->delete();
+                    }
                 }
 
                 $attributes = [
@@ -183,6 +198,27 @@ class PipelineService
                     'decided_by' => $admin?->id,
                     'remark' => $entry['remark'] ?? ($row?->is_addendum ? $row->remark : null),
                 ];
+                if ($wasPublished) {
+                    $attributes['published_at'] = null;
+                    $attributes['published_result'] = $row->result;
+                    $attributes['previously_published_at'] = $row->published_at;
+                }
+
+                // Changed back to what the student last saw, before publishing: restore it as published, so the
+                // student is not mailed a "new" result identical to the old one.
+                if (! $wasPublished && $row && $row->published_result !== null && $row->published_result === $entry['result']) {
+                    $restored[] = ['application' => $application, 'roll_no' => $roll, 'from' => $row->result, 'to' => $entry['result']];
+                    $row->update([
+                        'result' => $row->published_result,
+                        'published_at' => $row->previously_published_at ?? now(),
+                        'published_result' => null,
+                        'previously_published_at' => null,
+                        'decided_by' => $admin?->id,
+                    ]);
+                    $written++;
+
+                    continue;
+                }
 
                 if ($row) {
                     $row->update($attributes);
@@ -196,7 +232,46 @@ class PipelineService
             }
         });
 
-        return ['written' => $written, 'skipped' => $skipped];
+        return ['written' => $written, 'skipped' => $skipped, 'changed' => $changed, 'restored' => $restored];
+    }
+
+    /** How a decision reads in messages. */
+    public const RESULT_LABELS = ['selected' => 'shortlisted', 'rejected' => 'not selected', 'waitlisted' => 'on hold', 'pending' => 'undecided'];
+
+    /**
+     * Why a PUBLISHED decision cannot change to `$to` right now, or null. The row is never locked, but the record must
+     * stay consistent: an offer is revoked first, a later stage that already published a decision for the student is
+     * changed first, and bringing back someone who was not selected follows the offer guard (QA F-035).
+     */
+    private function publishedChangeRefusal(PostingRound $round, Application $application, ApplicationRoundResult $row, string $to): ?string
+    {
+        if ($application->offer()->exists()) {
+            return 'Holds an offer from this job profile. Revoke the offer on the Shortlist for Offer page first.';
+        }
+
+        if ($row->result === 'selected') {
+            $later = $this->laterResults($application, $round)->whereNotNull('published_at')->with('postingRound:id,name')->first();
+            if ($later) {
+                return sprintf('Already has a published decision in "%s". Change it there first.', $later->postingRound?->name ?? 'a later stage');
+            }
+        }
+
+        if ($row->result === 'rejected' && in_array($to, ['selected', 'waitlisted'], true)) {
+            $posting = $round->jobPosting ?? JobPosting::query()->find($round->job_posting_id);
+            if ($refusal = app(BlockingPolicy::class)->offerRefusal($application->studentProfile, $posting, $application->id)) {
+                return $refusal;
+            }
+        }
+
+        return null;
+    }
+
+    /** This application's results in the stages after `$round`. */
+    private function laterResults(Application $application, PostingRound $round): \Illuminate\Database\Eloquent\Builder
+    {
+        return ApplicationRoundResult::query()
+            ->where('application_id', $application->id)
+            ->whereHas('postingRound', fn ($q) => $q->where('job_posting_id', $round->job_posting_id)->where('sort_order', '>', $round->sort_order));
     }
 
     /**
@@ -259,7 +334,7 @@ class PipelineService
                 ->values();
 
             foreach ($drafts as $row) {
-                $row->forceFill(['published_at' => $now])->save();
+                $row->forceFill(['published_at' => $now, 'published_result' => null, 'previously_published_at' => null])->save();
             }
 
             $round->update(['status' => 'completed']);
@@ -304,25 +379,6 @@ class PipelineService
         }
 
         SendRoundResultMails::dispatch($round->id, $ids, $withNextRound, $kind);
-    }
-
-    /**
-     * "Move to next round" for a waitlisted candidate (D90, QA F-002): the PUBLISHED waitlist row becomes a published
-     * "selected" in the SAME round, so the student enters the next round's pool like everyone who cleared this round
-     * — nothing is pre-decided in the next round. Returns null when the candidate is not on the published waitlist.
-     */
-    public function promoteFromWaitlist(PostingRound $round, Application $application, ?User $admin): ?ApplicationRoundResult
-    {
-        return DB::transaction(function () use ($round, $application, $admin) {
-            $row = $round->results()->where('application_id', $application->id)->lockForUpdate()->first();
-            if (! $row || $row->result !== 'waitlisted' || ! $row->isPublished() || $application->status !== 'applied') {
-                return null;
-            }
-
-            $row->update(['result' => 'selected', 'published_at' => now(), 'decided_by' => $admin?->id, 'remark' => 'Promoted from On Hold']);
-
-            return $row;
-        });
     }
 
     /**
