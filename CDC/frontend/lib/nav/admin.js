@@ -14,6 +14,7 @@ import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccountOutlined
 import AssignmentIcon from "@mui/icons-material/AssignmentOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import BusinessIcon from "@mui/icons-material/BusinessOutlined";
+import TimelineIcon from "@mui/icons-material/TimelineOutlined";
 import PolicyIcon from "@mui/icons-material/PolicyOutlined";
 import Diversity3Icon from "@mui/icons-material/Diversity3Outlined";
 import CampaignIcon from "@mui/icons-material/CampaignOutlined";
@@ -56,6 +57,7 @@ export function adminNav({ isSuperAdmin = false, can = () => true } = {}) {
         { label: "JNF Reviews", href: "/admin/jnfs", permission: "form_reviews", icon: AssignmentIcon },
         { label: "INF Reviews", href: "/admin/infs", permission: "form_reviews", icon: SchoolIcon },
         { label: "Companies", href: "/admin/companies", permission: "companies", icon: BusinessIcon },
+        { label: "Company History", href: "/admin/company-history", permission: "companies", icon: TimelineIcon },
         { label: "Policy Documents", href: "/admin/policy-documents", permission: "policy_documents", icon: PolicyIcon },
         { label: "Alumni Outreach", href: "/admin/alumni-outreach", permission: "alumni_outreach", icon: Diversity3Icon },
       ],

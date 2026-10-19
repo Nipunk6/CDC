@@ -219,6 +219,8 @@ class AdminPostingController extends Controller
                     'scheduled_open_at' => $scheduledAt,
                     'visit_date' => $validated['visit_date'] ?? null,
                     'announcement' => $announcement,
+                    // Company History (P3-D55): the HR contact as it was when the job profile was opened.
+                    'hr_snapshot' => \App\Services\CompanyHistoryService::contactSnapshot($form->company),
                 ]);
 
                 $this->copyRounds($posting, $form);

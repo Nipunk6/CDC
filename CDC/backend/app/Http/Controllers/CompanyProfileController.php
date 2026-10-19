@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CompanyHistoryService;
 use App\Services\SpocService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -72,6 +73,7 @@ class CompanyProfileController extends Controller
         ]);
 
         $hrBefore = $company->only(['hr_name', 'hr_designation', 'hr_email', 'hr_phone', 'hr_alt_phone']);
+        $contactsBefore = CompanyHistoryService::contactValues($company);
         $company->update([
             'name' => $validated['name'],
             'website' => $validated['website'],
@@ -118,6 +120,7 @@ class CompanyProfileController extends Controller
             'company_description' => $validated['company_description'] ?? null,
         ]);
 
+        app(CompanyHistoryService::class)->recordChange($company, $contactsBefore, $request->user(), 'company'); // P3-D55
         // SPOCs of this company's live job profiles get the new HR contact by mail (P10.2).
         if (SpocService::hrChanged($hrBefore, $company)) {
             app(SpocService::class)->notifyHrChanged($company);

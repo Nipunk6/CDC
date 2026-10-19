@@ -26,6 +26,7 @@ const PAGE_PERMISSIONS = [
   ["/admin/jnfs", "form_reviews"],
   ["/admin/infs", "form_reviews"],
   ["/admin/companies", "companies"],
+  ["/admin/company-history", "companies"],
   ["/admin/policy-documents", "policy_documents"],
   ["/admin/alumni-outreach", "alumni_outreach"],
   ["/admin/students/invitations", "student_invitations"],

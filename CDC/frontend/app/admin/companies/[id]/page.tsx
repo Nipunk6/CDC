@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Avatar,
@@ -12,10 +12,13 @@ import {
   Divider,
   Grid2,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import BusinessIcon from "@mui/icons-material/Business";
 import { adminApi } from "@/lib/adminapi";
+import CompanyHistoryPanel from "@/components/admin/companyhistorypanel";
 
 type ContactBlock = {
   name?: string | null;
@@ -109,6 +112,9 @@ export default function AdminCompanyDetailPage() {
   const [company, setCompany] = useState<Company | null>(null);
   const [summary, setSummary] = useState<CompanySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Company History (P3-D55): ?tab=history opens the History & Contacts tab.
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get("tab") === "history" ? "history" : "profile");
 
   useEffect(() => {
     const run = async () => {
@@ -155,7 +161,14 @@ export default function AdminCompanyDetailPage() {
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      {summary && (
+      <Tabs value={tab} onChange={(_e, value) => setTab(value)} sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Tab value="profile" label="Profile" />
+        <Tab value="history" label="History & Contacts" />
+      </Tabs>
+
+      {tab === "history" && <CompanyHistoryPanel companyId={params.id} />}
+
+      {tab === "profile" && summary && (
         <Card>
           <CardContent>
             <Grid2 container spacing={2}>
@@ -181,7 +194,7 @@ export default function AdminCompanyDetailPage() {
         </Card>
       )}
 
-      {company && (
+      {tab === "profile" && company && (
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>
@@ -242,7 +255,7 @@ export default function AdminCompanyDetailPage() {
         </Card>
       )}
 
-      {company && (
+      {tab === "profile" && company && (
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>
@@ -292,7 +305,7 @@ export default function AdminCompanyDetailPage() {
         </Card>
       )}
 
-      {company && (
+      {tab === "profile" && company && (
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>

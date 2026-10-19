@@ -58,6 +58,7 @@ class JobPosting extends Model
         'announcement',
         'visit_date',
         'scheduled_open_at',
+        'hr_snapshot',
     ];
 
     /**
@@ -75,6 +76,7 @@ class JobPosting extends Model
             'announcement' => 'array',
             'visit_date' => 'date',
             'scheduled_open_at' => 'datetime',
+            'hr_snapshot' => 'array',
         ];
     }
 
@@ -129,6 +131,12 @@ class JobPosting extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(PostingDocument::class)->orderBy('id');
+    }
+
+    /** Offers announced for this job profile (Company History counts, P3-D55). */
+    public function offers(): HasMany
+    {
+        return $this->hasMany(Offer::class);
     }
 
     /** SCPT members assigned as SPOC for this job profile (P10.2). */

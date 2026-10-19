@@ -119,3 +119,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-19 · P10.1 + P10.2 SCPT registry and SPOC assignment, not committed (P3-D50)
 - 2026-10-19 · P6.2 stage attendance by Excel + company view, not committed (P3-D53)
 - 2026-10-20 · company applicant list CGPA sort + sorted downloads, not committed (P3-D54)
+- 2026-10-20 · Company History page + company History & Contacts tab + contact change log, not committed (P3-D55)

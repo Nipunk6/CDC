@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminAccessController;
 use App\Http\Controllers\AdminAttendanceController;
 use App\Http\Controllers\AdminCompanyController;
+use App\Http\Controllers\AdminCompanyHistoryController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFormReviewController;
 use App\Http\Controllers\AdminManagementController;
@@ -336,6 +337,10 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin', 'staff'])->prefix('ad
     Route::get('/companies', [AdminCompanyController::class, 'index']);
     Route::get('/companies/{company}', [AdminCompanyController::class, 'show']);
     Route::put('/companies/{company}', [AdminCompanyController::class, 'update']);
+    // Company History (P3-D55)
+    Route::get('/company-history', [AdminCompanyHistoryController::class, 'index']);
+    Route::get('/company-history/export', [AdminCompanyHistoryController::class, 'export']);
+    Route::get('/companies/{company}/history', [AdminCompanyHistoryController::class, 'show']);
 
     // "Add New Job" (S6.1): the CDC fills the JNF/INF wizard for a company, picking or creating it.
     Route::get('/form-builder/companies', [AdminFormBuilderController::class, 'companies']);

@@ -162,6 +162,7 @@ final class StaffPermissions
         ['GET', 'form-builder/*', 'form_reviews', 'write'],
         ['*', 'form-builder*', 'form_reviews', 'write'],
         ['GET', 'companies*', 'companies', 'read'],
+        ['GET', 'company-history*', 'companies', 'read'],
         ['*', 'companies*', 'companies', 'write'],
         ['*', 'policy-documents*', 'policy_documents', 'write'],
         ['GET', 'alumni-outreach', 'alumni_outreach', 'read'],
