@@ -120,3 +120,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-19 · P6.2 stage attendance by Excel + company view, not committed (P3-D53)
 - 2026-10-20 · company applicant list CGPA sort + sorted downloads, not committed (P3-D54)
 - 2026-10-20 · Company History page + company History & Contacts tab + contact change log, not committed (P3-D55)
+- 2026-10-20 · company bulk proposals (decision sheet with dropdown, roll-number list), not committed (P3-D56)

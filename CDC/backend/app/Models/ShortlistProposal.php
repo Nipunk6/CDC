@@ -15,12 +15,17 @@ class ShortlistProposal extends Model
      *
      * @var list<string>
      */
+    /** The stored copy's location stays server-side (P3-D56). */
+    protected $hidden = ['source_file_path'];
+
     protected $fillable = [
         'job_posting_id',
         'posting_round_id',
         'proposed_by',
         'kind',
         'payload',
+        'source_file_name',
+        'source_file_path',
         'status',
         'admin_remark',
         'decided_by',

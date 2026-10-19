@@ -46,6 +46,8 @@ import { companyApi } from "@/lib/companyapi";
 import { companyDownload } from "@/lib/companydownload";
 import { formatDateTime, postingStatusLabel, statusColor, titleCase } from "@/lib/format";
 import { cgpaQuery, nextCgpaDirection, sortByCgpa } from "@/lib/applicantorder";
+import ProposalUploadDialog from "@/components/company/proposaluploaddialog";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 const kindLabels = { shortlist: "Shortlist", waitlist: "On Hold", addendum: "Addendum", replacement_request: "Replacement request" };
 // A completed drive still takes these (QA F-010).
@@ -64,6 +66,7 @@ export default function CompanyPostingDetailPage({ params }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [dialog, setDialog] = useState(null);
+  const [uploadOpen, setUploadOpen] = useState(false); // P3-D56
   const [dialogError, setDialogError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [stageMenu, setStageMenu] = useState(null); // { anchor, round } of a stage's download menu
@@ -180,6 +183,9 @@ export default function CompanyPostingDetailPage({ params }) {
               }}
             >
               {completed ? "Request replacement" : "Propose shortlist"}
+            </Button>
+            <Button variant="outlined" color="secondary" startIcon={<UploadFileIcon />} disabled={posting.status === "cancelled"} onClick={() => setUploadOpen(true)}>
+              Upload from Excel
             </Button>
           </>
         }
@@ -400,6 +406,7 @@ export default function CompanyPostingDetailPage({ params }) {
                     <Chip size="small" variant="outlined" color={statusColor(p.status)} label={titleCase(p.status)} />
                     <Typography variant="caption" color="text.secondary">
                       {formatDateTime(p.created_at)} · {(p.payload ?? []).length} candidate(s)
+                      {p.source_file_name ? ` · uploaded from ${p.source_file_name}` : ""}
                     </Typography>
                   </Stack>
                   {p.admin_remark && <Typography variant="body2">CDC remark: {p.admin_remark}</Typography>}
@@ -466,6 +473,20 @@ export default function CompanyPostingDetailPage({ params }) {
           </Button>
         </DialogActions>
       </Dialog>
+      {uploadOpen && (
+        <ProposalUploadDialog
+          posting={posting}
+          completed={completed}
+          open
+          onClose={() => setUploadOpen(false)}
+          onSent={async (response) => {
+            setUploadOpen(false);
+            setSuccess(response.message);
+            setTab("proposals");
+            await load();
+          }}
+        />
+      )}
       <Menu anchorEl={stageMenu?.anchor} open={Boolean(stageMenu)} onClose={() => setStageMenu(null)}>
         <MenuItem onClick={() => exportStage(stageMenu.round, "shortlisted")}>{stageMenu?.round?.is_final ? "Selected" : "Shortlisted"}</MenuItem>
         <MenuItem onClick={() => exportStage(stageMenu.round, "rejected")}>Not selected</MenuItem>

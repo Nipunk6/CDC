@@ -300,6 +300,7 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin', 'staff'])->prefix('ad
 
     Route::get('/proposals', [AdminProposalController::class, 'index']);
     Route::patch('/proposals/{shortlistProposal}', [AdminProposalController::class, 'update']);
+    Route::get('/proposals/{shortlistProposal}/file', [AdminProposalController::class, 'file']); // P3-D56
 
     // Phase 3 P0.5: the login log (super admins: everything; other admins: their own and students' rows).
     Route::get('/login-logs', [\App\Http\Controllers\AdminLoginLogController::class, 'index']);
@@ -394,6 +395,10 @@ Route::middleware(['auth:sanctum', 'active', 'role:company'])->prefix('company')
     Route::get('/postings/{jobPosting}/offers/export', [CompanyPipelineController::class, 'exportOffers']);
     Route::get('/postings/{jobPosting}/proposals', [CompanyPipelineController::class, 'proposals']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/proposals', [CompanyPipelineController::class, 'storeProposal']);
+    // Bulk proposals from a sheet (P3-D56)
+    Route::get('/postings/{jobPosting}/rounds/{postingRound}/decision-sheet', [CompanyPipelineController::class, 'decisionSheet']);
+    Route::post('/postings/{jobPosting}/rounds/{postingRound}/decision-sheet', [CompanyPipelineController::class, 'uploadDecisions']);
+    Route::post('/postings/{jobPosting}/rounds/{postingRound}/proposals/upload', [CompanyPipelineController::class, 'uploadRollList']);
 
     Route::post('/infs/autosave', [CompanyInfController::class, 'autosave']);
     Route::post('/infs/{inf}/duplicate', [CompanyInfController::class, 'duplicate']);

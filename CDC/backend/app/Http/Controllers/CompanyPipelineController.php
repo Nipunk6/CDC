@@ -10,12 +10,16 @@ use App\Models\JobPosting;
 use App\Models\PostingRound;
 use App\Models\ShortlistProposal;
 use App\Services\PipelineService;
+use App\Services\SpreadsheetImportService;
+use App\Services\CompanyProposalUploadService;
 use App\Services\SpocService;
 use App\Services\StakeholderNotifier;
 use App\Support\ApplicantOrder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
+use Illuminate\Support\Str;
 
 /**
  * Company view of its OWN floated forms (spec M6.4 / Q10.x). Only PUBLISHED round outcomes are ever shown,
@@ -169,7 +173,7 @@ class CompanyPipelineController extends Controller
             'proposals' => $jobPosting->proposals()
                 ->with('postingRound:id,name')
                 ->latest('id')
-                ->get(['id', 'job_posting_id', 'posting_round_id', 'kind', 'payload', 'status', 'admin_remark', 'decided_at', 'created_at']),
+                ->get(['id', 'job_posting_id', 'posting_round_id', 'kind', 'payload', 'source_file_name', 'status', 'admin_remark', 'decided_at', 'created_at']),
         ]);
     }
 
@@ -187,13 +191,8 @@ class CompanyPipelineController extends Controller
             'entries.*.roll_no' => ['required', 'string', 'max:30'],
         ]);
 
-        // A completed drive still takes replacement requests and addenda (E9 invites them; QA F-010).
-        if ($jobPosting->status === 'cancelled'
-            || ($jobPosting->status === 'completed' && ! in_array($validated['kind'], ['addendum', 'replacement_request'], true))) {
-            return response()->json(['message' => 'This job profile is '.$jobPosting->status.'.'.($jobPosting->status === 'completed' ? ' You can still send a replacement request or an addendum.' : '')], 422);
-        }
-        if ($jobPosting->acceptsApplications()) {
-            return response()->json(['message' => 'Applications are still open. You can propose candidates once the application window closes.'], 422);
+        if ($refused = $this->proposalRefusal($jobPosting, $validated['kind'])) {
+            return $refused;
         }
 
         // One entry per roll number (case-insensitive).
@@ -212,21 +211,156 @@ class CompanyPipelineController extends Controller
             ], 422);
         }
 
-        $payload = array_values(array_map(fn ($e) => ['roll_no' => strtoupper(trim($e['roll_no']))], $validated['entries']));
+        $proposal = $this->createProposal($request, $jobPosting, $postingRound, $validated['kind'], array_map(fn ($e) => strtoupper(trim($e['roll_no'])), $validated['entries']));
+
+        return response()->json([
+            'message' => 'Proposal sent to the CDC. Results become visible to students only after the CDC publishes them.',
+            'proposal' => $proposal,
+        ], 201);
+    }
+
+    /** P3-D56: the stage's decision sheet (its students, a Decision column with a Shortlisted / On Hold dropdown). */
+    public function decisionSheet(Request $request, JobPosting $jobPosting, PostingRound $postingRound, \App\Services\ExportService $exports, CompanyProposalUploadService $uploads): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorizePosting($request, $jobPosting);
+        abort_if($postingRound->job_posting_id !== $jobPosting->id, 404, 'Stage not found.');
+
+        return $exports->decisionSheetWorkbook($jobPosting, $postingRound, $uploads->pool($postingRound));
+    }
+
+    /**
+     * P3-D56: upload the filled decision sheet. Shortlisted rows become a Shortlist proposal and On Hold rows an On Hold
+     * proposal (each only when it has rows); bad rows are skipped and reported. `dry_run` only reports.
+     */
+    public function uploadDecisions(Request $request, JobPosting $jobPosting, PostingRound $postingRound, CompanyProposalUploadService $uploads): JsonResponse
+    {
+        $this->authorizePosting($request, $jobPosting);
+        abort_if($postingRound->job_posting_id !== $jobPosting->id, 404, 'Stage not found.');
+        $request->validate(['file' => array_merge(['required'], SpreadsheetImportService::UPLOAD_RULES), 'dry_run' => ['nullable', 'boolean']]);
+
+        if ($refused = $this->proposalRefusal($jobPosting, 'shortlist')) {
+            return $refused;
+        }
+
+        try {
+            $report = $uploads->readDecisionSheet($request->file('file'), $jobPosting, $postingRound);
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        $counts = ['shortlist' => count($report['shortlist']), 'waitlist' => count($report['waitlist'])];
+        $answer = ['shortlisted' => $counts['shortlist'], 'on_hold' => $counts['waitlist'], 'blank' => $report['blank'], 'errors' => $report['errors']];
+        if ($counts['shortlist'] + $counts['waitlist'] === 0) {
+            return response()->json(['message' => 'Nothing to send: no row is marked Shortlisted or On Hold for a student of this stage.'] + $answer, 422);
+        }
+
+        if ($request->boolean('dry_run')) {
+            return response()->json(['message' => sprintf('Preview: %d shortlisted, %d on hold, %d left blank, %d row(s) skipped. Nothing is sent yet.',
+                $counts['shortlist'], $counts['waitlist'], $report['blank'], count($report['errors'])), 'dry_run' => true] + $answer);
+        }
+
+        $source = $this->keepSourceFile($request, $jobPosting);
+        $proposals = [];
+        $sent = [];
+        foreach (['shortlist' => 'a shortlist of %d', 'waitlist' => 'an On Hold list of %d'] as $kind => $label) {
+            if ($report[$kind] !== []) {
+                $proposals[] = $this->createProposal($request, $jobPosting, $postingRound, $kind, $report[$kind], $source);
+                $sent[] = sprintf($label, $counts[$kind]);
+            }
+        }
+
+        return response()->json([
+            'message' => sprintf('Sent to the CDC: %s. %d row(s) skipped. Results become visible to students only after the CDC publishes them.', implode(' and ', $sent), count($report['errors'])),
+            'proposals' => $proposals,
+        ] + $answer, 201);
+    }
+
+    /** P3-D56: a roll-number list (first column) as a proposal of the chosen type; bad rows are skipped and reported. */
+    public function uploadRollList(Request $request, JobPosting $jobPosting, PostingRound $postingRound, CompanyProposalUploadService $uploads): JsonResponse
+    {
+        $this->authorizePosting($request, $jobPosting);
+        abort_if($postingRound->job_posting_id !== $jobPosting->id, 404, 'Stage not found.');
+        $validated = $request->validate([
+            'kind' => ['required', 'in:shortlist,waitlist,addendum,replacement_request'],
+            'file' => array_merge(['required'], SpreadsheetImportService::UPLOAD_RULES),
+            'dry_run' => ['nullable', 'boolean'],
+        ]);
+
+        if ($refused = $this->proposalRefusal($jobPosting, $validated['kind'])) {
+            return $refused;
+        }
+
+        try {
+            $report = $uploads->readRollList($request->file('file'), $jobPosting);
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+        $answer = ['students' => count($report['rolls']), 'errors' => $report['errors']];
+        if ($report['rolls'] === []) {
+            return response()->json(['message' => 'Nothing to send: no roll number in the file is an applicant of this job profile.'] + $answer, 422);
+        }
+        if ($request->boolean('dry_run')) {
+            return response()->json(['message' => sprintf('Preview: %d student(s), %d row(s) skipped. Nothing is sent yet.', count($report['rolls']), count($report['errors'])), 'dry_run' => true] + $answer);
+        }
+
+        $proposal = $this->createProposal($request, $jobPosting, $postingRound, $validated['kind'], $report['rolls'], $this->keepSourceFile($request, $jobPosting));
+
+        return response()->json([
+            'message' => sprintf('Proposal of %d student(s) sent to the CDC. %d row(s) skipped.', count($report['rolls']), count($report['errors'])),
+            'proposal' => $proposal,
+        ] + $answer, 201);
+    }
+
+    /** The same refusals for every way of proposing. */
+    private function proposalRefusal(JobPosting $jobPosting, string $kind): ?JsonResponse
+    {
+        // A completed drive still takes replacement requests and addenda (E9 invites them; QA F-010).
+        if ($jobPosting->status === 'cancelled'
+            || ($jobPosting->status === 'completed' && ! in_array($kind, ['addendum', 'replacement_request'], true))) {
+            return response()->json(['message' => 'This job profile is '.$jobPosting->status.'.'.($jobPosting->status === 'completed' ? ' You can still send a replacement request or an addendum.' : '')], 422);
+        }
+        if ($jobPosting->acceptsApplications()) {
+            return response()->json(['message' => 'Applications are still open. You can propose candidates once the application window closes.'], 422);
+        }
+
+        return null;
+    }
+
+    /** @return array{name: string, path: string} the uploaded file, kept for the CDC (private disk) */
+    private function keepSourceFile(Request $request, JobPosting $jobPosting): array
+    {
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension() ?: 'xlsx');
+        $name = mb_substr((string) $file->getClientOriginalName(), 0, 200) ?: "upload.{$extension}";
+        $path = $file->storeAs("proposal-uploads/{$jobPosting->id}", Str::uuid().'.'.$extension, 'local');
+
+        return ['name' => $name, 'path' => $path];
+    }
+
+    /**
+     * @param  list<string>  $rolls
+     * @param  array{name: string, path: string}|null  $source
+     */
+    private function createProposal(Request $request, JobPosting $jobPosting, PostingRound $postingRound, string $kind, array $rolls, ?array $source = null): ShortlistProposal
+    {
+        $payload = array_values(array_map(fn ($roll) => ['roll_no' => $roll], $rolls));
 
         $proposal = ShortlistProposal::create([
             'job_posting_id' => $jobPosting->id,
             'posting_round_id' => $postingRound->id,
             'proposed_by' => $request->user()->id,
-            'kind' => $validated['kind'],
+            'kind' => $kind,
             'payload' => $payload,
+            'source_file_name' => $source['name'] ?? null,
+            'source_file_path' => $source['path'] ?? null,
             'status' => 'pending',
         ]);
 
         $company = $jobPosting->company()?->name ?? 'A company';
         $this->stakeholders->notifyAdmins(
-            "{$company} proposed a {$this->kindLabel($validated['kind'])}",
-            sprintf('%s submitted a %s of %d candidate(s) for %s — %s.', $company, $this->kindLabel($validated['kind']), count($payload), $jobPosting->title(), $postingRound->name),
+            "{$company} proposed a {$this->kindLabel($kind)}",
+            sprintf('%s submitted a %s of %d candidate(s) for %s — %s.', $company, $this->kindLabel($kind), count($payload), $jobPosting->title(), $postingRound->name)
+                .($source ? " (uploaded from {$source['name']})" : ''),
             [],
             "/admin/postings/{$jobPosting->id}",
             ['job_posting_id' => $jobPosting->id, 'kind' => 'shortlist_proposal'],
@@ -235,10 +369,7 @@ class CompanyPipelineController extends Controller
             'verify'
         );
 
-        return response()->json([
-            'message' => 'Proposal sent to the CDC. Results become visible to students only after the CDC publishes them.',
-            'proposal' => $proposal,
-        ], 201);
+        return $proposal;
     }
 
     private function kindLabel(string $kind): string

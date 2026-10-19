@@ -22,7 +22,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { adminApi } from "@/lib/adminapi";
+import { adminApi, adminDownload } from "@/lib/adminapi";
 import { formatDateTime, statusColor, titleCase } from "@/lib/format";
 
 /**
@@ -118,6 +118,24 @@ export default function ProposalsList({ postingId, onDecided }) {
                   By {p.proposed_by?.name} ({p.proposed_by?.email}) · {formatDateTime(p.created_at)}
                   {p.decided_at ? ` · decided ${formatDateTime(p.decided_at)} by ${p.decided_by?.name ?? "—"}` : ""}
                 </Typography>
+                {p.source_file_name && (
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Uploaded from {p.source_file_name}
+                    {p.has_source_file && (
+                      <>
+                        {" · "}
+                        <Box
+                          component="button"
+                          type="button"
+                          onClick={() => adminDownload(`/admin/proposals/${p.id}/file`, p.source_file_name).catch((e) => setError(e.message))}
+                          sx={{ border: 0, p: 0, bgcolor: "transparent", color: "primary.main", cursor: "pointer", font: "inherit", textDecoration: "underline" }}
+                        >
+                          Download the file
+                        </Box>
+                      </>
+                    )}
+                  </Typography>
+                )}
                 <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
                   {(p.payload ?? []).map((e) => (
                     <Chip key={e.roll_no} size="small" label={e.roll_no} />

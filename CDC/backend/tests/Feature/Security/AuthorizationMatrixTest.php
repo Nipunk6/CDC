@@ -337,6 +337,11 @@ class AuthorizationMatrixTest extends TestCase
             'kind' => 'shortlist', 'entries' => [['roll_no' => '22JE9001']],
         ], 201, 'COMPANY_A shortlist proposal');
         $this->ids['proposal_a'] = ShortlistProposal::where('job_posting_id', $postingA->id)->sole()->id;
+        // P3-D56: like a proposal uploaded from a sheet, so its original-file download route has something to serve.
+        Storage::disk('local')->put("proposal-uploads/{$postingA->id}/matrix.csv", "Roll No,Decision
+22JE9001,Shortlisted
+");
+        ShortlistProposal::whereKey($this->ids['proposal_a'])->update(['source_file_name' => 'matrix.csv', 'source_file_path' => "proposal-uploads/{$postingA->id}/matrix.csv"]);
 
         // --- Events ----------------------------------------------------------------------------------------------
         $this->fixtureCall('POST', '/api/admin/events', 'ADMIN', [

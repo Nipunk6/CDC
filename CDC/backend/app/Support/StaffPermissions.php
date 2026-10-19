@@ -176,6 +176,7 @@ final class StaffPermissions
         ['GET', 'surveys*', 'surveys', 'read'],
         ['*', 'surveys*', 'surveys', 'write'],
         ['GET', 'proposals', 'proposals', 'read'],
+        ['GET', 'proposals/*/file', 'proposals', 'read'],
         ['*', 'proposals/*', 'proposals', 'verify'],
 
         // Settings

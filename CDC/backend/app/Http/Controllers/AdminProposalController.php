@@ -25,6 +25,14 @@ class AdminProposalController extends Controller
     ) {
     }
 
+    /** P3-D56: the sheet a company uploaded for this proposal, as it was uploaded. */
+    public function file(ShortlistProposal $shortlistProposal): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        abort_if(! $shortlistProposal->source_file_path || ! \Illuminate\Support\Facades\Storage::disk('local')->exists($shortlistProposal->source_file_path), 404, 'File not found.');
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download($shortlistProposal->source_file_path, $shortlistProposal->source_file_name ?: 'proposal-upload');
+    }
+
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -52,6 +60,9 @@ class AdminProposalController extends Controller
                 'kind' => $p->kind,
                 'status' => $p->status,
                 'payload' => $p->payload,
+                // Uploaded from a sheet by the company (P3-D56); the original can be downloaded.
+                'source_file_name' => $p->source_file_name,
+                'has_source_file' => $p->source_file_path !== null,
                 'admin_remark' => $p->admin_remark,
                 'created_at' => $p->created_at,
                 'decided_at' => $p->decided_at,

@@ -685,6 +685,56 @@ class ExportService
      * Text is always written as a literal string so user-controlled values (names, answers, links) such as
      * "=HYPERLINK(...)" can never become live formulas in Excel (D87). Numbers stay numeric.
      */
+    /**
+     * The company's decision sheet for one stage (P3-D56): the stage's students and a Decision column whose cells offer
+     * a dropdown of "Shortlisted" / "On Hold" (an .xlsx list validation; any other text is refused by Excel). A blank
+     * Decision means "not shortlisted".
+     *
+     * @param  \Illuminate\Support\Collection<int, Application>  $applications  the stage's pool, with studentProfile
+     */
+    public function decisionSheetWorkbook(JobPosting $posting, \App\Models\PostingRound $round, \Illuminate\Support\Collection $applications): StreamedResponse
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Decisions');
+
+        $company = $posting->company()?->name ?? 'Company';
+        $headers = ['Roll No', 'Name', 'Programme', 'Branch', 'CGPA', 'Decision'];
+        $this->put($sheet, 1, 1, sprintf('%s · %s · %s: choose Shortlisted or On Hold in the Decision column (blank = not shortlisted)', $company, $posting->title(), $round->name));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $this->writeHeader($sheet, $headers, 3);
+
+        $rowNumber = 4;
+        foreach ($applications as $application) {
+            $s = $application->studentProfile;
+            foreach ([$s?->roll_no, $s?->full_name, $s?->programme, $s?->branch, $this->num($s?->current_cgpa)] as $col => $value) {
+                $this->put($sheet, $col + 1, $rowNumber, $value);
+            }
+            $rowNumber++;
+        }
+
+        // The dropdown covers every student row plus some spare rows below them.
+        $lastRow = max(4, $rowNumber - 1) + 50;
+        $validation = $sheet->getCell('F4')->getDataValidation();
+        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_STOP)
+            ->setAllowBlank(true)
+            ->setShowDropDown(true)
+            ->setShowErrorMessage(true)
+            ->setErrorTitle('Choose from the list')
+            ->setError('Choose Shortlisted or On Hold, or leave the cell blank.')
+            ->setShowInputMessage(true)
+            ->setPromptTitle('Decision')
+            ->setPrompt('Shortlisted or On Hold. Leave blank if not shortlisted.')
+            ->setFormula1('"Shortlisted,On Hold"');
+        $validation->setSqref('F4:F'.$lastRow);
+
+        $this->finish($sheet, count($headers), 'A3:F'.max(3, $rowNumber - 1));
+        $sheet->getColumnDimension('F')->setAutoSize(false)->setWidth(18);
+
+        return $this->stream($spreadsheet, Str::slug($company.'-'.$round->name).'-decisions.xlsx');
+    }
+
     private function put(Worksheet $sheet, int $column, int $row, mixed $value): void
     {
         if ($value === null) {
