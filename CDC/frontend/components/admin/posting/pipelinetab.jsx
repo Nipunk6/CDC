@@ -38,6 +38,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { adminApi, adminDownload } from "@/lib/adminapi";
 import BulkShortlistDialog from "@/components/admin/posting/bulkshortlistdialog";
+import AttendanceUploadDialog from "@/components/admin/posting/attendanceuploaddialog";
 import StudentQuickView from "@/components/admin/studentquickview";
 import { statusColor, titleCase } from "@/lib/format";
 
@@ -363,6 +364,14 @@ export default function PipelineTab({ posting, onMessage, onChanged }) {
           Mark attendance
         </MenuItem>
         <MenuItem
+          onClick={() => {
+            setDialog({ kind: "attendance_upload", round: menu.round });
+            setMenu(null);
+          }}
+        >
+          Upload attendance sheet (Excel)
+        </MenuItem>
+        <MenuItem
           disabled={menu?.round?.status !== "completed"}
           onClick={() => {
             setDialog({ kind: "addendum", round: menu.round, text: "", remark: "" });
@@ -384,6 +393,22 @@ export default function PipelineTab({ posting, onMessage, onChanged }) {
 
       <StudentQuickView studentId={quickView} onClose={() => setQuickView(null)} />
 
+      {dialog?.kind === "attendance_upload" && (
+        <AttendanceUploadDialog
+          postingId={posting.id}
+          round={dialog.round}
+          open
+          onClose={() => setDialog(null)}
+          onDone={async (response) => {
+            onMessage?.(response.message);
+            setReport(response.errors?.length || response.warnings?.length ? response : null);
+            setDialog(null);
+            await load();
+            onChanged?.();
+          }}
+        />
+      )}
+
       {dialog?.kind === "results" && (
         <BulkShortlistDialog
           postingId={posting.id}
@@ -400,7 +425,7 @@ export default function PipelineTab({ posting, onMessage, onChanged }) {
         />
       )}
 
-      <Dialog open={Boolean(dialog) && dialog.kind !== "results"} onClose={() => !busy && setDialog(null)} maxWidth="sm" fullWidth>
+      <Dialog open={Boolean(dialog) && !["results", "attendance_upload"].includes(dialog.kind)} onClose={() => !busy && setDialog(null)} maxWidth="sm" fullWidth>
         <DialogTitle>
           {dialog?.kind === "attendance" && `Attendance — ${dialog.round.name}`}
           {dialog?.kind === "addendum" && `Addendum — ${dialog.round.name}`}

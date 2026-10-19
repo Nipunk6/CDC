@@ -70,7 +70,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - [ ] P5 Deadline reminders
   - [ ] P5.1 `DeadlineReminderService::dueSlots` · P5.2 `reminders:dispatch` (S11) · P5.3 settings UI + per-posting toggle
 - [ ] P6 Shortlist categories & attendance uploads
-  - [ ] P6.1 Placed/Blocked vs Unplaced tabs + exports · P6.2 round attendance upload · P6.3 event attendance (S15)
+  - [ ] P6.1 Placed/Blocked vs Unplaced tabs + exports · [x] P6.2 round attendance upload (P3-D53, 2026-10-19) · [ ] P6.3 event attendance (S15)
 - [ ] P7 Juniors: events dashboard + experience survey
   - [ ] P7.1 `student.access` middleware · P7.2 events by year · P7.3 survey, moderation, junior feed (S16)
 - [ ] P8 Mentors (🛑 OD-6)
@@ -117,3 +117,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P0 Definition of Done run (P3-D35): evidence qa/evidence/p0_gates.txt, screenshots qa/screenshots/p3/p0/
 - 2026-10-12 · on `phase3`: P-1.14 (rate limit df09539, SEC-003 d40b6c2, SEC-012 868a26e), MySQL-neutral tests aebb9de, PHP 8.2 lock 498f4fd, CI a9fe018; merged into `phase3-p0`
 - 2026-10-19 · P10.1 + P10.2 SCPT registry and SPOC assignment, not committed (P3-D50)
+- 2026-10-19 · P6.2 stage attendance by Excel + company view, not committed (P3-D53)

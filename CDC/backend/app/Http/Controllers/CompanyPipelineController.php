@@ -52,6 +52,8 @@ class CompanyPipelineController extends Controller
                 'rounds' => $jobPosting->rounds->map(fn (PostingRound $r) => $r->only(['id', 'name', 'round_type', 'sort_order', 'scheduled_at', 'status', 'is_final']) + [
                     'published_selected' => $r->results()->whereNotNull('published_at')->where('result', 'selected')->count(),
                     'published_waitlisted' => $r->results()->whereNotNull('published_at')->where('result', 'waitlisted')->count(),
+                    // Attendance of students whose result in this stage is published (P3-D53); drafts stay hidden.
+                    'attendance' => $this->attendanceSummary($r),
                 ]),
                 'questions' => $jobPosting->questions()->get(['id', 'question', 'qtype', 'options', 'required']),
                 // Student SPOCs of this job profile (P3-D52): name, phone and email only.
@@ -250,6 +252,25 @@ class CompanyPipelineController extends Controller
                 $q->where(fn (Builder $j) => $j->where('postable_type', Jnf::class)->whereIn('postable_id', Jnf::query()->where('company_id', $companyId)->select('id')))
                     ->orWhere(fn (Builder $i) => $i->where('postable_type', Inf::class)->whereIn('postable_id', Inf::query()->where('company_id', $companyId)->select('id')));
             });
+    }
+
+    /**
+     * Appeared / absent counts of one stage, over rows the company may see (a published result, or the previously
+     * published one while a change waits as a draft) of live applications only.
+     *
+     * @return array{appeared: int, absent: int}
+     */
+    private function attendanceSummary(PostingRound $round): array
+    {
+        $counts = $round->results()
+            ->where(fn ($q) => $q->whereNotNull('published_at')->orWhereNotNull('published_result'))
+            ->whereNotNull('attendance')
+            ->whereHas('application', fn ($q) => $q->where('status', 'applied'))
+            ->selectRaw('attendance, count(*) as total')
+            ->groupBy('attendance')
+            ->pluck('total', 'attendance');
+
+        return ['appeared' => (int) ($counts['yes'] ?? 0), 'absent' => (int) ($counts['no'] ?? 0)];
     }
 
     private function authorizePosting(Request $request, JobPosting $posting): void

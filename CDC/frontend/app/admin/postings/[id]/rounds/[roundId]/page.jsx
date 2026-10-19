@@ -45,6 +45,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import PageHeader from "@/components/shared/pageheader";
 import StudentQuickView from "@/components/admin/studentquickview";
 import BulkShortlistDialog from "@/components/admin/posting/bulkshortlistdialog";
+import AttendanceUploadDialog from "@/components/admin/posting/attendanceuploaddialog";
 import TemplateDownloadButton from "@/components/admin/templatedownloadbutton";
 import NoticeComposer from "@/components/admin/engagement/noticecomposer";
 import StageEmailDialog from "@/components/admin/engagement/stageemaildialog";
@@ -102,6 +103,7 @@ function StageShortlist({ id, roundId }) {
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [publish, setPublish] = useState(null);
   const [quickView, setQuickView] = useState(null);
   const [comms, setComms] = useState(null); // "notice" | "email" (Superset parity S7.2)
@@ -314,6 +316,9 @@ function StageShortlist({ id, roundId }) {
               <Button variant="outlined" disabled={locked} onClick={() => setBulkOpen(true)}>
                 Bulk Shortlist / Reject / Hold
               </Button>
+              <Button variant="outlined" disabled={locked} onClick={() => setAttendanceOpen(true)}>
+                Upload Attendance
+              </Button>
               <Button variant="outlined" color="error" onClick={() => setReconcileOpen(true)}>
                 Reconcile Ineligible Students
               </Button>
@@ -508,6 +513,20 @@ function StageShortlist({ id, roundId }) {
           </Stack>
         </CardContent>
       </Card>
+
+      {attendanceOpen && (
+        <AttendanceUploadDialog
+          postingId={posting.id}
+          round={round}
+          open={attendanceOpen}
+          onClose={() => setAttendanceOpen(false)}
+          onDone={(response) => {
+            setAttendanceOpen(false);
+            showReport(response);
+            void load();
+          }}
+        />
+      )}
 
       {bulkOpen && (
         <BulkShortlistDialog

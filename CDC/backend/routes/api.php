@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminAccessController;
+use App\Http\Controllers\AdminAttendanceController;
 use App\Http\Controllers\AdminCompanyController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminFormReviewController;
@@ -247,6 +248,8 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin', 'staff'])->prefix('ad
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/reconcile', [AdminReconcileController::class, 'reject']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/results', [AdminPipelineController::class, 'results']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/attendance', [AdminPipelineController::class, 'attendance']);
+    Route::get('/postings/{jobPosting}/rounds/{postingRound}/attendance/template', [AdminAttendanceController::class, 'template']);
+    Route::post('/postings/{jobPosting}/rounds/{postingRound}/attendance/upload', [AdminAttendanceController::class, 'upload']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/publish', [AdminPipelineController::class, 'publish']);
     Route::post('/postings/{jobPosting}/rounds/{postingRound}/addendum', [AdminPipelineController::class, 'addendum']);
     Route::delete('/postings/{jobPosting}/rounds/{postingRound}/results/{application}', [AdminPipelineController::class, 'destroyDraft']);

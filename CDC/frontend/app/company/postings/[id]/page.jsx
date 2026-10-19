@@ -187,12 +187,14 @@ export default function CompanyPostingDetailPage({ params }) {
                 key={r.id}
                 variant="outlined"
                 color={statusColor(r.status)}
-                label={`${r.name}: ${r.status === "completed" ? `${r.published_selected} ${r.is_final ? "selected" : "shortlisted"}${r.published_waitlisted ? `, ${r.published_waitlisted} on hold` : ""}` : titleCase(r.status)}`}
+                label={`${r.name}: ${r.status === "completed" ? `${r.published_selected} ${r.is_final ? "selected" : "shortlisted"}${r.published_waitlisted ? `, ${r.published_waitlisted} on hold` : ""}` : titleCase(r.status)}${
+                  r.attendance && r.attendance.appeared + r.attendance.absent > 0 ? ` · ${r.attendance.appeared} appeared, ${r.attendance.absent} absent` : ""
+                }`}
               />
             ))}
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-            You see results only after the CDC publishes them. {share ? "Contact details are shared for this job profile." : "Contact details are not shared for this job profile."}
+            You see results and attendance only after the CDC publishes them. {share ? "Contact details are shared for this job profile." : "Contact details are not shared for this job profile."}
           </Typography>
         </CardContent>
       </Card>
@@ -311,7 +313,14 @@ export default function CompanyPostingDetailPage({ params }) {
                         return (
                           <TableCell key={r.id}>
                             {cell ? (
-                              <Chip size="small" color={resultColors[cell.result]} label={companyResultLabel(cell.result, r.is_final)} />
+                              <Stack spacing={0.5} alignItems="flex-start">
+                                <Chip size="small" color={resultColors[cell.result]} label={companyResultLabel(cell.result, r.is_final)} />
+                                {cell.attendance && (
+                                  <Typography variant="caption" color={cell.attendance === "yes" ? "success.main" : "error.main"} fontWeight={600}>
+                                    {cell.attendance === "yes" ? "Appeared" : "Absent"}
+                                  </Typography>
+                                )}
+                              </Stack>
                             ) : (
                               "—"
                             )}

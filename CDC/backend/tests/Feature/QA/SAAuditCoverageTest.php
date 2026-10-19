@@ -312,6 +312,7 @@ class SAAuditCoverageTest extends TestCase
             // ---------------- pipeline
             'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/results' => fn () => ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/results", ['roll_nos' => [$s[1]->roll_no], 'result' => 'selected']],
             'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/attendance' => fn () => ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/attendance", ['roll_nos_present' => [$s[1]->roll_no, $s[2]->roll_no], 'roll_nos_absent' => [$s[3]->roll_no]]],
+            'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/attendance/upload' => fn () => ['POST', "/api/admin/postings/{$p}/rounds/{$r1}/attendance/upload", ['file' => $csv('attendance.csv', ['Roll No,Attendance', "{$s[1]->roll_no},Present", "{$s[3]->roll_no},Absent"])], true],
             'POST api/admin/postings/{jobPosting}/rounds/{postingRound}/publish' => function () use ($row, $p, $r1) {
                 $row(1, 'selected', false);
 

@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationRoundResult;
 use App\Models\JobPosting;
 use App\Models\PostingRound;
+use App\Services\AttendanceService;
 use App\Services\AuditService;
 use App\Services\PipelineService;
 use App\Services\SpreadsheetImportService;
@@ -23,7 +24,8 @@ class AdminPipelineController extends Controller
         private readonly AuditService $audit,
         private readonly PipelineService $pipeline,
         private readonly SpreadsheetImportService $spreadsheets,
-        private readonly StakeholderNotifier $stakeholders
+        private readonly StakeholderNotifier $stakeholders,
+        private readonly AttendanceService $attendance
     ) {
     }
 
@@ -210,43 +212,20 @@ class AdminPipelineController extends Controller
             'roll_nos_absent.*' => ['string', 'max:30'],
         ]);
 
-        $present = $validated['roll_nos_present'] ?? [];
-        $absent = $validated['roll_nos_absent'] ?? [];
-        [$found, $unknown] = $this->pipeline->resolveApplicants($jobPosting, array_merge($present, $absent));
-        $presentSet = array_flip(array_map(fn ($r) => strtoupper(trim($r)), $present));
-
-        $marked = 0;
-        $markedPresent = 0;
-        foreach ($found as $roll => $application) {
-            $row = ApplicationRoundResult::query()->firstOrNew([
-                'application_id' => $application->id,
-                'posting_round_id' => $postingRound->id,
-            ]);
-            $attendance = isset($presentSet[$roll]) ? 'yes' : 'no';
-            // QA F-033: once this student's result in the stage is published, their attendance is part of the record.
-            if ($row->exists && $row->isPublished()) {
-                if ($row->attendance !== $attendance) {
-                    $unknown[] = ['roll_no' => $roll, 'reason' => 'Result already published for this stage; attendance not changed.'];
-                }
-
-                continue;
-            }
-            $row->attendance = $attendance;
-            $row->result ??= 'pending';
-            $row->save();
-            $marked++;
-            $markedPresent += $attendance === 'yes' ? 1 : 0;
+        // A roll number in both lists counts as present (as before).
+        $marks = [];
+        foreach ($validated['roll_nos_absent'] ?? [] as $roll) {
+            $marks[strtoupper(trim($roll))] = 'no';
         }
+        foreach ($validated['roll_nos_present'] ?? [] as $roll) {
+            $marks[strtoupper(trim($roll))] = 'yes';
+        }
+        unset($marks['']);
 
-        $this->audit->log($request, 'round.attendance', $postingRound, null, [
-            'present' => $markedPresent,
-            'absent' => $marked - $markedPresent,
-        ]);
+        // P3-D53 (owner, 19-10-2026): attendance can be corrected after the stage is published (replaces QA F-033's lock).
+        $report = $this->attendance->apply($jobPosting, $postingRound, $marks);
 
-        return response()->json([
-            'message' => "Attendance saved for {$marked} student(s).",
-            'errors' => $unknown,
-        ]);
+        return response()->json(AdminAttendanceController::respond($request, $this->audit, $postingRound, $report, 'pasted'));
     }
 
     public function publish(Request $request, JobPosting $jobPosting, PostingRound $postingRound): JsonResponse

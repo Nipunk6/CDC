@@ -4,6 +4,7 @@ namespace Tests\Feature\QA;
 
 use App\Models\Application;
 use App\Models\ApplicationRoundResult;
+use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\CycleEnrollment;
 use App\Models\Jnf;
@@ -24,7 +25,8 @@ use Tests\TestCase;
  * Regressions for the QA findings approved in the owner's QA follow-up and fixed in P-1.13:
  * F-022 (unverified-resume flag on the results console), F-026 (rejecting an approved resume re-flags its live
  * applications), F-028 (unblock is atomic and clears "placed elsewhere" flags a remaining internships-only block does
- * not cover), F-033 (attendance is locked once that student's result in the stage is published).
+ * not cover), F-033 (attendance after a stage's result is published: locked at first; since P3-D53 a correction is
+ * allowed and reported).
  */
 #[Group('qa')]
 class FixApprovedS4LeftoversTest extends TestCase
@@ -167,7 +169,11 @@ class FixApprovedS4LeftoversTest extends TestCase
         $this->assertTrue($this->apps['22JE0001']->fresh()->placed_elsewhere_flag);
     }
 
-    public function test_F033_attendance_is_locked_once_the_result_is_published(): void
+    /**
+     * F-033 locked a published row's attendance. The owner replaced that on 19-10-2026 (P3-D53): attendance can be
+     * corrected after publishing, like stage decisions; the change is reported as a correction and audited.
+     */
+    public function test_F033_attendance_can_be_corrected_after_the_result_is_published(): void
     {
         $url = $this->base(0).'/attendance';
         $this->postJson($url, ['roll_nos_present' => ['22JE0001', '22JE0002']])->assertOk();
@@ -177,12 +183,13 @@ class FixApprovedS4LeftoversTest extends TestCase
         $response = $this->postJson($url, ['roll_nos_absent' => ['22JE0001', '22JE0002']])->assertOk();
 
         $attendance = fn (string $roll) => ApplicationRoundResult::where('application_id', $this->apps[$roll]->id)->value('attendance');
-        $this->assertSame('yes', $attendance('22JE0001'), 'published row keeps its attendance');
+        $this->assertSame('no', $attendance('22JE0001'), 'published row is corrected');
         $this->assertSame('no', $attendance('22JE0002'), 'unpublished row is still editable');
-        $this->assertSame(['22JE0001'], array_column($response->json('errors'), 'roll_no'));
-        $this->assertStringContainsString('published', $response->json('errors.0.reason'));
+        $this->assertSame([], $response->json('errors'));
+        $this->assertSame([['roll_no' => '22JE0001', 'from' => 'yes', 'to' => 'no']], $response->json('corrected'));
+        $this->assertSame('22JE0001:yes', AuditLog::where('action', 'round.attendance')->latest('id')->first()->before['corrected'][0]);
 
-        // Re-sending the same value for a published row is not an error.
-        $this->postJson($url, ['roll_nos_present' => ['22JE0001']])->assertOk()->assertJsonCount(0, 'errors');
+        // Re-sending the same value is not an error and changes nothing.
+        $this->postJson($url, ['roll_nos_absent' => ['22JE0001']])->assertOk()->assertJsonCount(0, 'errors')->assertJsonPath('unchanged', 1);
     }
 }
