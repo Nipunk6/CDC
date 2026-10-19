@@ -417,13 +417,26 @@ export default function AdminResultsPage({ params }) {
               {dialogError}
             </Alert>
           )}
-          <Typography gutterBottom>
-            <strong>{included.length}</strong> offer(s) · <strong>{blocks}</strong> student(s) blocked · about <strong>{regrets}</strong> regret mail(s)
-          </Typography>
+          <Typography gutterBottom>When you press Continue:</Typography>
+          <Box component="ul" sx={{ mt: 0, mb: 2, pl: 3, "& li": { mb: 0.5 } }}>
+            {included.length > 0 && (
+              <li>
+                <strong>{included.length}</strong> selected student(s) get an offer email.
+              </li>
+            )}
+            <li>
+              Everyone else still in the final stage gets their result by email. About <strong>{regrets}</strong> of them will be told they were not selected.
+            </li>
+            {blocks > 0 && (
+              <li>
+                <strong>{blocks}</strong> student(s) get blocked as you set on each row (from every placement, or from internships only). Their other
+                open applications that the block covers are marked &quot;placed elsewhere&quot;.
+              </li>
+            )}
+            <li>This job profile is marked Completed.</li>
+          </Box>
           <Typography variant="body2" color="text.secondary">
-            Offers are emailed to the selected students, everyone else in the final stage is told they were not selected, blocked students&apos; other
-            live applications in the placements their block reaches are flagged as placed elsewhere, and the job profile is marked completed. This cannot be undone from here
-            (blocks can be lifted later).
+            Emails cannot be taken back once sent. You can still revoke an offer or lift a block later.
           </Typography>
         </DialogContent>
         <DialogActions>

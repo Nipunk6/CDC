@@ -274,7 +274,8 @@ class StudentApplicationController extends Controller
             $student->user,
             'Application submitted',
             "You applied to {$title} at {$company} with \"{$resume->label}\".",
-            $application->used_unverified_resume ? 'warning' : 'success'
+            $application->used_unverified_resume ? 'warning' : 'success',
+            ['category' => 'application', 'job_posting_id' => $posting->id, 'link' => '/student/applications']
         );
 
         $mailable = new ApplicationSubmittedMail(

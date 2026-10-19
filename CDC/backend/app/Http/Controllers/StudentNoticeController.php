@@ -83,7 +83,7 @@ class StudentNoticeController extends Controller
             // An automatic "Open for applications" notice also carries its content as data, laid out on the page
             // with headings and numbered lists (the body stays plain text, D76).
             'job_profile' => $notice->source === \App\Services\JobProfileNoticeService::SOURCE && $notice->jobPosting
-                ? app(\App\Services\JobProfileNoticeService::class)->details($notice->jobPosting)
+                ? app(\App\Services\JobProfileNoticeService::class)->details($notice->jobPosting) + ['message' => $notice->intro]
                 : null,
         ];
     }

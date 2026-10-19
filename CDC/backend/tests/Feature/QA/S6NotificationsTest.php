@@ -362,7 +362,7 @@ class S6NotificationsTest extends TestCase
         $this->assertCount(2, $messages, '3 recipients at batch size 2 = 2 BCC messages');
         $this->assertBroadcast($messages, $expectedEmails, 'E2');
 
-        $notified = PortalNotification::query()->where('title', 'New opening: Company A')->pluck('user_id')->sort()->values()->all();
+        $notified = PortalNotification::query()->where('category', 'new_job')->pluck('user_id')->sort()->values()->all();
         $this->assertSame($expectedIds, $notified, 'in-app E2 audience must equal the mail audience');
 
         foreach (['LOWCGPA', 'BACKLOG', 'OTHERBRANCH', 'WRONGBATCH', 'LOW10TH', 'LOW12TH', 'NOTENROLLED', 'SUSPENDED', 'DEBARRED'] as $actor) {

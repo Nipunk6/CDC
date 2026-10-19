@@ -192,7 +192,7 @@ final class PostingEligibilityService
             $changed = $this->differs($before, $criteria);
 
             if (! $changed && $openUntil === null) {
-                return ['changed' => false, 'reopened' => false, 'newly_eligible' => 0, 'no_longer_eligible' => 0, 'notified' => 0, 'ids' => []];
+                return ['changed' => false, 'reopened' => false, 'newly_eligible' => 0, 'no_longer_eligible' => 0, 'notified' => 0, 'ids' => [], 'in_app' => []];
             }
 
             $beforeIds = $this->eligibleIds($posting);
@@ -222,6 +222,10 @@ final class PostingEligibilityService
                 ? array_values(array_diff($openUntil !== null ? $afterIds : $newly, $this->notifiedIds($posting), $this->applicantIds($posting)))
                 : [];
 
+            // The notification center tells every newly eligible student (or, on a reopening, everyone eligible not told
+            // yet) whatever the email choice; JobProfileStudentNotifier skips anyone already told about this job profile.
+            $inApp = $posting->acceptsApplications() ? ($openUntil !== null ? $afterIds : $newly) : [];
+
             $reopened = $openUntil !== null;
             $beforeState = $changed ? ['criteria' => $before] : [];
             $afterState = $changed ? ['criteria' => $criteria] : [];
@@ -240,7 +244,7 @@ final class PostingEligibilityService
                 'notified' => count($toNotify),
             ]);
 
-            return ['changed' => $changed, 'reopened' => $reopened, 'newly_eligible' => count($newly), 'no_longer_eligible' => count($lost), 'notified' => count($toNotify), 'ids' => $toNotify];
+            return ['changed' => $changed, 'reopened' => $reopened, 'newly_eligible' => count($newly), 'no_longer_eligible' => count($lost), 'notified' => count($toNotify), 'ids' => $toNotify, 'in_app' => $inApp];
         });
 
         if ($result['ids'] !== []) {
@@ -252,7 +256,13 @@ final class PostingEligibilityService
                 : SendPostingFloatedMails::dispatch($id, $ids));
         }
 
-        unset($result['ids']);
+        if ($result['in_app'] !== []) {
+            $inApp = $result['in_app'];
+            $id = $posting->id;
+            DB::afterCommit(fn () => app(JobProfileStudentNotifier::class)->newJob(JobPosting::query()->findOrFail($id), $inApp));
+        }
+
+        unset($result['ids'], $result['in_app']);
 
         return $result;
     }

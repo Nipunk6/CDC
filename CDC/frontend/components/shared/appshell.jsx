@@ -26,6 +26,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import HistoryIcon from "@mui/icons-material/History";
 
 import BrandLogo from "@/components/shared/brandlogo";
+import { useTrackNavigation } from "@/lib/backnavigation";
 
 // The one application shell of every signed-in portal (Phase 3 PU.2, see CDC/docs/ui/DESIGN_BRIEF.md).
 // All navigation between pages is in the left sidebar; the top bar only says where you are and holds global utilities.
@@ -101,6 +102,7 @@ export default function AppShell({
   children,
 }) {
   const pathname = usePathname();
+  useTrackNavigation(); // lets "Back" return to the page you came from
   const isDesktop = useMediaQuery("(min-width:1200px)");
   const isTablet = useMediaQuery("(min-width:768px)");
   const [collapsed, setCollapsed] = useState(false);

@@ -644,8 +644,9 @@ class S5S6VerifyTest extends TestCase
 
                 return true;
             });
-            $this->app['auth']->forgetGuards();
-            $response = $this->get(parse_url($url, PHP_URL_PATH).'?'.parse_url($url, PHP_URL_QUERY))->assertOk();
+            $this->assertStringEndsWith("/company/postings/{$posting->id}", (string) $url);
+            $this->as(User::where('role', 'company')->where('company_id', $posting->company()->id)->sole());
+            $response = $this->get("/api/company/postings/{$posting->id}/export")->assertOk();
 
             return [$this->xlsxHeaders($response->streamedContent()), $response->streamedContent()];
         };

@@ -17,7 +17,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -206,8 +205,8 @@ class AdminPostingActivityController extends Controller
     // ---- Send Applicant List -------------------------------------------------------------------
 
     /**
-     * Email the company a signed link (7 days) to the company-safe applicant export (S6.11). Not a gate: the company
-     * can still download from its own portal at any time.
+     * Email the company a link to this job profile in its portal, where it downloads the company-safe applicant export
+     * (S6.11). The link needs the company's sign-in, so it never expires. Not a gate: the company can download at any time.
      */
     public function sendApplicantList(Request $request, JobPosting $jobPosting): JsonResponse
     {
@@ -219,18 +218,18 @@ class AdminPostingActivityController extends Controller
             return response()->json(['message' => 'This company has no active portal users to send the list to.'], 422);
         }
 
-        $url = URL::temporarySignedRoute('company-exports.applicants', now()->addDays(7), ['jobPosting' => $jobPosting->id]);
+        $url = rtrim((string) config('app.frontend_url'), '/')."/company/postings/{$jobPosting->id}";
         $live = $jobPosting->applications()->where('status', 'applied')->count();
         $subject = 'Applicant list: '.$jobPosting->title();
         $lines = array_values(array_filter([
             "The CDC has shared the list of {$live} applicant(s) for {$jobPosting->title()}.",
             filled($validated['note'] ?? null) ? 'Note from the CDC: '.trim($validated['note']) : null,
-            'The download link works for 7 days. You can also download the latest list any time from the Company Portal.',
+            'Sign in to the Company Portal and press Download Applicants on this job profile to get the latest list at any time.',
         ]));
 
         foreach ($users as $user) {
             $this->notifications->createInAppNotification($user, $subject, $lines[0], 'info');
-            $this->mail->send($user, new PortalNoticeMail($subject, "Hello {$user->name},", $lines[0], $lines, $url, 'Download Applicant List'), $subject, 'emails.portal-notice', [
+            $this->mail->send($user, new PortalNoticeMail($subject, "Hello {$user->name},", $lines[0], $lines, $url, 'Open in Company Portal'), $subject, 'emails.portal-notice', [
                 'job_posting_id' => $jobPosting->id,
                 'kind' => 'applicant_list',
             ]);

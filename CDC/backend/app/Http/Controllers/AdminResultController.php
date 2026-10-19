@@ -364,7 +364,8 @@ class AdminResultController extends Controller
                 $student->user,
                 "Offer from {$company}",
                 "Congratulations! You have been selected for {$title} at {$company} (".Offer::LABELS[$offer->offer_type].').',
-                'success'
+                'success',
+                ['category' => 'offer', 'job_posting_id' => $posting->id, 'link' => '/student/applications']
             );
 
             $mailable = new OfferMail($student->full_name, $company, $title, Offer::LABELS[$offer->offer_type], $compensation, $blockNote);

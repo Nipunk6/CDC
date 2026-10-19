@@ -83,6 +83,15 @@ class AdminStageMessageController extends Controller
             'kind' => 'stage_email',
         ], deleteAttachmentAfter: true);
 
+        // The same message in each student's notification center (personal: only this stage's shortlist / on hold).
+        app(\App\Services\PortalNotificationService::class)->notifyStudents(
+            clone $audience,
+            $validated['subject'],
+            implode("\n", BroadcastMail::paragraphs($validated['message'])),
+            'info',
+            ['category' => 'message', 'job_posting_id' => $jobPosting->id, 'link' => '/student/applications']
+        );
+
         $this->audit->log($request, 'stage.email', $postingRound, null, [
             'job_posting_id' => $jobPosting->id, 'subject' => $validated['subject'], 'results' => $results,
             'recipients' => $mailed, 'attachment' => $name,

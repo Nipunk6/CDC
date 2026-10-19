@@ -12,7 +12,7 @@ export default function StudentCalendarPage() {
         <Typography variant="h4" color="primary.main" fontWeight={700}>
           Calendar
         </Typography>
-        <Typography color="text.secondary">Deadlines of job profiles in your placements, your selection stages and events for you.</Typography>
+        <Typography color="text.secondary">Deadlines of job profiles in your placements, your selection stages, events for you and your own entries.</Typography>
       </Box>
       <MonthCalendar api={studentApi} endpoint="/student/calendar" />
     </Stack>

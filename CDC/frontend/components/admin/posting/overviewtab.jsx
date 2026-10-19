@@ -30,6 +30,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import ForwardToInboxIcon from "@mui/icons-material/ForwardToInbox";
 import { offerCategoriesFor, selectionConsequence } from "@/lib/offerpolicy";
 import ProcessStatusCard from "@/components/admin/posting/processstatuscard";
+import { NotifyStudentsButton } from "@/components/admin/posting/announcementfields";
 
 const Stat = ({ label, value, color }) => (
   <Card variant="outlined" sx={{ height: "100%" }}>
@@ -51,6 +52,8 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
   const [visitDate, setVisitDate] = useState(posting.visit_date ?? "");
   const [openAt, setOpenAt] = useState(toLocalInput(posting.scheduled_open_at));
   const [sendOpen, setSendOpen] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopenDeadline, setReopenDeadline] = useState("");
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -91,6 +94,33 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
       body.application_deadline = fromLocalInput(deadline);
     }
     void call(`/admin/postings/${posting.id}`, { method: "PATCH", body: JSON.stringify(body) });
+  };
+
+  // "open" alone is not enough: an open job profile whose deadline has passed (or whose placement closed) takes no
+  // applications, so it is reopened rather than closed.
+  const acceptingApplications =
+    posting.status === "open" && !posting.is_scheduled && !posting.deadline_passed && posting.accepts_applications !== false;
+  const canReopen = posting.status === "in_process" || (posting.status === "open" && !posting.is_scheduled && !acceptingApplications);
+
+  const reopen = () => {
+    if (!posting.deadline_passed) {
+      void call(`/admin/postings/${posting.id}/reopen`, { method: "PATCH" });
+      return;
+    }
+    setReopenDeadline("");
+    setReopenOpen(true);
+  };
+
+  const confirmReopen = async () => {
+    if (!reopenDeadline || Number.isNaN(new Date(reopenDeadline).getTime())) {
+      setError("Enter the new application deadline.");
+      return;
+    }
+    setReopenOpen(false);
+    await call(`/admin/postings/${posting.id}/reopen`, {
+      method: "PATCH",
+      body: JSON.stringify({ application_deadline: fromLocalInput(reopenDeadline) }),
+    });
   };
 
   const comp = posting.compensation ?? {};
@@ -214,7 +244,7 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
                       variant="outlined"
                       disabled={busy}
                       onClick={() =>
-                        window.confirm("Open applications now? Eligible students are emailed straight away.") &&
+                        window.confirm("Open applications now? The notice and email you chose go out straight away.") &&
                         call(`/admin/postings/${posting.id}/open-now`, { method: "POST" })
                       }
                     >
@@ -272,8 +302,9 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
             </Button>
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-            Copy Link gives the student job page (students must sign in). Sending the list emails the company a 7-day download link to the same
-            company-safe Excel they can download from their portal at any time.
+            Copy Link copies the address of this job&apos;s page for students (they must sign in to open it). Send Applicant List emails the
+            company&apos;s portal users a link to this job profile in their portal, where they sign in and download the latest list of applicants
+            as an Excel file. The link does not expire.
           </Typography>
         </CardContent>
       </Card>
@@ -283,8 +314,8 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
             <Typography variant="body2">
-              Every active portal user of {posting.company?.name ?? "the company"} gets an email with a download link (valid 7 days) to the
-              applicant list: {s.applied ?? 0} live applicant(s), company-safe columns only
+              Every active portal user of {posting.company?.name ?? "the company"} gets an email with a link to this job profile in their portal,
+              where they sign in and download the applicant list: {s.applied ?? 0} live applicant(s), company-safe columns only
               {posting.share_contact_details ? ", with contact details" : ", without contact details"}.
             </Typography>
             <TextField label="Note to the company (optional)" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} inputProps={{ maxLength: 1000 }} />
@@ -308,6 +339,31 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
         </DialogActions>
       </Dialog>
 
+      <Dialog open={reopenOpen} onClose={() => setReopenOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Reopen applications</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="body2">
+              The application deadline ({formatDateTime(posting.application_deadline)}) has passed. Choose a new deadline; students can apply, edit and
+              withdraw until then.
+            </Typography>
+            <TextField
+              type="datetime-local"
+              label="New application deadline (IST)"
+              value={reopenDeadline}
+              onChange={(e) => setReopenDeadline(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReopenOpen(false)}>Back</Button>
+          <Button variant="contained" disabled={busy || !reopenDeadline} onClick={confirmReopen}>
+            Reopen
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle1" fontWeight={700} gutterBottom>
@@ -317,7 +373,7 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
             Accepting Applications → Close applications (in process) → results published (completed). Cancelling hides the job profile from students.
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            {posting.status === "open" && (
+            {acceptingApplications && (
               <Button
                 variant="outlined"
                 disabled={busy}
@@ -329,10 +385,20 @@ export default function OverviewTab({ posting, onChanged, onMessage }) {
                 Close applications
               </Button>
             )}
-            {posting.status === "in_process" && (
-              <Button variant="outlined" disabled={busy} onClick={() => call(`/admin/postings/${posting.id}/reopen`, { method: "PATCH" })}>
+            {canReopen && (
+              <Button variant="outlined" disabled={busy} onClick={reopen}>
                 Reopen applications
               </Button>
+            )}
+            {posting.status === "open" && (
+              <NotifyStudentsButton
+                posting={posting}
+                disabled={busy}
+                onDone={async (message) => {
+                  onMessage?.(message);
+                  await onChanged();
+                }}
+              />
             )}
             {["open", "in_process"].includes(posting.status) && (
               <Button

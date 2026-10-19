@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   Box,
@@ -26,8 +27,10 @@ import AddBusinessIcon from "@mui/icons-material/AddBusiness";
 import { adminApi } from "@/lib/adminapi";
 import { formatDate, formatDateTime, postingStatusLabel, statusColor } from "@/lib/format";
 
-// Postings floated into one placement cycle (cycle detail page, Postings tab).
+// Postings floated into one placement cycle (cycle detail page, Postings tab). A click anywhere on a row opens the
+// job profile; its "Back" then returns here (see lib/backnavigation).
 export default function CyclePostings({ cycleId }) {
+  const router = useRouter();
   const [postings, setPostings] = useState(null);
   const [error, setError] = useState(null);
 
@@ -36,6 +39,13 @@ export default function CyclePostings({ cycleId }) {
       .then((response) => setPostings(response.postings ?? []))
       .catch((e) => setError(e.message));
   }, [cycleId]);
+
+  const openPosting = (event, id) => {
+    if (event.target.closest("a, button")) return; // the profile link handles its own click
+    const href = `/admin/postings/${id}`;
+    if (event.metaKey || event.ctrlKey) window.open(href, "_blank", "noopener");
+    else router.push(href);
+  };
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!postings) return <LinearProgress />;
@@ -87,7 +97,7 @@ export default function CyclePostings({ cycleId }) {
           </TableHead>
           <TableBody>
             {postings.map((posting) => (
-              <TableRow key={posting.id} hover>
+              <TableRow key={posting.id} hover onClick={(event) => openPosting(event, posting.id)} sx={{ cursor: "pointer" }}>
                 <TableCell>{posting.company?.name}</TableCell>
                 <TableCell>
                   <Link href={`/admin/postings/${posting.id}`}>{posting.title}</Link>

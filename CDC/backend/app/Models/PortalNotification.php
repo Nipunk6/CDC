@@ -22,6 +22,10 @@ class PortalNotification extends Model
         'title',
         'message',
         'type',
+        'category',
+        'job_posting_id',
+        'link',
+        'details',
         'read_at',
     ];
 
@@ -34,6 +38,7 @@ class PortalNotification extends Model
     {
         return [
             'read_at' => 'datetime',
+            'details' => 'array',
         ];
     }
 

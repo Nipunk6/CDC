@@ -4,11 +4,18 @@ import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import InboxIcon from "@mui/icons-material/InboxOutlined";
 import WorkIcon from "@mui/icons-material/WorkOutline";
 import BusinessIcon from "@mui/icons-material/BusinessOutlined";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonthOutlined";
 
 // Recruiter portal navigation (PU.3). Shown only in the left sidebar.
 export function companyNav() {
   return [
-    { heading: "Overview", items: [{ label: "Dashboard", href: "/company", icon: DashboardIcon, exact: true }] },
+    {
+      heading: "Overview",
+      items: [
+        { label: "Dashboard", href: "/company", icon: DashboardIcon, exact: true },
+        { label: "Calendar", href: "/company/calendar", icon: CalendarMonthIcon },
+      ],
+    },
     {
       heading: "Forms",
       items: [

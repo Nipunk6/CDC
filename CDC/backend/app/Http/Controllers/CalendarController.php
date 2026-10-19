@@ -101,6 +101,7 @@ class CalendarController extends Controller
 
         $items = collect()
             ->merge($events->map(fn (CampusEvent $e) => [
+                'key' => 'event:'.$e->id,
                 'type' => 'event',
                 'at' => $e->starts_at,
                 'title' => $e->title,
@@ -109,6 +110,7 @@ class CalendarController extends Controller
                 'link' => $prefix.'/events',
             ]))
             ->merge($postings->map(fn (JobPosting $p) => [
+                'key' => 'deadline:'.$p->id,
                 'type' => 'deadline',
                 'at' => $p->application_deadline,
                 'title' => 'Apply by: '.$p->title(),
@@ -117,6 +119,7 @@ class CalendarController extends Controller
                 'link' => $prefix.'/postings/'.$p->id,
             ]))
             ->merge($rounds->map(fn (PostingRound $r) => [
+                'key' => 'round:'.$r->id,
                 'type' => 'round',
                 'at' => $r->scheduled_at,
                 'title' => $r->name.' — '.$r->jobPosting->title(),
@@ -125,6 +128,7 @@ class CalendarController extends Controller
                 'link' => $prefix.'/postings/'.$r->job_posting_id,
             ]))
             ->merge(($visits ?? collect())->map(fn (JobPosting $p) => [
+                'key' => 'visit:'.$p->id,
                 'type' => 'visit',
                 // A date without a time: 10:00 IST so it lands on the right day in every view.
                 'at' => \Carbon\Carbon::parse($p->visit_date->toDateString().' 10:00', 'Asia/Kolkata')->utc(),

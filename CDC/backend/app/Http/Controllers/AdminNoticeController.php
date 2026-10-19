@@ -127,6 +127,18 @@ class AdminNoticeController extends Controller
             $notice->update(['emailed_at' => now()]);
         }
 
+        // A notice for selected students (no "All students" group) is personal, so it reaches their notification
+        // center as well; a notice for everyone stays on the general Notices page only.
+        if (! $notice->audiences->contains('audience_type', 'all')) {
+            app(\App\Services\PortalNotificationService::class)->notifyStudents(
+                $notice->audienceQuery(),
+                'New notice: '.$notice->title,
+                \Illuminate\Support\Str::limit(implode(' ', BroadcastMail::paragraphs($notice->body)), 300) ?: 'Open Notices to read it.',
+                'info',
+                ['category' => 'notice', 'job_posting_id' => $notice->job_posting_id, 'link' => '/student/notices']
+            );
+        }
+
         $this->audit->log($request, 'notice.publish', $notice, ['published_at' => null], [
             'published_at' => $notice->published_at->toIso8601String(), 'audience' => $audience, 'emailed' => $mailed,
         ]);

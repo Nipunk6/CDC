@@ -78,7 +78,7 @@ class JobProfileNoticeTest extends TestCase
         $posting = $this->open();
 
         $notice = Notice::where('source', 'job_profile')->where('job_posting_id', $posting->id)->sole();
-        $this->assertSame("Open for applications - Acme's Job Profile - SDE", $notice->title);
+        $this->assertSame("Acme's SDE is open for applications", $notice->title);
         $this->assertStringContainsString("Applications are now being accepted for Acme's Job Profile: SDE.", $notice->body);
         $this->assertStringContainsString('1. B.Tech - Computer Science & Engineering', $notice->body);
         $this->assertStringContainsString('CGPA 6 and above', $notice->body);
@@ -90,11 +90,11 @@ class JobProfileNoticeTest extends TestCase
         CycleEnrollment::create(['placement_cycle_id' => $this->cycle->id, 'student_profile_id' => $eligible->id, 'status' => 'active']);
         $otherBranch = StudentProfile::factory()->create(['branch' => 'Mining Engineering', 'graduating_batch' => 2029]);
         foreach ([$eligible, $otherBranch] as $student) {
-            $this->assertContains("Open for applications - Acme's Job Profile - SDE", $this->noticesOf($student));
+            $this->assertContains("Acme's SDE is open for applications", $this->noticesOf($student));
         }
 
         // The page also gets the card's content as data (laid out with headings and numbered lists, no HTML).
-        $details = collect($this->getJson('/api/student/notices')->json('notices'))->firstWhere('title', "Open for applications - Acme's Job Profile - SDE")['job_profile'];
+        $details = collect($this->getJson('/api/student/notices')->json('notices'))->firstWhere('title', "Acme's SDE is open for applications")['job_profile'];
         $this->assertSame(['B.Tech - Computer Science & Engineering'], $details['courses']);
         $this->assertSame([['label' => 'B.Tech', 'points' => ['CGPA 6 and above', 'Backlogs allowed']]], $details['eligibility']);
         $this->assertNotEmpty($details['stages']);
@@ -131,7 +131,7 @@ class JobProfileNoticeTest extends TestCase
         $this->patchJson("/api/admin/postings/{$posting->id}/cancel")->assertOk();
         $this->assertNull($notice()->published_at);
         $other = StudentProfile::factory()->create();
-        $this->assertNotContains("Open for applications - Acme's Job Profile - SDE", $this->noticesOf($other));
+        $this->assertNotContains("Acme's SDE is open for applications", $this->noticesOf($other));
 
         $this->assertSame(1, Notice::where('job_posting_id', $posting->id)->count());
     }

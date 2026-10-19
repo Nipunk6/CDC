@@ -132,6 +132,9 @@ class AdminPostingController extends Controller
             'enrolled_count' => $enrolled,
             // "Steps to publish" (S6.10): the stages the job profile will start with.
             'stages' => collect($formRounds)->filter(fn ($r) => is_array($r) && ($r['enabled'] ?? false))->count(),
+            // For the default notice headline and email subject.
+            'company' => $draft->company()?->name,
+            'title' => $draft->title(),
         ]);
     }
 
@@ -154,7 +157,10 @@ class AdminPostingController extends Controller
             // Allowed Student Categories (S8.4): at least one is required to be eligible; empty = no restriction.
             'allowed_student_categories' => ['nullable', 'array', 'max:50'],
             'allowed_student_categories.*' => ['integer', 'exists:student_categories,id'],
+            // Notice and email for the opening, each with its own audience and text (owner request 2026-10-19).
+            'announcement' => ['nullable', 'array'],
         ] + $this->questionRules());
+        $announcement = isset($validated['announcement']) ? $this->announcements()->normalise($validated['announcement']) : null;
 
         $form = $this->findForm($validated['form_type'], (int) $validated['form_id']);
         if (! $form) {
@@ -196,7 +202,7 @@ class AdminPostingController extends Controller
         }
 
         try {
-            $posting = DB::transaction(function () use ($form, $cycle, $validated, $request, $scheduledAt, $offerType): JobPosting {
+            $posting = DB::transaction(function () use ($form, $cycle, $validated, $request, $scheduledAt, $offerType, $announcement): JobPosting {
                 $posting = JobPosting::create([
                     'postable_type' => $form::class,
                     'postable_id' => $form->id,
@@ -212,6 +218,7 @@ class AdminPostingController extends Controller
                     ]),
                     'scheduled_open_at' => $scheduledAt,
                     'visit_date' => $validated['visit_date'] ?? null,
+                    'announcement' => $announcement,
                 ]);
 
                 $this->copyRounds($posting, $form);
@@ -237,20 +244,22 @@ class AdminPostingController extends Controller
             'allowed_student_categories' => \App\Services\EligibilityService::categoryIds($posting->eligibility_snapshot ?? []),
             'scheduled_open_at' => $posting->scheduled_open_at?->toIso8601String(),
             'visit_date' => $posting->visit_date?->toDateString(),
+            'announcement' => $posting->announcement,
         ]);
 
         if ($posting->isScheduled()) {
             return response()->json([
-                'message' => 'Job profile scheduled. It opens for applications on '.$posting->scheduled_open_at->timezone('Asia/Kolkata')->format('d M Y, h:i A').' IST, and eligible students are emailed then.',
+                'message' => 'Job profile scheduled. It opens for applications on '.$posting->scheduled_open_at->timezone('Asia/Kolkata')->format('d M Y, h:i A').' IST. When it opens, '.lcfirst($this->announcements()->summary($posting, true)),
                 'posting' => $this->detail($posting),
             ], 201);
         }
 
         $this->dispatchFloatMails($posting);
         app(\App\Services\JobProfileNoticeService::class)->publish($posting);
+        app(\App\Services\JobProfileStudentNotifier::class)->opened($posting);
 
         return response()->json([
-            'message' => 'Job profile opened for applications. Eligible students are being notified.',
+            'message' => 'Job profile opened for applications. '.$this->announcements()->summary($posting),
             'posting' => $this->detail($posting),
         ], 201);
     }
@@ -296,6 +305,7 @@ class AdminPostingController extends Controller
         }
 
         $before = $this->auditState($jobPosting);
+        $deadlineBefore = $jobPosting->application_deadline?->copy();
 
         DB::transaction(function () use ($jobPosting, $validated): void {
             if (array_key_exists('application_deadline', $validated)) {
@@ -324,6 +334,9 @@ class AdminPostingController extends Controller
         $jobPosting->refresh();
         $this->audit->log($request, 'posting.update', $jobPosting, $before, $this->auditState($jobPosting));
         app(\App\Services\JobProfileNoticeService::class)->sync($jobPosting);
+        if (array_key_exists('application_deadline', $validated)) {
+            app(\App\Services\JobProfileStudentNotifier::class)->deadlineChanged($jobPosting, $deadlineBefore);
+        }
 
         return response()->json([
             'message' => 'Job profile updated.',
@@ -427,9 +440,63 @@ class AdminPostingController extends Controller
         $this->audit->log($request, 'posting.open_now', $jobPosting, $before, ['scheduled_open_at' => null]);
         $this->dispatchFloatMails($jobPosting);
         app(\App\Services\JobProfileNoticeService::class)->publish($jobPosting);
+        app(\App\Services\JobProfileStudentNotifier::class)->opened($jobPosting);
 
         return response()->json([
-            'message' => 'Job profile opened for applications. Eligible students are being notified.',
+            'message' => 'Job profile opened for applications. '.$this->announcements()->summary($jobPosting),
+            'posting' => $this->detail($jobPosting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status', 'floatedBy:id,name'])),
+        ]);
+    }
+
+    /**
+     * "Notify students" (owner request 2026-10-19): post the job profile's notice and/or send its opening email, each
+     * to the chosen audience with the chosen text. A scheduled job profile only saves the choice; it is applied when the
+     * job profile opens. A student is still emailed about a job profile once, so a repeat reaches only new recipients.
+     */
+    public function announce(Request $request, JobPosting $jobPosting): JsonResponse
+    {
+        $validated = $request->validate(['announcement' => ['required', 'array']]);
+        $announcement = $this->announcements()->normalise($validated['announcement']);
+
+        if ($jobPosting->status !== 'open') {
+            return response()->json(['message' => 'Only a job profile open for applications can be announced to students.'], 422);
+        }
+
+        $before = ['announcement' => $jobPosting->announcement];
+        $jobPosting->update(['announcement' => $announcement]);
+        $scheduled = $jobPosting->isScheduled();
+
+        $noticeCount = null;
+        $emailCount = null;
+        if (! $scheduled) {
+            $notices = app(\App\Services\JobProfileNoticeService::class);
+            if ($announcement['notice']['enabled']) {
+                $noticeCount = $notices->publish($jobPosting)?->audienceQuery()->count();
+            }
+            if ($announcement['email']['enabled']) {
+                $already = app(PostingEligibilityService::class)->notifiedIds($jobPosting);
+                $emailCount = $this->announcements()->query($jobPosting, $announcement['email']['audience'])
+                    ->when($already !== [], fn ($q) => $q->whereNotIn('student_profiles.id', $already))->count();
+                $this->dispatchFloatMails($jobPosting);
+            }
+            // The notification center: eligible students not told yet, and the selected branches / courses.
+            app(\App\Services\JobProfileStudentNotifier::class)->opened($jobPosting);
+        }
+
+        $this->audit->log($request, 'posting.announce', $jobPosting, $before, ['announcement' => $announcement, 'notice_audience' => $noticeCount, 'emailed' => $emailCount]);
+
+        $parts = [];
+        if ($noticeCount !== null) {
+            $parts[] = "Notice posted for {$noticeCount} student(s)";
+        }
+        if ($emailCount !== null) {
+            $parts[] = $emailCount > 0 ? "email on its way to {$emailCount} student(s)" : 'no email sent: everyone in that audience was already emailed about this job profile';
+        }
+
+        return response()->json([
+            'message' => $scheduled
+                ? 'Saved. When the job profile opens, '.lcfirst($this->announcements()->summary($jobPosting, true))
+                : ($parts === [] ? 'Saved. No notice or email was sent.' : ucfirst(implode('; ', $parts)).'.'),
             'posting' => $this->detail($jobPosting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status', 'floatedBy:id,name'])),
         ]);
     }
@@ -439,17 +506,44 @@ class AdminPostingController extends Controller
         return $this->transition($request, $jobPosting, 'cancelled', ['open', 'in_process'], 'posting.cancel', 'Job profile cancelled.');
     }
 
+    /**
+     * Take applications again: a drive closed by hand (in process) or one still "open" whose deadline passed. An
+     * optional new deadline is saved in the same step, since a passed deadline would keep applications closed.
+     */
     public function reopen(Request $request, JobPosting $jobPosting): JsonResponse
     {
+        $validated = $request->validate([
+            'application_deadline' => ['sometimes', 'bail', 'date', $this->futureDeadline()],
+        ]);
+
+        $closedByDeadline = $jobPosting->status === 'open' && ! $jobPosting->isScheduled() && ! $jobPosting->acceptsApplications();
+        if ($jobPosting->status !== 'in_process' && ! $closedByDeadline) {
+            return response()->json(['message' => $jobPosting->status === 'open' ? 'This job profile is already taking applications.' : sprintf('A %s job profile cannot be reopened.', str_replace('_', ' ', $jobPosting->status))], 422);
+        }
+
         if ($this->hasAnyResults($jobPosting)) {
             return response()->json(['message' => 'Results have already been entered for this job profile, so it cannot be reopened.'], 422);
         }
 
-        if ($jobPosting->deadlinePassed()) {
-            return response()->json(['message' => 'Extend the application deadline before reopening the job profile.'], 422);
+        if ($jobPosting->placementCycle && ! $jobPosting->placementCycle->isOpen()) {
+            return response()->json(['message' => 'The placement is closed, so applications cannot be reopened.'], 422);
         }
 
-        return $this->transition($request, $jobPosting, 'open', ['in_process'], 'posting.reopen', 'Job profile reopened for applications.');
+        $deadline = array_key_exists('application_deadline', $validated) ? Ist::parse($validated['application_deadline']) : $jobPosting->application_deadline;
+        if ($deadline === null || $deadline->isPast()) {
+            return response()->json(['message' => 'Choose a new application deadline to reopen the job profile.', 'errors' => ['application_deadline' => ['Choose a new application deadline to reopen the job profile.']]], 422);
+        }
+
+        $before = ['status' => $jobPosting->status, 'application_deadline' => $jobPosting->application_deadline?->toIso8601String()];
+        $jobPosting->update(['status' => 'open', 'application_deadline' => $deadline]);
+        $this->audit->log($request, 'posting.reopen', $jobPosting, $before, ['status' => 'open', 'application_deadline' => $deadline->toIso8601String()]);
+        app(\App\Services\JobProfileNoticeService::class)->sync($jobPosting);
+        app(\App\Services\JobProfileStudentNotifier::class)->reopened($jobPosting);
+
+        return response()->json([
+            'message' => 'Job profile reopened for applications until '.$deadline->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A').' IST.',
+            'posting' => $this->detail($jobPosting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status', 'floatedBy:id,name'])),
+        ]);
     }
 
     public function export(Request $request, JobPosting $jobPosting, \App\Services\ExportService $exports, \App\Services\TemplateExports $templates): \Symfony\Component\HttpFoundation\StreamedResponse
@@ -592,7 +686,11 @@ class AdminPostingController extends Controller
             }
         });
 
-        $this->audit->log($request, 'round.update', $postingRound, $before, $postingRound->fresh()->only(['name', 'round_type', 'scheduled_at', 'venue', 'status', 'is_final']));
+        $after = $postingRound->fresh();
+        $this->audit->log($request, 'round.update', $postingRound, $before, $after->only(['name', 'round_type', 'scheduled_at', 'venue', 'status', 'is_final']));
+        if ($after->scheduled_at?->toIso8601String() !== $before['scheduled_at']?->toIso8601String() || $after->venue !== $before['venue']) {
+            app(\App\Services\JobProfileStudentNotifier::class)->roundRescheduled($jobPosting, $after);
+        }
 
         return response()->json(['message' => 'Stage updated.', 'rounds' => $jobPosting->rounds()->get()]);
     }
@@ -674,11 +772,21 @@ class AdminPostingController extends Controller
         $posting->update(['status' => $to]);
         $this->audit->log($request, $action, $posting, $before, ['status' => $to]);
         app(\App\Services\JobProfileNoticeService::class)->sync($posting);
+        match ($to) {
+            'in_process' => app(\App\Services\JobProfileStudentNotifier::class)->closed($posting),
+            'cancelled' => app(\App\Services\JobProfileStudentNotifier::class)->cancelled($posting),
+            default => null,
+        };
 
         return response()->json([
             'message' => $message,
             'posting' => $this->detail($posting->load(['rounds', 'questions', 'postable.company:id,name,logo_path', 'placementCycle:id,name,type,status', 'floatedBy:id,name'])),
         ]);
+    }
+
+    private function announcements(): \App\Services\JobProfileAnnouncementService
+    {
+        return app(\App\Services\JobProfileAnnouncementService::class);
     }
 
     private function dispatchFloatMails(JobPosting $posting): void
@@ -892,6 +1000,7 @@ class AdminPostingController extends Controller
             'status' => $posting->status,
             'application_deadline' => $posting->application_deadline,
             'deadline_passed' => $posting->deadlinePassed(),
+            'accepts_applications' => $posting->acceptsApplications(),
             'share_contact_details' => $posting->share_contact_details,
             'offer_type' => $posting->offerType(),
             'offer_label' => Offer::LABELS[$posting->offerType()] ?? $posting->offerType(),
@@ -915,6 +1024,12 @@ class AdminPostingController extends Controller
         return $this->summary($posting) + [
             'floated_by' => $posting->floatedBy ? $posting->floatedBy->only(['id', 'name']) : null,
             'eligibility_snapshot' => $posting->eligibility_snapshot,
+            // The notice and email choice in force, with the default headline for the "Notify students" dialog.
+            'announcement' => $this->announcements()->settings($posting) + [
+                'default_title' => app(\App\Services\JobProfileNoticeService::class)->defaultTitle($posting),
+                'notice_posted' => app(\App\Services\JobProfileNoticeService::class)->find($posting)?->published_at !== null,
+                'emailed_count' => count(app(PostingEligibilityService::class)->notifiedIds($posting)),
+            ],
             'compensation' => $posting->compensationFor(),
             'rounds' => $posting->rounds,
             'questions' => $posting->questions,

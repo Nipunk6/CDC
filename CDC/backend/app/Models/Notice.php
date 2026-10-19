@@ -20,6 +20,7 @@ class Notice extends Model
     protected $fillable = [
         'title',
         'body',
+        'intro',
         'attachment_path',
         'attachment_name',
         'attachment_size',

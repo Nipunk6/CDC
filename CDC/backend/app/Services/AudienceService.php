@@ -72,13 +72,14 @@ class AudienceService
         $cycles = $student->cycleEnrollments()->where('status', 'active')->pluck('placement_cycle_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         $applied = $student->applications()->where('status', 'applied')->pluck('job_posting_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         $offers = $student->offers()->pluck('job_posting_id')->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $eligibleFor = $this->eligiblePostingIds($rows, $student);
         $decisions = ApplicationRoundResult::query()
             ->whereHas('application', fn (Builder $a) => $a->where('student_profile_id', $student->id)->where('status', 'applied'))
             ->whereNotNull('published_at')
             ->whereIn('result', self::ROUND_RESULTS)
             ->get(['posting_round_id', 'result']);
 
-        return $rows->where(function (Builder $any) use ($student, $type, $filter, $table, $cycles, $applied, $offers, $decisions): void {
+        return $rows->where(function (Builder $any) use ($student, $type, $filter, $table, $cycles, $applied, $offers, $eligibleFor, $decisions): void {
             $any->where($type, 'all');
 
             if (filled($student->programme)) {
@@ -90,6 +91,9 @@ class AudienceService
             }
             if ($applied !== []) {
                 $any->orWhere(fn (Builder $q) => $q->where($type, 'posting_applicants')->whereIn($filter('job_posting_id'), $applied));
+            }
+            if ($eligibleFor !== []) {
+                $any->orWhere(fn (Builder $q) => $q->where($type, 'posting_eligible')->whereIn($filter('job_posting_id'), $eligibleFor));
             }
             if ($offers !== []) {
                 $any->orWhere(fn (Builder $q) => $q->where($type, 'offer_holders')->whereIn($filter('job_posting_id'), $offers));
@@ -103,6 +107,27 @@ class AudienceService
                     ->whereJsonContains($filter('results'), (string) $decision->result));
             }
         });
+    }
+
+    /**
+     * Job profiles named by a `posting_eligible` row of this audience table that the student is eligible for (the
+     * "only eligible students" notice of a job profile). One small query per such job profile.
+     *
+     * @return list<int>
+     */
+    private function eligiblePostingIds(Builder $rows, StudentProfile $student): array
+    {
+        $ids = $rows->getModel()->newQuery()->where('audience_type', 'posting_eligible')->pluck('audience_filter')
+            ->map(fn ($f) => (int) ((is_array($f) ? $f : (json_decode((string) $f, true) ?: []))['job_posting_id'] ?? 0))
+            ->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+        $eligibility = app(EligibilityService::class);
+
+        return JobPosting::query()->whereIn('id', $ids)->where('status', '!=', 'cancelled')->get()
+            ->filter(fn (JobPosting $posting) => $eligibility->eligibleStudentsQuery($posting)->whereKey($student->id)->exists())
+            ->map(fn (JobPosting $posting) => (int) $posting->id)->values()->all();
     }
 
     /**
@@ -149,6 +174,9 @@ class AudienceService
                 ->where('status', 'active')),
             'batch' => $query->whereIn('graduating_batch', array_map('intval', (array) ($filter['batches'] ?? []))),
             'offer_holders' => $query->whereHas('offers', fn (Builder $o) => $o->where('job_posting_id', (int) ($filter['job_posting_id'] ?? 0))),
+            'posting_eligible' => ($posting = JobPosting::query()->find((int) ($filter['job_posting_id'] ?? 0)))
+                ? app(EligibilityService::class)->eligibleStudentsQuery($posting)
+                : $query->whereRaw('1 = 0'),
             'round_results' => $query->whereHas('applications', fn (Builder $a) => $a
                 ->where('status', 'applied')
                 ->whereHas('roundResults', fn (Builder $r) => $r
@@ -265,6 +293,7 @@ class AudienceService
             'cycle' => 'Students enrolled in '.(PlacementCycle::query()->find($filter['placement_cycle_id'] ?? 0)?->name ?? 'a placement'),
             'batch' => 'Passout Batch '.implode(', ', $filter['batches'] ?? []),
             'offer_holders' => 'Offer holders of '.$postingLabel($filter['job_posting_id'] ?? null),
+            'posting_eligible' => 'Students eligible for '.$postingLabel($filter['job_posting_id'] ?? null),
             'posting_applicants' => 'Applicants of '.$postingLabel($filter['job_posting_id'] ?? null),
             'round_results' => (function () use ($filter, $postingLabel) {
                 $round = PostingRound::query()->find($filter['posting_round_id'] ?? 0);

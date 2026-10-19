@@ -55,6 +55,7 @@ class JobPosting extends Model
         'floated_by',
         'floated_at',
         'eligibility_snapshot',
+        'announcement',
         'visit_date',
         'scheduled_open_at',
     ];
@@ -71,6 +72,7 @@ class JobPosting extends Model
             'floated_at' => 'datetime',
             'share_contact_details' => 'boolean',
             'eligibility_snapshot' => 'array',
+            'announcement' => 'array',
             'visit_date' => 'date',
             'scheduled_open_at' => 'datetime',
         ];

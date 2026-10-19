@@ -87,6 +87,20 @@ Route::prefix('auth')->group(function () {
 Route::post('/alumni-outreach', [AlumniOutreachController::class, 'store']);
 
 
+// Personal calendar entries, for every role; each user sees and changes only their own.
+Route::middleware(['auth:sanctum', 'active'])->prefix('calendar/entries')->group(function () {
+    Route::get('/', [\App\Http\Controllers\CalendarEntryController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\CalendarEntryController::class, 'store']);
+    Route::patch('/{calendarEntry}', [\App\Http\Controllers\CalendarEntryController::class, 'update'])->whereNumber('calendarEntry');
+    Route::delete('/{calendarEntry}', [\App\Http\Controllers\CalendarEntryController::class, 'destroy'])->whereNumber('calendarEntry');
+});
+// A user's own edits to automatic calendar items, for every role; the placement data behind them is untouched.
+Route::middleware(['auth:sanctum', 'active'])->prefix('calendar/overrides')->group(function () {
+    Route::get('/', [\App\Http\Controllers\CalendarOverrideController::class, 'index']);
+    Route::put('/', [\App\Http\Controllers\CalendarOverrideController::class, 'upsert']);
+    Route::delete('/', [\App\Http\Controllers\CalendarOverrideController::class, 'destroy']);
+});
+
 Route::middleware(['auth:sanctum', 'active'])->get('/programme-branches', [EligibilityCatalogueController::class, 'programmeBranches']);
 
 Route::middleware(['auth:sanctum', 'active', 'role:admin'])->get('/admin/ping', function () {
@@ -179,6 +193,7 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin', 'staff'])->prefix('ad
     Route::patch('/postings/{jobPosting}/reopen', [AdminPostingController::class, 'reopen']);
     Route::patch('/postings/{jobPosting}/cancel', [AdminPostingController::class, 'cancel']);
     Route::post('/postings/{jobPosting}/open-now', [AdminPostingController::class, 'openNow']);
+    Route::post('/postings/{jobPosting}/announce', [AdminPostingController::class, 'announce']);
     Route::get('/postings/{jobPosting}/documents', [AdminPostingActivityController::class, 'documents']);
     Route::post('/postings/{jobPosting}/documents', [AdminPostingActivityController::class, 'storeDocument']);
     Route::get('/postings/{jobPosting}/documents/{postingDocument}', [AdminPostingActivityController::class, 'downloadDocument']);

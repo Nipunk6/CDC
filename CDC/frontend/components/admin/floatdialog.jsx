@@ -32,6 +32,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 
 import QuestionBuilder, { cleanQuestions } from "@/components/admin/questionbuilder";
+import AnnouncementFields, { announcementProblem, cleanAnnouncement, defaultAnnouncement } from "@/components/admin/posting/announcementfields";
 import StudentCategoryPicker from "@/components/admin/studentcategorypicker";
 import { adminApi } from "@/lib/adminapi";
 import { formatDateTime, fromLocalInput, statusColor, postingStatusLabel, toLocalInput } from "@/lib/format";
@@ -44,7 +45,7 @@ const defaultDeadline = () => `${toLocalInput(Date.now() + 7 * 24 * 60 * 60 * 10
  * "Float to students" for an accepted JNF/INF (spec M5.3). Renders a status card with either the
  * existing posting or a Float button + dialog. Dropped into the Phase 1 admin JNF/INF detail pages.
  */
-export default function FloatDialog({ formType, formId, formStatus, compact = false, onPublished }) {
+export default function FloatDialog({ formType, formId, formStatus, compact = false, onPublished = undefined }) {
   const [posting, setPosting] = useState(undefined);
   const [cycles, setCycles] = useState([]);
   const [open, setOpen] = useState(false);
@@ -61,6 +62,7 @@ export default function FloatDialog({ formType, formId, formStatus, compact = fa
   const [openAt, setOpenAt] = useState("");
   const [visitDate, setVisitDate] = useState("");
   const [categories, setCategories] = useState([]);
+  const [announcement, setAnnouncement] = useState(defaultAnnouncement);
 
   // Picking a cycle sets the role: an internship cycle is always "Internship"; a placement cycle starts on Full-Time.
   const chooseCycle = (id, list) => {
@@ -118,6 +120,7 @@ export default function FloatDialog({ formType, formId, formStatus, compact = fa
   const openDialog = () => {
     setError(null);
     setConfirmed(false);
+    setAnnouncement(defaultAnnouncement());
     setOpen(true);
   };
 
@@ -143,6 +146,11 @@ export default function FloatDialog({ formType, formId, formStatus, compact = fa
       setError("Choose when applications should open.");
       return;
     }
+    const announcementError = announcementProblem(announcement);
+    if (announcementError) {
+      setError(announcementError);
+      return;
+    }
     setSaving(true);
     try {
       await adminApi("/admin/postings", {
@@ -155,6 +163,7 @@ export default function FloatDialog({ formType, formId, formStatus, compact = fa
           application_deadline: fromLocalInput(deadline),
           share_contact_details: shareContacts,
           questions: cleaned,
+          announcement: cleanAnnouncement(announcement),
           ...(scheduleLater && openAt ? { scheduled_open_at: fromLocalInput(openAt) } : {}),
           ...(visitDate ? { visit_date: visitDate } : {}),
           ...(categories.length ? { allowed_student_categories: categories } : {}),
@@ -216,14 +225,30 @@ export default function FloatDialog({ formType, formId, formStatus, compact = fa
           <StudentCategoryPicker value={categories} onChange={setCategories} />
           {preview && (
             <Alert severity={preview.eligible_count > 0 ? "info" : "warning"}>
-              <strong>{preview.eligible_count}</strong> of {preview.enrolled_count} enrolled students are eligible and will be emailed
-              when you open this job profile for applications.
+              <strong>{preview.eligible_count}</strong> of {preview.enrolled_count} enrolled students are eligible for this job profile.
             </Alert>
           )}
           <FormControlLabel
             control={<Switch checked={shareContacts} onChange={(e) => setShareContacts(e.target.checked)} />}
             label="Share applicants' phone and personal email with the company in exports"
           />
+          <Box>
+            <Typography variant="subtitle1" fontWeight={700}>
+              Notify students
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Sent {scheduleLater ? "when the job profile opens" : "as soon as you open the job profile"}. Students see the headline on their Notices
+              page and the courses, eligibility, stages and deadline when they open it. You can notify more students later from the job profile.
+            </Typography>
+            <AnnouncementFields
+              value={announcement}
+              onChange={setAnnouncement}
+              company={preview?.company}
+              title={preview?.title}
+              eligibleCount={preview?.eligible_count}
+              disabled={saving}
+            />
+          </Box>
           <Box>
             <Typography variant="subtitle1" fontWeight={700}>
               Additional Questions
@@ -243,7 +268,7 @@ export default function FloatDialog({ formType, formId, formStatus, compact = fa
                 fullWidth
                 type="datetime-local"
                 label="Open applications at (IST)"
-                helperText="The job profile stays hidden from students until then; eligible students are emailed when it opens."
+                helperText="The job profile stays hidden from students until then; the notice and email go out when it opens."
                 value={openAt}
                 onChange={(e) => setOpenAt(e.target.value)}
                 slotProps={{ inputLabel: { shrink: true } }}
@@ -287,8 +312,8 @@ export default function FloatDialog({ formType, formId, formStatus, compact = fa
             control={<Checkbox checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />}
             label={
               scheduleLater
-                ? "I have reviewed the questions. Eligible students are notified when the job profile opens."
-                : "I have reviewed the questions and understand eligible students are notified immediately."
+                ? "I have reviewed the questions and the notice and email. Students are notified when the job profile opens."
+                : "I have reviewed the questions and the notice and email, and understand students are notified immediately."
             }
           />
         </Stack>

@@ -19,10 +19,16 @@ const Numbered = ({ items, children }) => (
  * hiring stages and the deadline. Built from the notice's `job_profile` data with plain components, never from HTML (D76).
  */
 export default function JobProfileNotice({ details }) {
-  const { company, title, institute, courses = [], eligibility = [], stages = [], deadline } = details;
+  const { company, title, institute, courses = [], eligibility = [], stages = [], deadline, message } = details;
 
   return (
     <Box sx={{ wordBreak: "break-word" }}>
+      {message && (
+        // The CDC's own message for this opening, written when it was announced (plain text).
+        <Typography variant="body2" sx={{ whiteSpace: "pre-line", mb: 1.5 }}>
+          {message}
+        </Typography>
+      )}
       <Typography variant="body2">
         Applications are now being accepted for <strong>{company}</strong>&apos;s Job Profile: <strong>{title}</strong>.
       </Typography>

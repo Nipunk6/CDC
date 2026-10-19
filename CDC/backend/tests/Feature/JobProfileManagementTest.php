@@ -237,24 +237,13 @@ class JobProfileManagementTest extends TestCase
         $this->getJson("/api/admin/postings/{$other->id}/communications")->assertOk()->assertJsonMissing(['kind' => 'stage_result']);
     }
 
-    public function test_send_applicant_list_mails_a_signed_company_safe_link(): void
+    public function test_send_applicant_list_mails_a_link_to_the_company_portal(): void
     {
         Mail::fake();
         $this->postJson("/api/admin/postings/{$this->posting->id}/send-applicant-list", ['note' => 'Please confirm the test slots.'])->assertOk();
-        Mail::assertQueued(PortalNoticeMail::class, fn ($m) => $m->hasTo('hr@acme.test') && str_contains((string) $m->actionUrl, '/api/company-exports/'));
+        Mail::assertQueued(PortalNoticeMail::class, fn ($m) => $m->hasTo('hr@acme.test') && str_ends_with((string) $m->actionUrl, "/company/postings/{$this->posting->id}"));
         $this->assertTrue(AuditLog::where('action', 'posting.send_applicant_list')->exists());
         $this->assertTrue(EmailLog::where('job_posting_id', $this->posting->id)->where('kind', 'applicant_list')->exists());
-
-        $url = null;
-        Mail::assertQueued(PortalNoticeMail::class, function ($m) use (&$url) {
-            $url = $m->actionUrl;
-
-            return true;
-        });
-        $this->app['auth']->forgetGuards();
-        $path = parse_url($url, PHP_URL_PATH).'?'.parse_url($url, PHP_URL_QUERY);
-        $this->get($path)->assertOk();
-        $this->get(parse_url($url, PHP_URL_PATH))->assertForbidden(); // unsigned
     }
 
     public function test_list_search_and_status_flags(): void

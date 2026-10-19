@@ -101,7 +101,8 @@ export default function StudentNoticesPage() {
                         {formatDateTime(notice.published_at)}
                         {notice.attachment ? " · 1 attachment" : ""}
                       </Typography>
-                      {!expanded && text && (
+                      {/* A job profile's notice shows only its headline until opened; the details are in the expanded card. */}
+                      {!expanded && text && !notice.job_profile && (
                         <Typography
                           variant="body2"
                           color="text.secondary"

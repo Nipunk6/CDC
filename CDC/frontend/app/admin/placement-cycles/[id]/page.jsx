@@ -70,6 +70,9 @@ const formatDate = (value) => {
 
 const dash = (value) => (value === null || value === undefined || value === "" ? "—" : value);
 
+// The tabs, in order, as they appear in the URL.
+const TABS = ["overview", "students", "job-profiles", "blocks"];
+
 const emptyMeta = { current_page: 1, last_page: 1, per_page: 50, total: 0 };
 
 export default function AdminPlacementCycleDetailPage({ params }) {
@@ -87,7 +90,13 @@ export default function AdminPlacementCycleDetailPage({ params }) {
 function PlacementCycleDetail({ id }) {
   const router = useRouter();
   const params = useSearchParams();
-  const queryString = params.toString();
+  const tabParam = params.get("tab");
+  // The open tab is kept in the URL (?tab=job-profiles), so "Back" from a job profile returns to the same tab.
+  const queryString = useMemo(() => {
+    const rest = new URLSearchParams(params.toString());
+    rest.delete("tab");
+    return rest.toString();
+  }, [params]);
   const filters = useMemo(() => filtersFromParams(new URLSearchParams(queryString)), [queryString]);
   const page = Math.max(1, Number(new URLSearchParams(queryString).get("page")) || 1);
   const apiFilters = filtersToQuery(filters, { api: true });
@@ -97,7 +106,7 @@ function PlacementCycleDetail({ id }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   // A shared or reloaded filtered link opens on the enrolled list.
-  const [tab, setTab] = useState(() => (queryString ? 1 : 0));
+  const [tab, setTab] = useState(() => (TABS.includes(tabParam) ? TABS.indexOf(tabParam) : queryString ? 1 : 0));
 
   const catalogue = useCatalogue(adminApi);
   const [reloadTick, setReloadTick] = useState(0);
@@ -148,11 +157,19 @@ function PlacementCycleDetail({ id }) {
 
   const navigate = useCallback(
     (next, targetPage = 1) => {
-      const query = filtersToQuery(next, { extra: { page: targetPage > 1 ? targetPage : "" } });
+      const query = filtersToQuery(next, { extra: { page: targetPage > 1 ? targetPage : "", tab: TABS[1] } });
       router.replace(query ? `/admin/placement-cycles/${id}?${query}` : `/admin/placement-cycles/${id}`, { scroll: false });
     },
     [router, id]
   );
+
+  const changeTab = (next) => {
+    setTab(next);
+    const query = new URLSearchParams(queryString);
+    if (next > 0) query.set("tab", TABS[next]);
+    const search = query.toString();
+    router.replace(search ? `/admin/placement-cycles/${id}?${search}` : `/admin/placement-cycles/${id}`, { scroll: false });
+  };
 
   const reloadEnrollments = () => setReloadTick((tick) => tick + 1);
 
@@ -387,7 +404,7 @@ function PlacementCycleDetail({ id }) {
       )}
 
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={tab} onChange={(_event, next) => setTab(next)} variant="scrollable" allowScrollButtonsMobile>
+        <Tabs value={tab} onChange={(_event, next) => changeTab(next)} variant="scrollable" allowScrollButtonsMobile>
           <Tab label="Overview" />
           <Tab label={`Enrolled Students (${cycle.enrolled_students_count ?? 0})`} />
           <Tab label="Job Profiles" />

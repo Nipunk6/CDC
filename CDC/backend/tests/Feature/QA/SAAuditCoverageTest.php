@@ -377,6 +377,10 @@ class SAAuditCoverageTest extends TestCase
 
                 return ['POST', "/api/admin/postings/{$w['open']->id}/open-now", []];
             },
+            'POST api/admin/postings/{jobPosting}/announce' => fn () => ['POST', "/api/admin/postings/{$w['open']->id}/announce", ['announcement' => [
+                'notice' => ['enabled' => true, 'audience' => ['type' => 'all']],
+                'email' => ['enabled' => false, 'audience' => ['type' => 'eligible']],
+            ]]],
             'POST api/admin/postings/{jobPosting}/documents' => fn () => ['POST', "/api/admin/postings/{$w['open']->id}/documents", ['title' => 'Brochure', 'file' => UploadedFile::fake()->create('brochure.pdf', 10, 'application/pdf')], true],
             'DELETE api/admin/postings/{jobPosting}/documents/{postingDocument}' => fn () => ['DELETE', "/api/admin/postings/{$w['open']->id}/documents/{$w['document']->id}", []],
             'POST api/admin/postings/{jobPosting}/send-applicant-list' => fn () => ['POST', "/api/admin/postings/{$p}/send-applicant-list", ['note' => 'Please confirm the test slots.']],

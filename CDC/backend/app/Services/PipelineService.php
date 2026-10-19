@@ -441,7 +441,8 @@ class PipelineService
                 $user,
                 "{$company}: {$round->name} result",
                 $message,
-                $outcome === 'selected' ? 'success' : ($outcome === 'waitlisted' ? 'info' : 'warning')
+                $outcome === 'selected' ? 'success' : ($outcome === 'waitlisted' ? 'info' : 'warning'),
+                ['category' => 'result', 'job_posting_id' => $posting->id, 'link' => '/student/applications']
             );
 
             $batches[$outcome.'|'.(int) $row->is_addendum][] = $user;

@@ -7,9 +7,10 @@ use App\Models\Notice;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Owner decision 2026-10-18: every job profile opened for applications appears on the student Notices page for ALL
- * students, whatever their programme, branch or batch (eligibility still decides who can apply). One automatic notice
- * per job profile, marked `source = job_profile`; it is never emailed (eligible students already get the E2 mail).
+ * Owner decisions 2026-10-18 / 2026-10-19: a job profile opened for applications gets one automatic notice on the student
+ * Notices page, marked `source = job_profile`. The admin picks its target audience (eligible students, all students,
+ * branches or courses), its headline and an optional message (JobProfileAnnouncementService); without a choice it goes
+ * to ALL students. The notice itself is never emailed: the opening email is a separate choice (SendPostingFloatedMails).
  *
  * The notice reads like Superset's "Open for applications" card: applicable courses, eligibility, hiring stages and
  * the deadline. The body is plain text (notices never render HTML, D76); details() gives the same content as data so
@@ -21,30 +22,26 @@ class JobProfileNoticeService
 
     public const DEFAULT_INSTITUTE = 'Indian Institute of Technology (Indian School of Mines) Dhanbad';
 
-    public function __construct(private readonly SettingsService $settings)
+    public function __construct(private readonly SettingsService $settings, private readonly JobProfileAnnouncementService $announcements)
     {
     }
 
-    /** The job profile has just opened for applications: publish (or re-publish) its notice. */
-    public function publish(JobPosting $posting): Notice
+    /**
+     * The job profile has just opened for applications (or the admin announced it again): publish or refresh its notice,
+     * unless the admin chose not to post one. Returns the notice, or null when none is posted.
+     */
+    public function publish(JobPosting $posting): ?Notice
     {
-        return DB::transaction(function () use ($posting) {
-            $notice = $this->find($posting) ?? new Notice(['source' => self::SOURCE, 'job_posting_id' => $posting->id]);
-            $notice->fill($this->content($posting) + ['created_by' => $posting->floated_by]);
-            $notice->published_at ??= now();
-            $notice->save();
+        if (! $this->announcements->settings($posting)['notice']['enabled']) {
+            return null;
+        }
 
-            if (! $notice->audiences()->where('audience_type', 'all')->exists()) {
-                $notice->audiences()->create(['audience_type' => 'all', 'audience_filter' => null]);
-            }
-
-            return $notice;
-        });
+        return $this->write($posting);
     }
 
     /**
      * Keep an existing notice in step with its job profile: details refreshed, hidden once cancelled. A job profile that
-     * never opened has no notice and gets none here.
+     * never opened (or was opened without a notice) has none and gets none here.
      */
     public function sync(JobPosting $posting): void
     {
@@ -59,7 +56,31 @@ class JobProfileNoticeService
             return;
         }
 
-        $this->publish($posting);
+        $this->write($posting);
+    }
+
+    /** Fill the notice from the job profile and its announcement settings, with the chosen target audience. */
+    private function write(JobPosting $posting): Notice
+    {
+        $settings = $this->announcements->settings($posting)['notice'];
+
+        return DB::transaction(function () use ($posting, $settings) {
+            $notice = $this->find($posting) ?? new Notice(['source' => self::SOURCE, 'job_posting_id' => $posting->id]);
+            $notice->fill($this->content($posting, $settings) + ['created_by' => $posting->floated_by]);
+            $notice->published_at ??= now();
+            $notice->save();
+
+            $groups = $this->announcements->groups($posting, $settings['audience']);
+            $current = $notice->audiences()->get()->map(fn ($a) => $a->toGroup())->all();
+            if ($current != $groups) {
+                $notice->audiences()->delete();
+                foreach ($groups as $group) {
+                    $notice->audiences()->create($group);
+                }
+            }
+
+            return $notice;
+        });
     }
 
     public function find(JobPosting $posting): ?Notice
@@ -123,13 +144,23 @@ class JobProfileNoticeService
         ];
     }
 
-    /** @return array{title: string, body: string} */
-    private function content(JobPosting $posting): array
+    /** "Acme's SDE is open for applications": the headline students see before they open the notice. */
+    public function defaultTitle(JobPosting $posting): string
+    {
+        return mb_substr(sprintf("%s's %s is open for applications", $posting->company()?->name ?? 'A company', $posting->title()), 0, 255);
+    }
+
+    /**
+     * @param  array{title: ?string, message: ?string}  $settings
+     * @return array{title: string, body: string, intro: ?string}
+     */
+    private function content(JobPosting $posting, array $settings): array
     {
         $d = $this->details($posting);
         $numbered = fn (array $items) => array_map(fn ($item, $i) => ($i + 1).'. '.$item, $items, array_keys($items));
 
         $lines = [
+            ...($settings['message'] ? [$settings['message'], ''] : []),
             sprintf("Applications are now being accepted for %s's Job Profile: %s.", $d['company'], $d['title']),
             '',
             'Eligible students will be able to find this job profile under JOB PROFILES options, and apply.',
@@ -154,8 +185,9 @@ class JobProfileNoticeService
         }
 
         return [
-            'title' => mb_substr("Open for applications - {$d['company']}'s Job Profile - {$d['title']}", 0, 255),
+            'title' => $settings['title'] ?: $this->defaultTitle($posting),
             'body' => implode("\n", $lines),
+            'intro' => $settings['message'],
         ];
     }
 

@@ -54,6 +54,7 @@ Artisan::command('placement:open-scheduled', function (AuditService $audit, \App
                 : \App\Jobs\SendPostingFloatedMails::dispatch($posting->id);
             // The job profile is live now: announce it on every student's Notices page (owner decision 2026-10-18).
             app(\App\Services\JobProfileNoticeService::class)->publish($posting->fresh());
+            app(\App\Services\JobProfileStudentNotifier::class)->opened($posting->fresh());
             $opened++;
         });
     $this->info("{$opened} scheduled job profile(s) opened.");
@@ -73,3 +74,8 @@ Artisan::command('login-logs:purge', function (\App\Services\SettingsService $se
 
 \Illuminate\Support\Facades\Schedule::command('login-logs:purge')->dailyAt('02:30')->timezone('Asia/Kolkata')->withoutOverlapping();
 
+// Calendar reminders (owner request 2026-10-19): in-app notifications before items users set a reminder on.
+Artisan::command('calendar:send-reminders', function (\App\Services\CalendarReminderService $reminders) {
+    $this->info($reminders->sendDue().' calendar reminder(s) sent.');
+})->purpose('Send due calendar reminders as in-app notifications');
+\Illuminate\Support\Facades\Schedule::command('calendar:send-reminders')->everyMinute()->withoutOverlapping();

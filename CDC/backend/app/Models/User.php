@@ -100,6 +100,11 @@ class User extends Authenticatable
         return $this->hasOne(StudentProfile::class);
     }
 
+    public function calendarEntries(): HasMany
+    {
+        return $this->hasMany(CalendarEntry::class);
+    }
+
     public function notifications(): HasMany
     {
         return $this->hasMany(PortalNotification::class);
