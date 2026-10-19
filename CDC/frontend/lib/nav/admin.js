@@ -10,6 +10,7 @@ import GroupsIcon from "@mui/icons-material/GroupsOutlined";
 import DescriptionIcon from "@mui/icons-material/DescriptionOutlined";
 import SwapHorizIcon from "@mui/icons-material/SwapHorizOutlined";
 import LabelIcon from "@mui/icons-material/LabelOutlined";
+import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccountOutlined";
 import AssignmentIcon from "@mui/icons-material/AssignmentOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import BusinessIcon from "@mui/icons-material/BusinessOutlined";
@@ -66,6 +67,7 @@ export function adminNav({ isSuperAdmin = false, can = () => true } = {}) {
         { label: "Resumes", href: "/admin/resumes", permission: "resumes", icon: DescriptionIcon },
         { label: "Branch Changes", href: "/admin/branch-changes", permission: "branch_changes", icon: SwapHorizIcon },
         { label: "Student Categories", href: "/admin/student-categories", permission: "student_categories", icon: LabelIcon },
+        { label: "SCPT & SPOCs", href: "/admin/scpt", permission: "scpt", icon: SupervisorAccountIcon },
       ],
     },
     {

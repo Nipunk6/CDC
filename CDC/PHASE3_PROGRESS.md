@@ -78,7 +78,7 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - [ ] P9 Mail infrastructure: Zimbra pool, delivery log, tags, composer, company outreach
   - [ ] P9.1 migrations S7–S10, S17, S18 · P9.2 sender pool · P9.3 delivery log · P9.4 mail senders page · P9.5 tag groups · P9.6 composer · P9.7 company outreach + invitation tracker
 - [ ] P10 SCPT & SPOC + double-major analytics
-  - [ ] P10.1 SCPT registry (S19) · P10.2 SPOC assignment · P10.3 analytics additions
+  - [x] P10.1 SCPT registry (S19) · [x] P10.2 SPOC assignment (P3-D50, 2026-10-19) · [ ] P10.3 analytics additions
 - [ ] P11 UI polish + mobile
   - [ ] P11.0 design review with the brief · P11.1 dashboards · P11.2 four-width check + F-023
 - [ ] P12 Alumni portal (🛑 OD-12)
@@ -116,3 +116,4 @@ Gate: `php artisan test --exclude-group=qa-open` (from CDC/backend), `npm run bu
 - 2026-10-10 · P0.4–P0.6 login log: migration …000042, LoginLogService, AuthController, AdminLoginLogController (+export), login-logs:purge on the scheduler, admin Login Log page, student last-login line, cron documented (P3-D34)
 - 2026-10-10 · P0 Definition of Done run (P3-D35): evidence qa/evidence/p0_gates.txt, screenshots qa/screenshots/p3/p0/
 - 2026-10-12 · on `phase3`: P-1.14 (rate limit df09539, SEC-003 d40b6c2, SEC-012 868a26e), MySQL-neutral tests aebb9de, PHP 8.2 lock 498f4fd, CI a9fe018; merged into `phase3-p0`
+- 2026-10-19 · P10.1 + P10.2 SCPT registry and SPOC assignment, not committed (P3-D50)

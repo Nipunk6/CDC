@@ -9,6 +9,8 @@ use App\Http\Controllers\AdminExportTemplateController;
 use App\Http\Controllers\AdminOfferController;
 use App\Http\Controllers\AdminReconcileController;
 use App\Http\Controllers\AdminStudentCategoryController;
+use App\Http\Controllers\AdminScptController;
+use App\Http\Controllers\StudentSpocController;
 use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AdminPostingActivityController;
 use App\Http\Controllers\AdminPlacementCycleController;
@@ -215,6 +217,14 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin', 'staff'])->prefix('ad
     Route::post('/student-categories/{studentCategory}/students', [AdminStudentCategoryController::class, 'assign']);
     Route::delete('/student-categories/{studentCategory}/students/{studentProfile}', [AdminStudentCategoryController::class, 'unassign']);
     Route::get('/students/{studentProfile}/categories', [AdminStudentCategoryController::class, 'forStudent']);
+    // SCPT registry and SPOC assignment (P10.1, P10.2)
+    Route::get('/scpt', [AdminScptController::class, 'index']);
+    Route::post('/scpt', [AdminScptController::class, 'store']);
+    Route::patch('/scpt/{scptMember}', [AdminScptController::class, 'update']);
+    Route::delete('/scpt/{scptMember}', [AdminScptController::class, 'destroy']);
+    Route::get('/postings/{jobPosting}/spocs', [AdminScptController::class, 'candidates']);
+    Route::post('/postings/{jobPosting}/spocs', [AdminScptController::class, 'assign']);
+    Route::delete('/postings/{jobPosting}/spocs/{jobPostingSpoc}', [AdminScptController::class, 'unassign']);
     Route::get('/reports', [AdminReportController::class, 'index']);
     Route::get('/placement-cycles/{placementCycle}/reports/{report}', [AdminReportController::class, 'download']);
     Route::get('/export-templates', [AdminExportTemplateController::class, 'index']);
@@ -418,6 +428,8 @@ Route::middleware(['auth:sanctum', 'active', 'role:student'])->prefix('student')
 
     Route::get('/branch-change', [StudentBranchChangeController::class, 'index']);
     Route::post('/branch-change', [StudentBranchChangeController::class, 'store']);
+
+    Route::get('/spoc', [StudentSpocController::class, 'index']);
 });
 });
 

@@ -131,6 +131,12 @@ class JobPosting extends Model
         return $this->hasMany(PostingDocument::class)->orderBy('id');
     }
 
+    /** SCPT members assigned as SPOC for this job profile (P10.2). */
+    public function spocs(): HasMany
+    {
+        return $this->hasMany(JobPostingSpoc::class)->orderBy('id');
+    }
+
     public function proposals(): HasMany
     {
         return $this->hasMany(ShortlistProposal::class);

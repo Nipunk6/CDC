@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Services\AuditService;
+use App\Services\SpocService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,6 +95,10 @@ class AdminCompanyController extends Controller
         $before = $company->only(array_keys($validated));
         $company->update($validated);
         $this->audit->log($request, 'company.update', $company, $before, $company->only(array_keys($validated)));
+        // SPOCs of this company's live job profiles get the new HR contact by mail (P10.2).
+        if (SpocService::hrChanged($before, $company)) {
+            app(SpocService::class)->notifyHrChanged($company);
+        }
 
         return response()->json([
             'message' => 'Company updated successfully.',

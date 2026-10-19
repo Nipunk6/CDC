@@ -7,6 +7,7 @@ import CampaignIcon from "@mui/icons-material/CampaignOutlined";
 import PollIcon from "@mui/icons-material/PollOutlined";
 import EventIcon from "@mui/icons-material/EventOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutline";
+import SupportAgentIcon from "@mui/icons-material/SupportAgentOutlined";
 
 // Student portal navigation (PU.3). Shown only in the left sidebar.
 export function studentNav() {
@@ -24,6 +25,7 @@ export function studentNav() {
         { label: "Job Profiles", href: "/student/postings", icon: WorkIcon },
         { label: "My Applications", href: "/student/applications", icon: AssignmentIcon },
         { label: "My Resumes", href: "/student/resumes", icon: DescriptionIcon },
+        { label: "SPOC", href: "/student/spoc", icon: SupportAgentIcon },
       ],
     },
     {

@@ -10,6 +10,7 @@ use App\Models\JobPosting;
 use App\Models\PostingRound;
 use App\Models\ShortlistProposal;
 use App\Services\PipelineService;
+use App\Services\SpocService;
 use App\Services\StakeholderNotifier;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -53,6 +54,8 @@ class CompanyPipelineController extends Controller
                     'published_waitlisted' => $r->results()->whereNotNull('published_at')->where('result', 'waitlisted')->count(),
                 ]),
                 'questions' => $jobPosting->questions()->get(['id', 'question', 'qtype', 'options', 'required']),
+                // Student SPOCs of this job profile (P3-D52): name, phone and email only.
+                'spocs' => SpocService::companyFacing($jobPosting),
             ],
         ]);
     }

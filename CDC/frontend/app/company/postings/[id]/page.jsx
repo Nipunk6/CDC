@@ -17,6 +17,7 @@ import {
   IconButton,
   InputLabel,
   LinearProgress,
+  Link as MuiLink,
   Menu,
   MenuItem,
   Select,
@@ -195,6 +196,40 @@ export default function CompanyPostingDetailPage({ params }) {
           </Typography>
         </CardContent>
       </Card>
+
+      {posting.spocs?.length > 0 && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent>
+            <Typography variant="subtitle1" fontWeight={700}>
+              Student SPOC
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              The student coordinator(s) the CDC has assigned to this job profile. You can contact them to coordinate with students.
+            </Typography>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1.5, md: 4 }} flexWrap="wrap" useFlexGap>
+              {posting.spocs.map((spoc, index) => (
+                <Box key={`${spoc.email ?? spoc.name}-${index}`} sx={{ minWidth: 0 }}>
+                  <Typography fontWeight={600}>{spoc.name}</Typography>
+                  {spoc.phone && (
+                    <Typography variant="body2">
+                      <MuiLink href={`tel:${spoc.phone}`} underline="hover">
+                        {spoc.phone}
+                      </MuiLink>
+                    </Typography>
+                  )}
+                  {spoc.email && (
+                    <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                      <MuiLink href={`mailto:${spoc.email}`} underline="hover">
+                        {spoc.email}
+                      </MuiLink>
+                    </Typography>
+                  )}
+                </Box>
+              ))}
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>

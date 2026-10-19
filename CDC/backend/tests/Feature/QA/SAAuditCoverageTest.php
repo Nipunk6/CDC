@@ -14,6 +14,7 @@ use App\Models\FormStatusHistory;
 use App\Models\Inf;
 use App\Models\Jnf;
 use App\Models\JobPosting;
+use App\Models\JobPostingSpoc;
 use App\Models\Notice;
 use App\Models\Offer;
 use App\Models\PlacementBlock;
@@ -21,6 +22,7 @@ use App\Models\PlacementCycle;
 use App\Models\PolicyDocument;
 use App\Models\PostingDocument;
 use App\Models\ProgrammeBranch;
+use App\Models\ScptMember;
 use App\Models\ShortlistProposal;
 use App\Models\StudentCategory;
 use App\Models\StudentNote;
@@ -214,10 +216,11 @@ class SAAuditCoverageTest extends TestCase
         $survey = Survey::create(['title' => 'QA Draft Survey', 'status' => 'draft', 'created_by' => $this->adminB->id]);
         $survey->questions()->create(['qtype' => 'text', 'question' => 'Any feedback?', 'required' => false, 'sort_order' => 1]);
         $survey->audiences()->create(['audience_type' => 'all', 'audience_filter' => null]);
+        $scpt = ScptMember::create(['placement_cycle_id' => $ft->id, 'student_profile_id' => $s[5]->id, 'added_by' => $this->adminB->id]);
 
         return compact('company', 'companyUser', 'ft', 'in', 's', 'outsider', 'p', 'pApps', 'pR1', 'open', 'openRounds', 'final', 'finalApps',
             'notFloated', 'jSub', 'jDraft', 'iSub', 'iDraft', 'pendingResume', 'event', 'branch', 'policy', 'branchChange', 'proposal', 'block',
-            'note', 'document', 'category', 'template', 'notice', 'survey');
+            'note', 'document', 'category', 'template', 'notice', 'survey', 'scpt');
     }
 
     /**
@@ -392,6 +395,15 @@ class SAAuditCoverageTest extends TestCase
                 $w['category']->students()->attach($s[2]->id, ['assigned_by' => $this->adminB->id]);
 
                 return ['DELETE', "/api/admin/student-categories/{$w['category']->id}/students/{$s[2]->id}", []];
+            },
+            'POST api/admin/scpt' => fn () => ['POST', '/api/admin/scpt', ['placement_cycle_id' => $w['ft']->id, 'roll_nos' => [$s[1]->roll_no]]],
+            'PATCH api/admin/scpt/{scptMember}' => fn () => ['PATCH', "/api/admin/scpt/{$w['scpt']->id}", ['designation' => 'Coordinator']],
+            'DELETE api/admin/scpt/{scptMember}' => fn () => ['DELETE', "/api/admin/scpt/{$w['scpt']->id}", []],
+            'POST api/admin/postings/{jobPosting}/spocs' => fn () => ['POST', "/api/admin/postings/{$w['open']->id}/spocs", ['scpt_member_ids' => [$w['scpt']->id]]],
+            'DELETE api/admin/postings/{jobPosting}/spocs/{jobPostingSpoc}' => function () use ($w) {
+                $spoc = JobPostingSpoc::create(['job_posting_id' => $w['open']->id, 'scpt_member_id' => $w['scpt']->id, 'assigned_by' => $this->adminB->id]);
+
+                return ['DELETE', "/api/admin/postings/{$w['open']->id}/spocs/{$spoc->id}", []];
             },
             'POST api/admin/export-templates' => fn () => ['POST', '/api/admin/export-templates', ['name' => 'QA New Template']],
             'PATCH api/admin/export-templates/{exportTemplate}' => fn () => ['PATCH', "/api/admin/export-templates/{$w['template']->id}", ['name' => 'QA Template (renamed)']],

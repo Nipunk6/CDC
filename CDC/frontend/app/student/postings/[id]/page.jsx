@@ -25,6 +25,7 @@ import { compensationText } from "@/components/student/postingcard";
 import { studentApi, studentBlobUrl } from "@/lib/studentapi";
 import { formatDate } from "@/lib/format";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import SpocContacts from "@/components/student/spoccontacts";
 
 export default function StudentPostingDetailPage({ params }) {
   const { id } = use(params);
@@ -95,11 +96,19 @@ export default function StudentPostingDetailPage({ params }) {
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 4 }} sx={{ order: { xs: 1, md: 2 } }}>
-          <Card sx={{ position: { md: "sticky" }, top: { md: 24 } }}>
-            <CardContent>
-              <ApplyPanel posting={posting} onChanged={load} />
-            </CardContent>
-          </Card>
+          {/* The apply panel and the SPOC card stick together, so the SPOC card never slides under the panel; the
+              column scrolls on its own when both are taller than the screen. */}
+          <Stack
+            spacing={3}
+            sx={{ position: { md: "sticky" }, top: { md: 24 }, maxHeight: { md: "calc(100vh - 48px)" }, overflowY: { md: "auto" } }}
+          >
+            <Card sx={{ flexShrink: 0 }}>
+              <CardContent>
+                <ApplyPanel posting={posting} onChanged={load} />
+              </CardContent>
+            </Card>
+            {posting.spocs?.length > 0 && <SpocContacts spocs={posting.spocs} sx={{ flexShrink: 0 }} />}
+          </Stack>
         </Grid>
         <Grid size={{ xs: 12, md: 8 }} sx={{ order: { xs: 2, md: 1 } }}>
           <Stack spacing={3}>

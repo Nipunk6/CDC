@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\JobPosting;
 use App\Models\StudentProfile;
 use App\Services\EligibilityService;
+use App\Services\SpocService;
 use App\Support\PostingPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -110,6 +111,8 @@ class StudentPostingController extends Controller
                 'eligibility' => $this->eligibility->check($student, $jobPosting),
                 'application' => PostingPresenter::application($application, $student, $jobPosting),
                 'trail' => PostingPresenter::trail($jobPosting, $application),
+                // SCPT SPOCs a student may contact (P10.2): name, roll number, phone, email. Never HR details.
+                'spocs' => SpocService::studentFacing($jobPosting),
             ],
         ]);
     }

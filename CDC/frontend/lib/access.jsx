@@ -33,6 +33,7 @@ const PAGE_PERMISSIONS = [
   ["/admin/resumes", "resumes"],
   ["/admin/branch-changes", "branch_changes"],
   ["/admin/student-categories", "student_categories"],
+  ["/admin/scpt", "scpt"],
   ["/admin/notices", "notices"],
   ["/admin/surveys", "surveys"],
   ["/admin/settings", "settings"],

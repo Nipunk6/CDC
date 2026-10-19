@@ -162,4 +162,10 @@ class StudentProfile extends Model
     {
         return $this->hasMany(StudentFieldVerification::class);
     }
+
+    /** SCPT memberships, one per placement cycle (P10.1). */
+    public function scptMemberships(): HasMany
+    {
+        return $this->hasMany(ScptMember::class);
+    }
 }

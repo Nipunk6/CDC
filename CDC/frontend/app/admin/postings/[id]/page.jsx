@@ -21,6 +21,8 @@ import ProposalsList from "@/components/admin/proposalslist";
 import DocumentsTab from "@/components/admin/posting/documentstab";
 import ActivityTab from "@/components/admin/posting/activitytab";
 import CommunicationTab from "@/components/admin/posting/communicationtab";
+import SpocTab from "@/components/admin/posting/spoctab";
+import { useAccess } from "@/lib/access";
 import { adminApi } from "@/lib/adminapi";
 import { formatDateTime, statusColor, postingStatusLabel } from "@/lib/format";
 
@@ -35,6 +37,7 @@ const TABS = [
   { key: "documents", label: "Attached Documents" },
   { key: "activity", label: "Activity" },
   { key: "communication", label: "Communication Log" },
+  { key: "spoc", label: "SPOC", permission: "scpt" },
 ];
 
 export default function AdminPostingDetailPage({ params }) {
@@ -45,6 +48,7 @@ export default function AdminPostingDetailPage({ params }) {
   const [success, setSuccess] = useState(null);
   const [tab, setTab] = useState("overview");
   const [editingEligibility, setEditingEligibility] = useState(false);
+  const { can } = useAccess();
 
   const load = useCallback(async () => {
     try {
@@ -117,7 +121,7 @@ export default function AdminPostingDetailPage({ params }) {
       )}
       <Card>
         <Tabs value={tab} onChange={(_e, value) => setTab(value)} variant="scrollable" allowScrollButtonsMobile>
-          {TABS.map((t) => (
+          {TABS.filter((t) => !t.permission || can(t.permission, "read")).map((t) => (
             <Tab key={t.key} value={t.key} label={t.label} />
           ))}
         </Tabs>
@@ -142,6 +146,7 @@ export default function AdminPostingDetailPage({ params }) {
             {tab === "documents" && <DocumentsTab posting={posting} onMessage={setSuccess} />}
             {tab === "activity" && <ActivityTab posting={posting} />}
             {tab === "communication" && <CommunicationTab posting={posting} />}
+            {tab === "spoc" && <SpocTab posting={posting} onMessage={setSuccess} />}
           </Stack>
         </CardContent>
       </Card>
