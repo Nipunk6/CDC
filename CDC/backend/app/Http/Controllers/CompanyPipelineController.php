@@ -12,6 +12,7 @@ use App\Models\ShortlistProposal;
 use App\Services\PipelineService;
 use App\Services\SpocService;
 use App\Services\StakeholderNotifier;
+use App\Support\ApplicantOrder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -113,8 +114,9 @@ class CompanyPipelineController extends Controller
     public function export(Request $request, JobPosting $jobPosting, \App\Services\ExportService $exports): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $this->authorizePosting($request, $jobPosting);
+        $order = ApplicantOrder::fromRequest($request); // P3-D54: the order chosen on screen
 
-        return $exports->applicantsWorkbook($jobPosting, 'company');
+        return $exports->applicantsWorkbook($jobPosting, 'company', fn ($applications) => ApplicantOrder::byCgpa($applications, $order));
     }
 
     /**
@@ -128,11 +130,13 @@ class CompanyPipelineController extends Controller
         $decision = $request->validate(['decision' => ['nullable', 'in:shortlisted,rejected,all']])['decision'] ?? 'all';
         $result = ['shortlisted' => 'selected', 'rejected' => 'rejected'][$decision] ?? null;
 
-        $narrow = fn ($applications) => $applications->filter(function (Application $a) use ($postingRound, $result) {
+        $order = ApplicantOrder::fromRequest($request); // P3-D54: the order chosen on screen
+
+        $narrow = fn ($applications) => ApplicantOrder::byCgpa($applications->filter(function (Application $a) use ($postingRound, $result) {
             $visible = $a->roundResults->first(fn (ApplicationRoundResult $r) => $r->posting_round_id === $postingRound->id)?->visibleResult();
 
             return $visible !== null && ($result === null || $visible === $result);
-        });
+        }), $order);
         $label = ['shortlisted' => $postingRound->is_final ? 'selected' : 'shortlisted', 'rejected' => 'not selected', 'all' => 'all students'][$decision];
 
         return $exports->applicantsWorkbook($jobPosting, 'company', $narrow, $postingRound->name.' '.$label);

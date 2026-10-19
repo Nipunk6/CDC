@@ -123,6 +123,25 @@ class CompanyStageExportTest extends TestCase
         $this->getJson($url.'?decision=maybe')->assertStatus(422);
     }
 
+    /** P3-D54: downloads follow the CGPA order chosen on the company page; no CGPA on record goes last. */
+    public function test_company_downloads_follow_the_cgpa_sort(): void
+    {
+        foreach (['22JE0001' => 7.0, '22JE0002' => 9.0, '22JE0003' => null, '22JE0004' => 8.0, '22JE0005' => 8.0] as $roll => $cgpa) {
+            StudentProfile::where('roll_no', $roll)->update(['current_cgpa' => $cgpa]);
+        }
+        Sanctum::actingAs($this->companyUser);
+        $applicants = "/api/company/postings/{$this->posting->id}/export";
+        $stage = "/api/company/postings/{$this->posting->id}/rounds/{$this->posting->rounds()->first()->id}/export?decision=all";
+
+        $this->assertSame(['22JE0001', '22JE0002', '22JE0003', '22JE0004', '22JE0005'], $this->rolls($this->get($applicants)->assertOk()), 'default: order of applying');
+        $this->assertSame(['22JE0002', '22JE0004', '22JE0005', '22JE0001', '22JE0003'], $this->rolls($this->get($applicants.'?sort=cgpa&dir=desc')->assertOk()));
+        $this->assertSame(['22JE0001', '22JE0004', '22JE0005', '22JE0002', '22JE0003'], $this->rolls($this->get($applicants.'?sort=cgpa&dir=asc')->assertOk()));
+        $this->assertSame(['22JE0002', '22JE0004', '22JE0001', '22JE0003'], $this->rolls($this->get($stage.'&sort=cgpa&dir=desc')->assertOk()));
+
+        $this->getJson($applicants.'?sort=name')->assertStatus(422);
+        $this->getJson($applicants.'?sort=cgpa&dir=up')->assertStatus(422);
+    }
+
     public function test_company_downloads_the_final_offers(): void
     {
         $offerApp = $this->apps[0];

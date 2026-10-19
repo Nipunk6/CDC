@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Autocomplete,
@@ -25,6 +26,7 @@ import {
   Tab,
   Table,
   TableBody,
+  TableSortLabel,
   TableCell,
   TableContainer,
   TableHead,
@@ -43,6 +45,7 @@ import PageHeader from "@/components/shared/pageheader";
 import { companyApi } from "@/lib/companyapi";
 import { companyDownload } from "@/lib/companydownload";
 import { formatDateTime, postingStatusLabel, statusColor, titleCase } from "@/lib/format";
+import { cgpaQuery, nextCgpaDirection, sortByCgpa } from "@/lib/applicantorder";
 
 const kindLabels = { shortlist: "Shortlist", waitlist: "On Hold", addendum: "Addendum", replacement_request: "Replacement request" };
 // A completed drive still takes these (QA F-010).
@@ -88,6 +91,21 @@ export default function CompanyPostingDetailPage({ params }) {
 
   const questions = useMemo(() => Object.fromEntries((posting?.questions ?? []).map((q) => [q.id, q.question])), [posting]);
 
+  // CGPA sort (P3-D54): kept in the address (?sort=cgpa&dir=desc|asc); no sort = order of applying. Downloads follow it.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const cgpaDir = searchParams.get("sort") === "cgpa" ? (searchParams.get("dir") === "asc" ? "asc" : "desc") : null;
+  const setCgpaDir = (direction) => {
+    const query = cgpaQuery(direction);
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+  const sortedApplicants = useMemo(() => sortByCgpa(applicants, cgpaDir), [applicants, cgpaDir]);
+  const withOrder = (url) => {
+    const query = cgpaQuery(cgpaDir);
+    return query ? `${url}${url.includes("?") ? "&" : "?"}${query}` : url;
+  };
+
   if (!posting) return error ? <Alert severity="error">{error}</Alert> : <LinearProgress />;
 
   const completed = posting.status === "completed";
@@ -114,12 +132,12 @@ export default function CompanyPostingDetailPage({ params }) {
   };
 
   const exportApplicants = () =>
-    companyDownload(`/company/postings/${id}/export`, `applicants-${id}.xlsx`).catch((e) => setError(e.message));
+    companyDownload(withOrder(`/company/postings/${id}/export`), `applicants-${id}.xlsx`).catch((e) => setError(e.message));
 
   // One stage's students (published decisions only): shortlisted, not selected, or everyone decided there.
   const exportStage = (round, decision) => {
     setStageMenu(null);
-    companyDownload(`/company/postings/${id}/rounds/${round.id}/export?decision=${decision}`, `stage-${round.id}-${decision}.xlsx`).catch((e) => setError(e.message));
+    companyDownload(withOrder(`/company/postings/${id}/rounds/${round.id}/export?decision=${decision}`), `stage-${round.id}-${decision}.xlsx`).catch((e) => setError(e.message));
   };
 
   const exportOffers = () =>
@@ -240,6 +258,26 @@ export default function CompanyPostingDetailPage({ params }) {
         </Tabs>
         <CardContent>
           {tab === "applicants" && (
+            <>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} sx={{ mb: 1.5 }}>
+              <TextField
+                select
+                size="small"
+                label="Order"
+                value={cgpaDir ?? "applied"}
+                onChange={(e) => setCgpaDir(e.target.value === "applied" ? null : e.target.value)}
+                sx={{ minWidth: 220 }}
+              >
+                <MenuItem value="applied">Order of applying</MenuItem>
+                <MenuItem value="desc">CGPA: highest first</MenuItem>
+                <MenuItem value="asc">CGPA: lowest first</MenuItem>
+              </TextField>
+              {cgpaDir && (
+                <Typography variant="caption" color="text.secondary">
+                  Downloads use this order too.
+                </Typography>
+              )}
+            </Stack>
             <TableContainer sx={{ maxHeight: 640 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
@@ -247,7 +285,13 @@ export default function CompanyPostingDetailPage({ params }) {
                     <TableCell>Roll Number</TableCell>
                     <TableCell>Name</TableCell>
                     <TableCell>Branch</TableCell>
-                    <TableCell>CGPA</TableCell>
+                    <TableCell sortDirection={cgpaDir ?? false}>
+                      <Tooltip title={cgpaDir === null ? "Sort by CGPA, highest first" : cgpaDir === "desc" ? "Sort by CGPA, lowest first" : "Back to the order of applying"}>
+                        <TableSortLabel active={cgpaDir !== null} direction={cgpaDir ?? "desc"} onClick={() => setCgpaDir(nextCgpaDirection(cgpaDir))}>
+                          CGPA
+                        </TableSortLabel>
+                      </Tooltip>
+                    </TableCell>
                     <TableCell>Backlogs</TableCell>
                     <TableCell>Class X / XII Percentage</TableCell>
                     {share && <TableCell>Contact</TableCell>}
@@ -280,7 +324,7 @@ export default function CompanyPostingDetailPage({ params }) {
                       <TableCell colSpan={8 + (posting.rounds?.length ?? 0)}>No applicants yet.</TableCell>
                     </TableRow>
                   )}
-                  {applicants.map((a) => (
+                  {sortedApplicants.map((a) => (
                     <TableRow key={a.application_id} hover>
                       <TableCell sx={{ fontWeight: 600 }}>{a.roll_no}</TableCell>
                       <TableCell>{a.full_name}</TableCell>
@@ -341,6 +385,7 @@ export default function CompanyPostingDetailPage({ params }) {
                 </TableBody>
               </Table>
             </TableContainer>
+            </>
           )}
 
           {tab === "proposals" && (
